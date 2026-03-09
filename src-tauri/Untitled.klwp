@@ -1,0 +1,52 @@
+{
+  "version": "0.1.0",
+  "name": "Untitled",
+  "resolution": {
+    "width": 1920,
+    "height": 1080
+  },
+  "background": {
+    "type": "color",
+    "value": "#1a1a2e"
+  },
+  "globals": [],
+  "layers": [
+    {
+      "id": "layer_1772993360186_0",
+      "name": "image_1",
+      "type": "image",
+      "properties": {
+        "x": 6.0,
+        "y": 0.0,
+        "width": 1910.0,
+        "height": 1278.0,
+        "opacity": 255.0,
+        "anchor": "top-left",
+        "src": "/home/andason/Pictures/Wallpapers/autumn_leaves_on_wood.jpg",
+        "scaleMode": "fit"
+      },
+      "locked": false,
+      "visible": true
+    },
+    {
+      "id": "layer_1772993438875_1",
+      "name": "text_2",
+      "type": "text",
+      "properties": {
+        "x": 708.0,
+        "y": 260.0,
+        "width": 200.0,
+        "height": 50.0,
+        "opacity": 255.0,
+        "anchor": "top-left",
+        "text": "$df(hh:mm)$",
+        "fontSize": 188.0,
+        "fontFamily": "sans-serif",
+        "color": "#ffffff",
+        "textAlign": "left"
+      },
+      "locked": false,
+      "visible": true
+    }
+  ]
+}

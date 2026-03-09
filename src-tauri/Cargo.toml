@@ -1,0 +1,24 @@
+[package]
+name = "kustomlinux"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+kustom-formula = { path = "../crates/kustom-formula" }
+tokio = { version = "1", features = ["time", "sync"] }
+nix = { version = "0.29", features = ["fs"] }
+chrono = "0.4"
+zip = "2"
+libc = "0.2"
+tauri-plugin-global-shortcut = "2"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[lib]
+name = "kustomlinux_lib"
+crate-type = ["lib", "cdylib", "staticlib"]

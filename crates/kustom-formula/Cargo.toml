@@ -1,0 +1,11 @@
+[package]
+name = "kustom-formula"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+chrono = "0.4"
+regex = "1"
+rand = "0.8"
+
+[dev-dependencies]

@@ -1,0 +1,457 @@
+{
+  "version": "0.1.0",
+  "name": "Desktop Dashboard",
+  "resolution": { "width": 2048, "height": 1280 },
+  "background": { "type": "color", "value": "#0b0e17" },
+  "globals": [
+    { "name": "weather_temp", "type": "text", "value": "72°F" },
+    { "name": "weather_condition", "type": "text", "value": "Partly Cloudy" },
+    { "name": "weather_hi", "type": "text", "value": "78°" },
+    { "name": "weather_lo", "type": "text", "value": "61°" },
+    { "name": "music_title", "type": "text", "value": "Midnight City" },
+    { "name": "music_artist", "type": "text", "value": "M83" },
+    { "name": "music_album", "type": "text", "value": "Hurry Up, We're Dreaming" },
+    { "name": "music_progress", "type": "number", "value": 35 },
+    { "name": "news_1", "type": "text", "value": "Technology sector sees record growth in Q1 2026" },
+    { "name": "news_2", "type": "text", "value": "New open-source AI models challenge proprietary alternatives" },
+    { "name": "news_3", "type": "text", "value": "Linux desktop market share reaches new milestone" },
+    { "name": "news_source", "type": "text", "value": "Tech News" }
+  ],
+  "layers": [
+    {
+      "id": "bg_gradient_top",
+      "name": "Gradient Top",
+      "type": "shape",
+      "properties": {
+        "x": 0, "y": 0,
+        "width": 2048, "height": 400,
+        "shapeKind": "rectangle",
+        "fill": "#0b0e1780",
+        "opacity": 200
+      },
+      "visible": true
+    },
+    {
+      "id": "bg_gradient_bottom",
+      "name": "Gradient Bottom",
+      "type": "shape",
+      "properties": {
+        "x": 0, "y": 980,
+        "width": 2048, "height": 300,
+        "shapeKind": "rectangle",
+        "fill": "#00000090",
+        "opacity": 200
+      },
+      "visible": true
+    },
+
+    {
+      "id": "clock_group",
+      "name": "Clock",
+      "type": "overlap",
+      "properties": {
+        "x": 120, "y": 320,
+        "width": 800, "height": 500
+      },
+      "visible": true,
+      "children": [
+        {
+          "id": "clock_time",
+          "name": "Time",
+          "type": "text",
+          "properties": {
+            "x": 0, "y": 0,
+            "width": 700, "height": 220,
+            "text": "$df(HH:mm)$",
+            "fontSize": 180,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left",
+            "opacity": 255,
+            "shadow": { "color": "#00000060", "dx": 2, "dy": 4, "radius": 10 }
+          },
+          "visible": true
+        },
+        {
+          "id": "clock_seconds",
+          "name": "Seconds",
+          "type": "text",
+          "properties": {
+            "x": 0, "y": 200,
+            "width": 200, "height": 60,
+            "text": "$df(ss)$",
+            "fontSize": 48,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff40",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "clock_divider",
+          "name": "Divider",
+          "type": "shape",
+          "properties": {
+            "x": 0, "y": 275,
+            "width": 80, "height": 3,
+            "shapeKind": "rectangle",
+            "fill": "#4a9eff",
+            "cornerRadius": 2
+          },
+          "visible": true
+        },
+        {
+          "id": "clock_day",
+          "name": "Day of Week",
+          "type": "text",
+          "properties": {
+            "x": 0, "y": 295,
+            "width": 700, "height": 50,
+            "text": "$df(EEEE)$",
+            "fontSize": 36,
+            "fontFamily": "sans-serif",
+            "color": "#4a9eff",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "clock_date",
+          "name": "Date",
+          "type": "text",
+          "properties": {
+            "x": 0, "y": 345,
+            "width": 700, "height": 45,
+            "text": "$df(MMMM d, yyyy)$",
+            "fontSize": 28,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff80",
+            "textAlign": "left"
+          },
+          "visible": true
+        }
+      ]
+    },
+
+    {
+      "id": "weather_group",
+      "name": "Weather",
+      "type": "overlap",
+      "properties": {
+        "x": 1500, "y": 80,
+        "width": 460, "height": 280
+      },
+      "visible": true,
+      "children": [
+        {
+          "id": "weather_bg",
+          "name": "Weather BG",
+          "type": "shape",
+          "properties": {
+            "x": 0, "y": 0,
+            "width": 460, "height": 280,
+            "shapeKind": "rectangle",
+            "fill": "#ffffff08",
+            "cornerRadius": 20,
+            "stroke": "#ffffff10",
+            "strokeWidth": 1
+          },
+          "visible": true
+        },
+        {
+          "id": "weather_temp_text",
+          "name": "Temperature",
+          "type": "text",
+          "properties": {
+            "x": 30, "y": 30,
+            "width": 300, "height": 100,
+            "text": "$gv(weather_temp)$",
+            "fontSize": 72,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "weather_condition_text",
+          "name": "Condition",
+          "type": "text",
+          "properties": {
+            "x": 30, "y": 130,
+            "width": 400, "height": 40,
+            "text": "$gv(weather_condition)$",
+            "fontSize": 24,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff90",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "weather_hilo",
+          "name": "Hi / Lo",
+          "type": "text",
+          "properties": {
+            "x": 30, "y": 180,
+            "width": 400, "height": 30,
+            "text": "H: $gv(weather_hi)$  L: $gv(weather_lo)$",
+            "fontSize": 18,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff50",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "weather_label",
+          "name": "Weather Label",
+          "type": "text",
+          "properties": {
+            "x": 30, "y": 230,
+            "width": 400, "height": 25,
+            "text": "WEATHER",
+            "fontSize": 11,
+            "fontFamily": "sans-serif",
+            "color": "#4a9eff60",
+            "textAlign": "left"
+          },
+          "visible": true
+        }
+      ]
+    },
+
+    {
+      "id": "music_group",
+      "name": "Music Player",
+      "type": "overlap",
+      "properties": {
+        "x": 1500, "y": 420,
+        "width": 460, "height": 520
+      },
+      "visible": true,
+      "children": [
+        {
+          "id": "music_bg",
+          "name": "Music BG",
+          "type": "shape",
+          "properties": {
+            "x": 0, "y": 0,
+            "width": 460, "height": 520,
+            "shapeKind": "rectangle",
+            "fill": "#ffffff08",
+            "cornerRadius": 20,
+            "stroke": "#ffffff10",
+            "strokeWidth": 1
+          },
+          "visible": true
+        },
+        {
+          "id": "music_art_bg",
+          "name": "Album Art Placeholder",
+          "type": "shape",
+          "properties": {
+            "x": 30, "y": 30,
+            "width": 400, "height": 300,
+            "shapeKind": "rectangle",
+            "fill": "#1a1f30",
+            "cornerRadius": 12
+          },
+          "visible": true
+        },
+        {
+          "id": "music_art_icon",
+          "name": "Music Icon",
+          "type": "text",
+          "properties": {
+            "x": 30, "y": 120,
+            "width": 400, "height": 100,
+            "text": "♫",
+            "fontSize": 80,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff15",
+            "textAlign": "center"
+          },
+          "visible": true
+        },
+        {
+          "id": "music_title_text",
+          "name": "Song Title",
+          "type": "text",
+          "properties": {
+            "x": 30, "y": 350,
+            "width": 400, "height": 40,
+            "text": "$gv(music_title)$",
+            "fontSize": 26,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "music_artist_text",
+          "name": "Artist",
+          "type": "text",
+          "properties": {
+            "x": 30, "y": 390,
+            "width": 400, "height": 30,
+            "text": "$gv(music_artist)$",
+            "fontSize": 18,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff60",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "music_album_text",
+          "name": "Album",
+          "type": "text",
+          "properties": {
+            "x": 30, "y": 418,
+            "width": 400, "height": 25,
+            "text": "$gv(music_album)$",
+            "fontSize": 14,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff35",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "music_progress_bar",
+          "name": "Progress Bar",
+          "type": "progress",
+          "properties": {
+            "x": 30, "y": 460,
+            "width": 400, "height": 20,
+            "style": "bar",
+            "min": 0,
+            "max": 100,
+            "value": "$gv(music_progress)$",
+            "color": "#4a9eff",
+            "trackColor": "#ffffff15",
+            "strokeWidth": 4
+          },
+          "visible": true
+        }
+      ]
+    },
+
+    {
+      "id": "news_group",
+      "name": "News Feed",
+      "type": "overlap",
+      "properties": {
+        "x": 80, "y": 1050,
+        "width": 1350, "height": 180
+      },
+      "visible": true,
+      "children": [
+        {
+          "id": "news_bg",
+          "name": "News BG",
+          "type": "shape",
+          "properties": {
+            "x": 0, "y": 0,
+            "width": 1350, "height": 180,
+            "shapeKind": "rectangle",
+            "fill": "#ffffff06",
+            "cornerRadius": 16,
+            "stroke": "#ffffff08",
+            "strokeWidth": 1
+          },
+          "visible": true
+        },
+        {
+          "id": "news_label",
+          "name": "NEWS Label",
+          "type": "text",
+          "properties": {
+            "x": 25, "y": 18,
+            "width": 200, "height": 20,
+            "text": "NEWS",
+            "fontSize": 11,
+            "fontFamily": "sans-serif",
+            "color": "#4a9eff80",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_source_text",
+          "name": "Source",
+          "type": "text",
+          "properties": {
+            "x": 80, "y": 16,
+            "width": 300, "height": 22,
+            "text": "$gv(news_source)$",
+            "fontSize": 12,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff30",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_divider",
+          "name": "News Divider",
+          "type": "shape",
+          "properties": {
+            "x": 25, "y": 42,
+            "width": 1300, "height": 1,
+            "shapeKind": "rectangle",
+            "fill": "#ffffff10"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_headline_1",
+          "name": "Headline 1",
+          "type": "text",
+          "properties": {
+            "x": 25, "y": 52,
+            "width": 1300, "height": 30,
+            "text": "• $gv(news_1)$",
+            "fontSize": 18,
+            "fontFamily": "sans-serif",
+            "color": "#ffffffcc",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_headline_2",
+          "name": "Headline 2",
+          "type": "text",
+          "properties": {
+            "x": 25, "y": 90,
+            "width": 1300, "height": 30,
+            "text": "• $gv(news_2)$",
+            "fontSize": 18,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff90",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_headline_3",
+          "name": "Headline 3",
+          "type": "text",
+          "properties": {
+            "x": 25, "y": 128,
+            "width": 1300, "height": 30,
+            "text": "• $gv(news_3)$",
+            "fontSize": 18,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff60",
+            "textAlign": "left"
+          },
+          "visible": true
+        }
+      ]
+    }
+  ]
+}

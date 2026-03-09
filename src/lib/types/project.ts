@@ -1,0 +1,203 @@
+export type LayerType = "text" | "shape" | "image" | "group" | "stack" | "overlap" | "progress" | "fonticon";
+
+export type ShapeKind = "rectangle" | "circle" | "oval" | "triangle" | "arc";
+
+export type AnchorPoint = "center" | "top-left" | "top-center" | "top-right" | "center-left" | "center-right" | "bottom-left" | "bottom-center" | "bottom-right";
+
+export type AnimationTrigger = "time" | "scroll" | "reactive" | "tap" | "show";
+
+export type AnimationType = "fade" | "rotate" | "scale" | "translate" | "color" | "blur";
+
+export type EasingType = "linear" | "ease-in" | "ease-out" | "ease-in-out" | "bounce" | "elastic";
+
+export type GlobalVarType = "text" | "number" | "color" | "switch" | "list";
+
+export interface GlobalVariable {
+  name: string;
+  type: GlobalVarType;
+  value: string | number | boolean;
+  options?: string[];
+}
+
+export interface Shadow {
+  color: string;
+  dx: number;
+  dy: number;
+  radius: number;
+}
+
+export interface Animation {
+  type: AnimationType;
+  trigger: AnimationTrigger;
+  rule: string;
+  amount: number;
+  speed?: number;
+  easing?: EasingType;
+  delay?: number;
+  loop?: "none" | "restart" | "reverse";
+}
+
+export interface LayerProperties {
+  x: number | string;
+  y: number | string;
+  width: number | string;
+  height: number | string;
+  rotation?: number | string;
+  scaleX?: number | string;
+  scaleY?: number | string;
+  opacity?: number | string;
+  anchor?: AnchorPoint;
+  visible?: boolean | string;
+
+  // Text
+  text?: string;
+  fontSize?: number | string;
+  fontFamily?: string;
+  color?: string;
+  textAlign?: "left" | "center" | "right";
+  maxLines?: number;
+  lineSpacing?: number;
+  shadow?: Shadow;
+
+  // Shape
+  shapeKind?: ShapeKind;
+  fill?: string;
+  stroke?: string;
+  strokeWidth?: number;
+  cornerRadius?: number;
+
+  // Image
+  src?: string;
+  scaleMode?: "fit" | "fill" | "crop" | "stretch";
+  tint?: string;
+
+  // Progress
+  style?: "arc" | "bar" | "circle";
+  min?: number;
+  max?: number;
+  value?: number | string;
+  trackColor?: string;
+
+  // FontIcon
+  iconSet?: string;
+  glyphCode?: string;
+
+  // Stack/Group
+  orientation?: "horizontal" | "vertical";
+  spacing?: number;
+}
+
+export interface Layer {
+  id: string;
+  name: string;
+  type: LayerType;
+  properties: LayerProperties;
+  animations?: Animation[];
+  children?: Layer[];
+  locked?: boolean;
+  visible?: boolean;
+}
+
+export interface Project {
+  version: string;
+  name: string;
+  resolution: { width: number; height: number };
+  background: { type: "color" | "image"; value: string };
+  globals: GlobalVariable[];
+  layers: Layer[];
+  assetDir?: string;
+}
+
+export function createDefaultProject(): Project {
+  return {
+    version: "0.1.0",
+    name: "Untitled",
+    resolution: { width: 1920, height: 1080 },
+    background: { type: "color", value: "#1a1a2e" },
+    globals: [],
+    layers: [],
+  };
+}
+
+let nextId = 0;
+export function generateId(): string {
+  return `layer_${Date.now()}_${nextId++}`;
+}
+
+export function createLayer(type: LayerType, name: string): Layer {
+  const base: Layer = {
+    id: generateId(),
+    name,
+    type,
+    properties: {
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 50,
+      opacity: 255,
+      anchor: "top-left",
+    },
+    visible: true,
+    locked: false,
+  };
+
+  switch (type) {
+    case "text":
+      base.properties.text = "Hello";
+      base.properties.fontSize = 24;
+      base.properties.fontFamily = "sans-serif";
+      base.properties.color = "#ffffff";
+      base.properties.textAlign = "left";
+      break;
+    case "shape":
+      base.properties.shapeKind = "rectangle";
+      base.properties.fill = "#e94560";
+      base.properties.width = 200;
+      base.properties.height = 200;
+      break;
+    case "image":
+      base.properties.src = "";
+      base.properties.scaleMode = "fit";
+      base.properties.width = 200;
+      base.properties.height = 200;
+      break;
+    case "progress":
+      base.properties.style = "arc";
+      base.properties.min = 0;
+      base.properties.max = 100;
+      base.properties.value = 50;
+      base.properties.color = "#e94560";
+      base.properties.trackColor = "#ffffff20";
+      base.properties.strokeWidth = 6;
+      base.properties.width = 80;
+      base.properties.height = 80;
+      break;
+    case "group":
+      base.children = [];
+      base.properties.width = 400;
+      base.properties.height = 400;
+      break;
+    case "stack":
+      base.children = [];
+      base.properties.orientation = "vertical";
+      base.properties.spacing = 0;
+      base.properties.width = 400;
+      base.properties.height = 400;
+      break;
+    case "overlap":
+      base.children = [];
+      base.properties.width = 400;
+      base.properties.height = 400;
+      break;
+    case "fonticon":
+      base.properties.iconSet = "material";
+      base.properties.glyphCode = "e88a";
+      base.properties.color = "#ffffff";
+      base.properties.fontSize = 48;
+      base.properties.width = 60;
+      base.properties.height = 60;
+      break;
+  }
+
+  return base;
+}

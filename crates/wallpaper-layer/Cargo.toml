@@ -1,0 +1,13 @@
+[package]
+name = "klwp-wallpaper"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "klwp-wallpaper"
+path = "src/main.rs"
+
+[dependencies]
+gtk = "0.18"
+gtk-layer-shell = "0.8"
+webkit2gtk = "2.0"

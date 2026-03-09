@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/kustom-formula", "crates/wallpaper-layer", "src-tauri"]
+resolver = "2"

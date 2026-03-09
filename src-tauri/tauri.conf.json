@@ -1,0 +1,30 @@
+{
+  "productName": "KustomLinux",
+  "version": "0.1.0",
+  "identifier": "com.kustomlinux.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "cargo build -p klwp-wallpaper && pnpm dev",
+    "beforeBuildCommand": "cargo build -p klwp-wallpaper --release && pnpm build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "KustomLinux Editor",
+        "width": 1400,
+        "height": 900,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
+    }
+  },
+  "plugins": {}
+}
