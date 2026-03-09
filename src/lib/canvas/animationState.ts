@@ -5,6 +5,10 @@ export interface LayerAnimState {
 
 const layerStates = new Map<string, LayerAnimState>();
 
+// Track which layers were rendered this frame vs last frame
+let renderedThisFrame = new Set<string>();
+let renderedLastFrame = new Set<string>();
+
 // Global input state
 let scrollX = 0;
 let engineStartTime: number | null = null;
@@ -36,9 +40,19 @@ export function getLayerAnimState(layerId: string): LayerAnimState {
 
 export function markLayerSeen(layerId: string, timestamp: number) {
   const state = getLayerAnimState(layerId);
-  if (state.firstSeenTime === null) {
+  renderedThisFrame.add(layerId);
+  // If layer wasn't rendered last frame, reset firstSeenTime so "show" replays
+  if (!renderedLastFrame.has(layerId)) {
+    state.firstSeenTime = timestamp;
+  } else if (state.firstSeenTime === null) {
     state.firstSeenTime = timestamp;
   }
+}
+
+/** Call at the start of each render frame to begin tracking */
+export function beginFrame() {
+  renderedLastFrame = renderedThisFrame;
+  renderedThisFrame = new Set<string>();
 }
 
 export function triggerTap(layerId: string, timestamp: number) {

@@ -8,6 +8,7 @@ export interface AnimatedDeltas {
   dy: number;
   dRotation: number;
   opacityMultiplier: number;
+  opacityOverride: number | null; // absolute 0-255 opacity (overrides base)
   scaleX: number;
   scaleY: number;
   blur: number;
@@ -20,6 +21,7 @@ function emptyDeltas(): AnimatedDeltas {
     dy: 0,
     dRotation: 0,
     opacityMultiplier: 1,
+    opacityOverride: null,
     scaleX: 1,
     scaleY: 1,
     blur: 0,
@@ -93,14 +95,19 @@ function applyLoop(cycles: number, mode: "none" | "restart" | "reverse"): number
 }
 
 /** Apply a single animation's effect to the accumulated deltas */
-function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDeltas) {
+function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDeltas, trigger: string) {
   const t = applyEasing(progress, anim.easing || "linear");
   const amount = anim.amount;
 
   switch (anim.type) {
     case "fade":
-      // amount is target opacity fraction (e.g. 0 = fade to invisible)
-      deltas.opacityMultiplier *= 1 - t * (1 - amount / 255);
+      // For show/tap triggers: fade IN from 0 to amount (absolute opacity)
+      // For other triggers: fade as multiplier toward amount/255
+      if (trigger === "show" || trigger === "tap") {
+        deltas.opacityOverride = (amount / 255) * t * 255;
+      } else {
+        deltas.opacityMultiplier *= 1 - t * (1 - amount / 255);
+      }
       break;
 
     case "rotate":
@@ -143,7 +150,7 @@ export function computeAnimatedDeltas(layer: Layer, timestamp: number): Animated
   for (const anim of layer.animations) {
     const progress = computeProgress(anim, layer.id, timestamp);
     if (progress === null) continue;
-    applyAnimation(anim, progress, deltas);
+    applyAnimation(anim, progress, deltas, anim.trigger);
   }
 
   return deltas;

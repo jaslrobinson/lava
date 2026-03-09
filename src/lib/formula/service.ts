@@ -967,6 +967,14 @@ export function invalidateGlobalsFormulas() {
  * Call after changing a global variable to avoid 1-second stale visibility.
  */
 export function flushGlobalsNow(globals: Record<string, string>) {
+  // Re-evaluate all cached formulas that depend on globals (not just pending ones)
+  for (const key of [...cache.keys()]) {
+    if (key.includes("gv(") || key.includes("if(")) {
+      cache.set(key, evaluateClientSide(key, globals));
+      pending.delete(key);
+    }
+  }
+  // Also flush any remaining pending global-dependent formulas
   for (const key of [...pending]) {
     if (key.includes("gv(") || key.includes("if(")) {
       cache.set(key, evaluateClientSide(key, globals));

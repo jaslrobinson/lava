@@ -1,7 +1,7 @@
 import type { Project, Layer } from "../types/project";
 import { resolveFormula, hasFormula } from "../formula/service";
 import { computeAnimatedDeltas } from "./animationEngine";
-import { initEngineTime, markLayerSeen } from "./animationState";
+import { initEngineTime, markLayerSeen, beginFrame } from "./animationState";
 
 // Detect if we're running inside Tauri (vs plain WebKitGTK wallpaper view)
 const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
@@ -136,6 +136,7 @@ export function getLayerBounds(): Map<string, LayerBounds> {
 }
 
 export function renderProject(ctx: CanvasRenderingContext2D, project: Project, selectedId: string | null, timestamp: number = 0) {
+  beginFrame();
   initEngineTime(timestamp);
   const { width, height } = project.resolution;
   const container: ContainerSize = { width, height };
@@ -248,7 +249,9 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
   const offsetY = resolveNumber(props.y, 0) + deltas.dy;
   const w = resolveNumber(props.width, 0);
   const h = resolveNumber(props.height, 0);
-  const opacity = (resolveNumber(props.opacity, 255) / 255) * deltas.opacityMultiplier;
+  const opacity = deltas.opacityOverride !== null
+    ? (deltas.opacityOverride / 255) * deltas.opacityMultiplier
+    : (resolveNumber(props.opacity, 255) / 255) * deltas.opacityMultiplier;
   const rotation = resolveNumber(props.rotation, 0) + deltas.dRotation;
 
   // Anchor-based positioning (local to container)
