@@ -97,7 +97,10 @@ function getCachedImage(src: string): HTMLImageElement | null {
 
   imageLoadingSet.add(resolved);
   const img = new Image();
-  img.crossOrigin = "anonymous";
+  // Only set crossOrigin for local/asset URLs, not external (avoids CORS failures)
+  if (!resolved.startsWith("http")) {
+    img.crossOrigin = "anonymous";
+  }
   img.onload = () => {
     imageCache.set(resolved, img);
     imageLoadingSet.delete(resolved);
@@ -160,7 +163,7 @@ export function renderProject(ctx: CanvasRenderingContext2D, project: Project, s
   }
 
   for (const layer of project.layers) {
-    if (layer.visible === false) continue;
+    if (!isLayerVisible(layer)) continue;
     renderLayer(ctx, layer, container, 0, 0, timestamp);
   }
 
@@ -176,8 +179,8 @@ function isLayerVisible(layer: Layer): boolean {
   const vis = layer.properties.visible;
   if (vis === undefined || vis === true) return true;
   if (vis === false) return false;
-  // Formula-driven visibility: "always", "never", "remove", or a formula
-  const resolved = resolve(vis as any, "always");
+  // Formula-driven visibility: "ALWAYS", "NEVER", "REMOVE", or a formula
+  const resolved = resolve(vis as any, "always").trim().toLowerCase();
   if (resolved === "never" || resolved === "remove" || resolved === "0" || resolved === "false") return false;
   return true;
 }

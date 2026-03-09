@@ -6,6 +6,7 @@ pub mod network;
 pub mod resource_monitor;
 pub mod sysinfo_provider;
 pub mod traffic;
+pub mod weather;
 
 use std::collections::HashMap;
 use std::time::Duration;

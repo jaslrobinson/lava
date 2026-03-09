@@ -16,6 +16,7 @@ zip = "2"
 libc = "0.2"
 tauri-plugin-global-shortcut = "2"
 dirs = "5"
+ureq = { version = "2", features = ["json"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

@@ -1,6 +1,17 @@
 <script lang="ts">
   import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType } from "../stores/project.svelte";
   import type { LayerType, Project } from "../types/project";
+  import { createDefaultProject } from "../types/project";
+
+  async function handleNew() {
+    if (getIsDirty()) {
+      const confirmed = confirm("You have unsaved changes. Save before creating a new project?");
+      if (confirmed) {
+        await handleSave();
+      }
+    }
+    setProject(createDefaultProject());
+  }
 
   async function handleSave() {
     try {
@@ -153,6 +164,9 @@
     {#if importStatus}
       <span class="import-status">{importStatus}</span>
     {/if}
+    <button class="toolbar-btn" title="New project" onclick={handleNew}>
+      <span class="btn-label">New</span>
+    </button>
     <button class="toolbar-btn" title="Open project" onclick={handleLoad}>
       <span class="btn-label">Open</span>
     </button>

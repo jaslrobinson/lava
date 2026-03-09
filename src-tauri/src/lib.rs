@@ -89,6 +89,9 @@ pub fn run() {
             manager.register(Box::new(providers::music::MusicProvider));
             manager.register(Box::new(providers::network::NetworkProvider));
             manager.register(Box::new(providers::traffic::TrafficProvider::new()));
+            let (weather, forecast) = providers::weather::create_providers();
+            manager.register(Box::new(weather));
+            manager.register(Box::new(forecast));
 
             let data = manager.data();
             app.manage(data);

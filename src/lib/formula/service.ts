@@ -552,11 +552,52 @@ function evaluateCm(argsStr: string): string {
 }
 
 /** Evaluate $if(cond, then, else)$ — conditional */
-function evaluateIf(argsStr: string, _globals: Record<string, string>): string {
+function evaluateIf(argsStr: string, globals: Record<string, string>): string {
   const args = splitArgs(argsStr);
-  const cond = args[0] ?? "";
-  const isTruthy = cond !== "" && cond !== "0" && cond !== "false";
-  return isTruthy ? (args[1] ?? "") : (args[2] ?? "");
+  const rawCond = args[0] ?? "";
+
+  // Evaluate any nested formulas in the condition first
+  const cond = resolveInnerFormulas(rawCond, globals);
+
+  // Check for comparison operators: =, !=, <, >, <=, >=
+  let isTruthy = false;
+  const cmpMatch = cond.match(/^(.+?)\s*(!=|<=|>=|=|<|>)\s*(.+)$/);
+  if (cmpMatch) {
+    let [, left, op, right] = cmpMatch;
+    left = left.trim();
+    right = right.trim();
+    const numL = parseFloat(left);
+    const numR = parseFloat(right);
+    const isNumeric = !isNaN(numL) && !isNaN(numR);
+
+    switch (op) {
+      case "=":
+        isTruthy = isNumeric ? numL === numR : left === right;
+        break;
+      case "!=":
+        isTruthy = isNumeric ? numL !== numR : left !== right;
+        break;
+      case "<":
+        isTruthy = isNumeric ? numL < numR : left < right;
+        break;
+      case ">":
+        isTruthy = isNumeric ? numL > numR : left > right;
+        break;
+      case "<=":
+        isTruthy = isNumeric ? numL <= numR : left <= right;
+        break;
+      case ">=":
+        isTruthy = isNumeric ? numL >= numR : left >= right;
+        break;
+    }
+  } else {
+    isTruthy = cond !== "" && cond !== "0" && cond !== "false";
+  }
+
+  // Also resolve inner formulas in the result values
+  const trueVal = args[1] ?? "";
+  const falseVal = args[2] ?? "";
+  return isTruthy ? trueVal : falseVal;
 }
 
 /** Evaluate $fl(init, stop, incr, body, sep)$ — for loop */
@@ -606,7 +647,7 @@ function evalArithmetic(expr: string): string {
 function resolveInnerFormulas(argsStr: string, globals: Record<string, string>): string {
   // Match innermost function calls (no nested parens in args)
   // Exclude lv() — it's resolved by fl() during loop iteration
-  const pattern = /\b(df|gv|wg|tf|dp|tu|mu|tc|ce|cm|fl|if|bi|mi|ai|rm|ts|ni|si)\(([^()]*)\)/;
+  const pattern = /\b(df|gv|wg|tf|dp|tu|mu|tc|ce|cm|fl|if|bi|mi|ai|rm|ts|ni|si|wi|wf)\(([^()]*)\)/;
   let result = argsStr;
   let safety = 50;
 
@@ -719,13 +760,16 @@ function evaluateClientSide(formula: string, globals: Record<string, string>): s
     return evaluateFl(flMatch[1], globals);
   }
 
-  // Provider formulas: mi(field), bi(field), ai(field), rm(field), ts(field), nc(field), si(field), wi(field)
+  // Provider formulas: mi(field), bi(field), wi(field), wf(day, field), etc.
   const providerMatch = inner.match(/^([a-z]{2})\((.+)\)$/);
   if (providerMatch) {
-    const [, prefix, field] = providerMatch;
+    const [, prefix, argsStr] = providerMatch;
     const provider = providerData[prefix];
     if (provider) {
-      return provider[field.trim()] ?? "";
+      const parts = argsStr.split(",").map((s) => s.trim());
+      // Multi-arg: join with "_" (e.g. wf(0, temp) -> "0_temp")
+      const key = parts.length > 1 ? parts.join("_") : parts[0];
+      return provider[key] ?? "";
     }
   }
 
@@ -865,7 +909,7 @@ export function startFormulaLoop(getGlobals: () => Record<string, string>) {
 
     // Queue time-dependent and web-get formulas for re-evaluation
     for (const [key] of cache) {
-      if (key.match(/\b(df|dp|tf|tu|ai|mi|bi|rm|ts|wg|gv|mu)\(/)) {
+      if (key.match(/\b(df|dp|tf|tu|ai|mi|bi|rm|ts|wg|gv|mu|wi|wf)\(/)) {
         pending.add(key);
       }
     }

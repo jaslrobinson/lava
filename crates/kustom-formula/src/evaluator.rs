@@ -82,8 +82,14 @@ impl EvalContext {
                 if name.len() >= 2 {
                     let prefix = &name[..2];
                     if let Some(provider) = self.providers.get(prefix) {
-                        // Provider function: look up the first arg as a key
-                        if let Some(arg) = args.first() {
+                        if args.len() >= 2 {
+                            // Multi-arg provider: join args with "_" (e.g. wf(0, temp) -> "0_temp")
+                            let parts: Vec<String> = args.iter()
+                                .map(|a| self.evaluate(a).as_text())
+                                .collect();
+                            let key = parts.join("_");
+                            return provider.get(&key).cloned().unwrap_or(Value::None);
+                        } else if let Some(arg) = args.first() {
                             let key = self.evaluate(arg).as_text();
                             return provider.get(&key).cloned().unwrap_or(Value::None);
                         }

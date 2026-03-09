@@ -235,6 +235,13 @@ export function removeGlobal(name: string) {
   isDirty = true;
 }
 
+/** Insert a fully-constructed layer tree (widget preset) into the project */
+export function insertWidget(layer: Layer) {
+  project.layers = [...project.layers, layer];
+  selectedLayerId = layer.id;
+  isDirty = true;
+}
+
 export function updateGlobal(name: string, field: string, value: any) {
   project.globals = project.globals.map(g => {
     if (g.name !== name) return g;

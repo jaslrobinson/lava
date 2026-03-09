@@ -4,6 +4,7 @@
   import ShortcutsPanel from "./ShortcutsPanel.svelte";
   import BackgroundPanel from "./BackgroundPanel.svelte";
   import SettingsPanel from "./SettingsPanel.svelte";
+  import WidgetsPanel from "./WidgetsPanel.svelte";
 
   let activeTab = $state("layers");
 </script>
@@ -29,6 +30,10 @@
       onclick={() => { activeTab = "background"; }}
     >BG</span>
     <span
+      style="flex: 1; padding: 6px 2px 4px; text-align: center; cursor: pointer; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; border-bottom: 2px solid {activeTab === 'widgets' ? 'var(--accent)' : 'transparent'}; color: {activeTab === 'widgets' ? 'var(--accent)' : 'var(--text-muted)'};"
+      onclick={() => { activeTab = "widgets"; }}
+    >Widgets</span>
+    <span
       style="flex: 1; padding: 6px 2px 4px; text-align: center; cursor: pointer; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; border-bottom: 2px solid {activeTab === 'settings' ? 'var(--accent)' : 'transparent'}; color: {activeTab === 'settings' ? 'var(--accent)' : 'var(--text-muted)'};"
       onclick={() => { activeTab = "settings"; }}
     >&#9881;</span>
@@ -43,6 +48,8 @@
       <ShortcutsPanel />
     {:else if activeTab === "background"}
       <BackgroundPanel />
+    {:else if activeTab === "widgets"}
+      <WidgetsPanel />
     {:else if activeTab === "settings"}
       <SettingsPanel />
     {/if}
