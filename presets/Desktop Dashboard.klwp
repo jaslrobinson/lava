@@ -1,0 +1,1050 @@
+{
+  "version": "0.1.0",
+  "name": "Desktop Dashboard",
+  "resolution": {
+    "width": 2048,
+    "height": 1280
+  },
+  "background": {
+    "type": "image",
+    "value": "/home/andason/Pictures/Wallpapers/thunderstorm-sea.webp"
+  },
+  "globals": [
+    {
+      "name": "weather_temp",
+      "type": "text",
+      "value": "$wi(temp)$"
+    },
+    {
+      "name": "weather_condition",
+      "type": "text",
+      "value": "$wi(cond)$"
+    },
+    {
+      "name": "weather_hi",
+      "type": "text",
+      "value": "$wf(0, max)$"
+    },
+    {
+      "name": "weather_lo",
+      "type": "text",
+      "value": "$wf(0, min)$"
+    },
+    {
+      "name": "music_title",
+      "type": "text",
+      "value": "$mi(title)$"
+    },
+    {
+      "name": "music_artist",
+      "type": "text",
+      "value": "$mi(artist)$"
+    },
+    {
+      "name": "music_album",
+      "type": "text",
+      "value": "$mi(album)$"
+    },
+    {
+      "name": "music_progress",
+      "type": "text",
+      "value": "$mi(pos)$"
+    },
+    {
+      "name": "news_1",
+      "type": "text",
+      "value": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, feed, gv(timer))$"
+    },
+    {
+      "name": "news_2",
+      "type": "text",
+      "value": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, feed, gv(timer)-1)$"
+    },
+    {
+      "name": "news_3",
+      "type": "text",
+      "value": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, feed, gv(timer)-2)$"
+    },
+    {
+      "name": "news_source",
+      "type": "text",
+      "value": "Tech News"
+    },
+    {
+      "name": "timer",
+      "type": "text",
+      "value": " $mu(mod, mu(floor, mu(div, dp(s), 5)), 30)$"
+    }
+  ],
+  "layers": [
+    {
+      "id": "bg_gradient_top",
+      "name": "Gradient Top",
+      "type": "shape",
+      "properties": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 2048.0,
+        "height": 400.0,
+        "opacity": 200.0,
+        "shapeKind": "rectangle",
+        "fill": "#0b0e1780"
+      },
+      "visible": true
+    },
+    {
+      "id": "bg_gradient_bottom",
+      "name": "Gradient Bottom",
+      "type": "shape",
+      "properties": {
+        "x": 0.0,
+        "y": 980.0,
+        "width": 2048.0,
+        "height": 300.0,
+        "opacity": 200.0,
+        "shapeKind": "rectangle",
+        "fill": "#00000090"
+      },
+      "visible": true
+    },
+    {
+      "id": "clock_group",
+      "name": "Clock",
+      "type": "overlap",
+      "properties": {
+        "x": 120.0,
+        "y": 356.0,
+        "width": 800.0,
+        "height": 500.0
+      },
+      "children": [
+        {
+          "id": "clock_time",
+          "name": "Time",
+          "type": "text",
+          "properties": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 700.0,
+            "height": 220.0,
+            "opacity": 255.0,
+            "text": "$df(HH:mm)$",
+            "fontSize": 180.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left",
+            "shadow": {
+              "color": "#00000060",
+              "dx": 2.0,
+              "dy": 4.0,
+              "radius": 10.0
+            }
+          },
+          "visible": true
+        },
+        {
+          "id": "clock_seconds",
+          "name": "Seconds",
+          "type": "text",
+          "properties": {
+            "x": 0.0,
+            "y": 200.0,
+            "width": 200.0,
+            "height": 60.0,
+            "text": "$df(ss)$",
+            "fontSize": 48.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff40",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "clock_divider",
+          "name": "Divider",
+          "type": "shape",
+          "properties": {
+            "x": 0.0,
+            "y": 275.0,
+            "width": 80.0,
+            "height": 3.0,
+            "shapeKind": "rectangle",
+            "fill": "#4a9eff",
+            "cornerRadius": 2.0
+          },
+          "visible": true
+        },
+        {
+          "id": "clock_day",
+          "name": "Day of Week",
+          "type": "text",
+          "properties": {
+            "x": 0.0,
+            "y": 295.0,
+            "width": 700.0,
+            "height": 50.0,
+            "text": "$df(EEEE)$",
+            "fontSize": 36.0,
+            "fontFamily": "sans-serif",
+            "color": "#4a9eff",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "clock_date",
+          "name": "Date",
+          "type": "text",
+          "properties": {
+            "x": 0.0,
+            "y": 345.0,
+            "width": 700.0,
+            "height": 45.0,
+            "text": "$df(MMMM d, yyyy)$",
+            "fontSize": 28.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff80",
+            "textAlign": "left"
+          },
+          "visible": true
+        }
+      ],
+      "visible": true
+    },
+    {
+      "id": "weather_group",
+      "name": "Weather",
+      "type": "overlap",
+      "properties": {
+        "x": 1500.0,
+        "y": 80.0,
+        "width": 460.0,
+        "height": 280.0
+      },
+      "children": [
+        {
+          "id": "weather_bg",
+          "name": "Weather BG",
+          "type": "shape",
+          "properties": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 460.0,
+            "height": 280.0,
+            "shapeKind": "rectangle",
+            "fill": "#ffffff08",
+            "stroke": "#ffffff10",
+            "strokeWidth": 1.0,
+            "cornerRadius": 20.0
+          },
+          "visible": true
+        },
+        {
+          "id": "weather_temp_text",
+          "name": "Temperature",
+          "type": "text",
+          "properties": {
+            "x": 30.0,
+            "y": 30.0,
+            "width": 300.0,
+            "height": 100.0,
+            "text": "$gv(weather_temp)$",
+            "fontSize": 72.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "weather_condition_text",
+          "name": "Condition",
+          "type": "text",
+          "properties": {
+            "x": 30.0,
+            "y": 130.0,
+            "width": 400.0,
+            "height": 40.0,
+            "text": "$gv(weather_condition)$",
+            "fontSize": 24.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff90",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "weather_hilo",
+          "name": "Hi / Lo",
+          "type": "text",
+          "properties": {
+            "x": 30.0,
+            "y": 180.0,
+            "width": 400.0,
+            "height": 30.0,
+            "text": "H: $gv(weather_hi)$  L: $gv(weather_lo)$",
+            "fontSize": 18.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff50",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "weather_label",
+          "name": "Weather Label",
+          "type": "text",
+          "properties": {
+            "x": 30.0,
+            "y": 230.0,
+            "width": 400.0,
+            "height": 25.0,
+            "text": "WEATHER",
+            "fontSize": 11.0,
+            "fontFamily": "sans-serif",
+            "color": "#4a9eff60",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "layer_1773068644895_68",
+          "name": "5-Day Forecast",
+          "type": "overlap",
+          "properties": {
+            "x": 120.0,
+            "y": 188.0,
+            "width": 380.0,
+            "height": 104.0,
+            "scaleX": 0.8,
+            "scaleY": 0.8,
+            "opacity": 255.0,
+            "anchor": "top-left"
+          },
+          "children": [
+            {
+              "id": "layer_1773068644895_67",
+              "name": "Days",
+              "type": "stack",
+              "properties": {
+                "x": 5.0,
+                "y": 10.0,
+                "width": 370.0,
+                "height": 110.0,
+                "opacity": 255.0,
+                "anchor": "top-left",
+                "orientation": "horizontal",
+                "spacing": 4.0
+              },
+              "children": [
+                {
+                  "id": "layer_1773068644895_49",
+                  "name": "Day 0",
+                  "type": "stack",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 70.0,
+                    "height": 100.0,
+                    "opacity": 255.0,
+                    "anchor": "top-left",
+                    "orientation": "vertical",
+                    "spacing": 2.0
+                  },
+                  "children": [
+                    {
+                      "id": "layer_1773068644895_46",
+                      "name": "Day",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(0, day)$",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#aaaaaa",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_47",
+                      "name": "Icon",
+                      "type": "image",
+                      "properties": {
+                        "x": 15.0,
+                        "y": 0.0,
+                        "width": 40.0,
+                        "height": 40.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "src": "$wf(0, iconurl)$",
+                        "scaleMode": "fit"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_48",
+                      "name": "Temp",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(0, max)$°/$wf(0, min)$°",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#ffffff",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    }
+                  ],
+                  "locked": false,
+                  "visible": true
+                },
+                {
+                  "id": "layer_1773068644895_53",
+                  "name": "Day 1",
+                  "type": "stack",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 70.0,
+                    "height": 100.0,
+                    "opacity": 255.0,
+                    "anchor": "top-left",
+                    "orientation": "vertical",
+                    "spacing": 2.0
+                  },
+                  "children": [
+                    {
+                      "id": "layer_1773068644895_50",
+                      "name": "Day",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(1, day)$",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#aaaaaa",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_51",
+                      "name": "Icon",
+                      "type": "image",
+                      "properties": {
+                        "x": 15.0,
+                        "y": 0.0,
+                        "width": 40.0,
+                        "height": 40.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "src": "$wf(1, iconurl)$",
+                        "scaleMode": "fit"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_52",
+                      "name": "Temp",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(1, max)$°/$wf(1, min)$°",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#ffffff",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    }
+                  ],
+                  "locked": false,
+                  "visible": true
+                },
+                {
+                  "id": "layer_1773068644895_57",
+                  "name": "Day 2",
+                  "type": "stack",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 70.0,
+                    "height": 100.0,
+                    "opacity": 255.0,
+                    "anchor": "top-left",
+                    "orientation": "vertical",
+                    "spacing": 2.0
+                  },
+                  "children": [
+                    {
+                      "id": "layer_1773068644895_54",
+                      "name": "Day",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(2, day)$",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#aaaaaa",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_55",
+                      "name": "Icon",
+                      "type": "image",
+                      "properties": {
+                        "x": 15.0,
+                        "y": 0.0,
+                        "width": 40.0,
+                        "height": 40.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "src": "$wf(2, iconurl)$",
+                        "scaleMode": "fit"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_56",
+                      "name": "Temp",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(2, max)$°/$wf(2, min)$°",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#ffffff",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    }
+                  ],
+                  "locked": false,
+                  "visible": true
+                },
+                {
+                  "id": "layer_1773068644895_61",
+                  "name": "Day 3",
+                  "type": "stack",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 70.0,
+                    "height": 100.0,
+                    "opacity": 255.0,
+                    "anchor": "top-left",
+                    "orientation": "vertical",
+                    "spacing": 2.0
+                  },
+                  "children": [
+                    {
+                      "id": "layer_1773068644895_58",
+                      "name": "Day",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(3, day)$",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#aaaaaa",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_59",
+                      "name": "Icon",
+                      "type": "image",
+                      "properties": {
+                        "x": 15.0,
+                        "y": 0.0,
+                        "width": 40.0,
+                        "height": 40.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "src": "$wf(3, iconurl)$",
+                        "scaleMode": "fit"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_60",
+                      "name": "Temp",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(3, max)$°/$wf(3, min)$°",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#ffffff",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    }
+                  ],
+                  "locked": false,
+                  "visible": true
+                },
+                {
+                  "id": "layer_1773068644895_65",
+                  "name": "Day 4",
+                  "type": "stack",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 70.0,
+                    "height": 100.0,
+                    "opacity": 255.0,
+                    "anchor": "top-left",
+                    "orientation": "vertical",
+                    "spacing": 2.0
+                  },
+                  "children": [
+                    {
+                      "id": "layer_1773068644895_62",
+                      "name": "Day",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(4, day)$",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#aaaaaa",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_63",
+                      "name": "Icon",
+                      "type": "image",
+                      "properties": {
+                        "x": 15.0,
+                        "y": 0.0,
+                        "width": 40.0,
+                        "height": 40.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "src": "$wf(4, iconurl)$",
+                        "scaleMode": "fit"
+                      },
+                      "locked": false,
+                      "visible": true
+                    },
+                    {
+                      "id": "layer_1773068644895_64",
+                      "name": "Temp",
+                      "type": "text",
+                      "properties": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "width": 70.0,
+                        "height": 16.0,
+                        "opacity": 255.0,
+                        "anchor": "top-left",
+                        "text": "$wf(4, max)$°/$wf(4, min)$°",
+                        "fontSize": 11.0,
+                        "fontFamily": "sans-serif",
+                        "color": "#ffffff",
+                        "textAlign": "center"
+                      },
+                      "locked": false,
+                      "visible": true
+                    }
+                  ],
+                  "locked": false,
+                  "visible": true
+                }
+              ],
+              "locked": false,
+              "visible": true
+            }
+          ],
+          "locked": false,
+          "visible": true
+        },
+        {
+          "id": "layer_1773039593586_2",
+          "name": "image_32",
+          "type": "image",
+          "properties": {
+            "x": 222.0,
+            "y": 46.0,
+            "width": 200.0,
+            "height": 200.0,
+            "opacity": 255.0,
+            "anchor": "top-left",
+            "src": "$wf(1, iconurl)$ ",
+            "scaleMode": "fit"
+          },
+          "locked": false,
+          "visible": true
+        }
+      ],
+      "visible": true
+    },
+    {
+      "id": "music_group",
+      "name": "Music Player",
+      "type": "overlap",
+      "properties": {
+        "x": 1500.0,
+        "y": 420.0,
+        "width": 460.0,
+        "height": 520.0,
+        "visible": " $if(mi(state)=PLAYING, ALWAYS, NEVER)$ "
+      },
+      "children": [
+        {
+          "id": "music_bg",
+          "name": "Music BG",
+          "type": "shape",
+          "properties": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 460.0,
+            "height": 520.0,
+            "shapeKind": "rectangle",
+            "fill": "#ffffff08",
+            "stroke": "#ffffff10",
+            "strokeWidth": 1.0,
+            "cornerRadius": 20.0
+          },
+          "visible": true
+        },
+        {
+          "id": "music_art_bg",
+          "name": "Album Art Placeholder",
+          "type": "shape",
+          "properties": {
+            "x": 30.0,
+            "y": 30.0,
+            "width": 400.0,
+            "height": 300.0,
+            "shapeKind": "rectangle",
+            "fill": "#1a1f30",
+            "cornerRadius": 12.0
+          },
+          "visible": true
+        },
+        {
+          "id": "music_art_icon",
+          "name": "Music Icon",
+          "type": "text",
+          "properties": {
+            "x": 30.0,
+            "y": 120.0,
+            "width": 400.0,
+            "height": 100.0,
+            "text": "♫",
+            "fontSize": 80.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff15",
+            "textAlign": "center"
+          },
+          "visible": true
+        },
+        {
+          "id": "music_title_text",
+          "name": "Song Title",
+          "type": "text",
+          "properties": {
+            "x": 30.0,
+            "y": 350.0,
+            "width": 407.0,
+            "height": 40.0,
+            "text": "$gv(music_title)$",
+            "fontSize": 23.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left",
+            "maxLines": 2,
+            "lineSpacing": 0.0,
+            "shadow": {
+              "color": "#00000080",
+              "dx": 2.0,
+              "dy": 2.0,
+              "radius": 4.0
+            }
+          },
+          "visible": true
+        },
+        {
+          "id": "music_artist_text",
+          "name": "Artist",
+          "type": "text",
+          "properties": {
+            "x": 30.0,
+            "y": 390.0,
+            "width": 400.0,
+            "height": 30.0,
+            "text": "$gv(music_artist)$",
+            "fontSize": 18.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff60",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "music_album_text",
+          "name": "Album",
+          "type": "text",
+          "properties": {
+            "x": 30.0,
+            "y": 418.0,
+            "width": 400.0,
+            "height": 25.0,
+            "text": "$gv(music_album)$",
+            "fontSize": 14.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff35",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "music_progress_bar",
+          "name": "Progress Bar",
+          "type": "progress",
+          "properties": {
+            "x": 30.0,
+            "y": 460.0,
+            "width": 400.0,
+            "height": 20.0,
+            "color": "#4a9eff",
+            "strokeWidth": 4.0,
+            "style": "bar",
+            "min": 0.0,
+            "max": 100.0,
+            "value": "$gv(music_progress)$",
+            "trackColor": "#ffffff15"
+          },
+          "visible": true
+        },
+        {
+          "id": "layer_1773038176793_1",
+          "name": "image_31",
+          "type": "image",
+          "properties": {
+            "x": 50.0,
+            "y": 36.0,
+            "width": 367.0,
+            "height": 282.0,
+            "opacity": 255.0,
+            "anchor": "top-left",
+            "src": "$mi(cover)$",
+            "scaleMode": "stretch"
+          },
+          "animations": [
+            {
+              "type": "fade",
+              "trigger": "reactive",
+              "rule": "",
+              "amount": 255.0,
+              "speed": 1000.0,
+              "easing": "ease-in",
+              "delay": 0.0,
+              "loop": "none"
+            }
+          ],
+          "locked": false,
+          "visible": true
+        }
+      ],
+      "visible": true
+    },
+    {
+      "id": "news_group",
+      "name": "News Feed",
+      "type": "overlap",
+      "properties": {
+        "x": 80.0,
+        "y": 1050.0,
+        "width": 1350.0,
+        "height": 180.0
+      },
+      "children": [
+        {
+          "id": "news_bg",
+          "name": "News BG",
+          "type": "shape",
+          "properties": {
+            "x": 0.0,
+            "y": 0.0,
+            "width": 1350.0,
+            "height": 180.0,
+            "shapeKind": "rectangle",
+            "fill": "#ffffff06",
+            "stroke": "#ffffff08",
+            "strokeWidth": 1.0,
+            "cornerRadius": 16.0
+          },
+          "visible": true
+        },
+        {
+          "id": "news_label",
+          "name": "NEWS Label",
+          "type": "text",
+          "properties": {
+            "x": 25.0,
+            "y": 18.0,
+            "width": 200.0,
+            "height": 20.0,
+            "text": "NEWS",
+            "fontSize": 11.0,
+            "fontFamily": "sans-serif",
+            "color": "#4a9eff80",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_source_text",
+          "name": "Source",
+          "type": "text",
+          "properties": {
+            "x": 80.0,
+            "y": 16.0,
+            "width": 300.0,
+            "height": 22.0,
+            "text": "$gv(news_source)$",
+            "fontSize": 12.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff30",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_divider",
+          "name": "News Divider",
+          "type": "shape",
+          "properties": {
+            "x": 25.0,
+            "y": 42.0,
+            "width": 1300.0,
+            "height": 1.0,
+            "shapeKind": "rectangle",
+            "fill": "#ffffff10"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_headline_1",
+          "name": "Headline 1",
+          "type": "text",
+          "properties": {
+            "x": 25.0,
+            "y": 52.0,
+            "width": 1300.0,
+            "height": 30.0,
+            "text": "• $gv(news_1)$",
+            "fontSize": 18.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffffcc",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_headline_2",
+          "name": "Headline 2",
+          "type": "text",
+          "properties": {
+            "x": 25.0,
+            "y": 90.0,
+            "width": 1300.0,
+            "height": 30.0,
+            "text": "• $gv(news_2)$",
+            "fontSize": 18.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff90",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "news_headline_3",
+          "name": "Headline 3",
+          "type": "text",
+          "properties": {
+            "x": 25.0,
+            "y": 128.0,
+            "width": 1300.0,
+            "height": 30.0,
+            "text": "• $gv(news_3)$",
+            "fontSize": 18.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff60",
+            "textAlign": "left"
+          },
+          "visible": true
+        }
+      ],
+      "visible": true
+    }
+  ]
+}

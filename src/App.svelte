@@ -5,7 +5,7 @@
   import CanvasRenderer from "./lib/canvas/CanvasRenderer.svelte";
   import PropertyPanel from "./lib/editor/PropertyPanel.svelte";
   import FormulaBar from "./lib/editor/FormulaBar.svelte";
-  import { getWallpaperMode, setWallpaperMode, setProject } from "./lib/stores/project.svelte";
+  import { getWallpaperMode, setWallpaperMode, setProject, copySelectedLayer, pasteLayer, getSelectedLayerId, getCopiedLayer, removeLayer, undo, redo } from "./lib/stores/project.svelte";
 
   // Check if this is the wallpaper helper webview (loaded with ?wallpaper=true)
   const isWallpaperView = new URLSearchParams(window.location.search).has("wallpaper");
@@ -25,6 +25,31 @@
       return;
     }
 
+    // Editor mode: global keyboard shortcuts
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key === "c") {
+        if (getSelectedLayerId()) { copySelectedLayer(); e.preventDefault(); }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "v") {
+        if (getCopiedLayer()) {
+          const name = prompt("Name for pasted layer:", getCopiedLayer()!.name + " copy");
+          if (name !== null) { pasteLayer(name); e.preventDefault(); }
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        undo(); e.preventDefault();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key === "y" || (e.shiftKey && e.key === "Z"))) {
+        redo(); e.preventDefault();
+      } else if (e.key === "Delete") {
+        const id = getSelectedLayerId();
+        if (id) {
+          if (confirm("Delete selected layer?")) { removeLayer(id); e.preventDefault(); }
+        }
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+
     // Listen for global shortcut exit event (Super+Escape)
     const { listen } = await import("@tauri-apps/api/event");
     const unlistenExit = await listen("exit-wallpaper", () => {
@@ -43,6 +68,7 @@
     });
 
     return () => {
+      window.removeEventListener("keydown", onKeyDown);
       unlistenExit();
       unlistenTrayStop();
       unlistenTrayStart();

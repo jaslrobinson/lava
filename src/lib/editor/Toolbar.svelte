@@ -1,7 +1,18 @@
 <script lang="ts">
-  import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType } from "../stores/project.svelte";
+  import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo } from "../stores/project.svelte";
   import type { LayerType, Project } from "../types/project";
   import { createDefaultProject } from "../types/project";
+
+  function handleCopy() {
+    if (getSelectedLayerId()) copySelectedLayer();
+  }
+
+  function handlePaste() {
+    const copied = getCopiedLayer();
+    if (!copied) return;
+    const name = prompt("Name for pasted layer:", copied.name + " copy");
+    if (name !== null) pasteLayer(name);
+  }
 
   async function handleNew() {
     if (getIsDirty()) {
@@ -143,9 +154,52 @@
     {#if getSelectedLayer() && isContainerType(getSelectedLayer()!.type)}
       <span class="target-indicator">into {getSelectedLayer()!.name}</span>
     {/if}
+    <span class="separator"></span>
+    <button
+      class="toolbar-btn"
+      title="Copy selected layer (Ctrl+C)"
+      disabled={!getSelectedLayerId()}
+      onclick={handleCopy}
+    >
+      <span class="btn-label">Copy</span>
+    </button>
+    <button
+      class="toolbar-btn"
+      title="Paste layer (Ctrl+V)"
+      disabled={!getCopiedLayer()}
+      onclick={handlePaste}
+    >
+      <span class="btn-label">Paste</span>
+    </button>
+    <span class="separator"></span>
+    <button
+      class="toolbar-btn"
+      title="Undo (Ctrl+Z)"
+      disabled={!canUndo()}
+      onclick={() => undo()}
+    >
+      <span class="btn-icon">{"\u21A9"}</span>
+    </button>
+    <button
+      class="toolbar-btn"
+      title="Redo (Ctrl+Y)"
+      disabled={!canRedo()}
+      onclick={() => redo()}
+    >
+      <span class="btn-icon">{"\u21AA"}</span>
+    </button>
   </div>
 
   <div class="toolbar-right">
+    <button
+      class="toolbar-btn"
+      class:interactive-active={getInteractiveMode()}
+      title={getInteractiveMode() ? "Interactive mode ON — clicks trigger actions. Click to disable." : "Interactive mode OFF — clicks only select layers. Click to enable."}
+      onclick={() => setInteractiveMode(!getInteractiveMode())}
+    >
+      <span class="btn-icon">{getInteractiveMode() ? "\u25B6" : "\u23F8"}</span>
+      <span class="btn-label">{getInteractiveMode() ? "Interactive" : "Edit Only"}</span>
+    </button>
     <button
       class="toolbar-btn"
       class:wallpaper-active={wallpaperActive}
@@ -239,6 +293,13 @@
     background: var(--accent);
     color: #fff;
   }
+  .toolbar-btn.interactive-active {
+    background: #b8860b;
+    color: #fff;
+  }
+  .toolbar-btn.interactive-active:hover {
+    background: #d4a017;
+  }
   .toolbar-btn.wallpaper-active {
     background: #2d7d46;
     color: #fff;
@@ -256,6 +317,16 @@
   }
   .btn-label {
     font-size: 12px;
+  }
+  .separator {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 4px;
+  }
+  .toolbar-btn:disabled {
+    opacity: 0.3;
+    pointer-events: none;
   }
   .target-indicator {
     font-size: 10px;

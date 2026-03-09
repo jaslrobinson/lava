@@ -531,8 +531,13 @@ function renderImage(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   const imgH = img.naturalHeight;
 
   ctx.save();
+  const cornerRadius = resolveNumber(layer.properties.cornerRadius, 0);
   ctx.beginPath();
-  ctx.rect(x, y, w, h);
+  if (cornerRadius > 0) {
+    roundedRect(ctx, x, y, w, h, cornerRadius);
+  } else {
+    ctx.rect(x, y, w, h);
+  }
   ctx.clip();
 
   let drawX = x, drawY = y, drawW = w, drawH = h;
@@ -620,10 +625,55 @@ function renderProgress(ctx: CanvasRenderingContext2D, layer: Layer, x: number, 
   }
 }
 
+/** Resolve a raw image source to a URL the browser can load.
+ *  Handles kfile://, absolute paths (via convertFileSrc), data: and http URLs. */
+function resolveImageSrc(src: string): string | null {
+  const resolvedPath = resolveImagePath(src);
+  if (!resolvedPath) return null;
+
+  if (resolvedPath.startsWith("http") || resolvedPath.startsWith("data:")) {
+    return resolvedPath;
+  }
+  if (convertFileSrc) {
+    return convertFileSrc(resolvedPath);
+  }
+  // Non-Tauri context (WebKitGTK wallpaper): serve via Vite asset proxy
+  return `/__klwp_assets${resolvedPath}`;
+}
+
 function renderFontIcon(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
   const props = layer.properties;
-  const glyphCode = props.glyphCode || "e88a";
   const color = resolve(props.color, "#ffffff");
+
+  // If iconSrc is set, render as image instead of font glyph
+  const iconSrc = props.iconSrc ? resolve(props.iconSrc, "") : "";
+  if (iconSrc) {
+    const resolved = resolveImageSrc(iconSrc);
+    if (resolved) {
+      const img = getCachedImage(iconSrc);
+      if (img) {
+        // Tint: draw image then overlay color using composite
+        ctx.save();
+        ctx.drawImage(img, x, y, w, h);
+        if (color && color !== "#ffffff" && color !== "#FFFFFF") {
+          ctx.globalCompositeOperation = "source-atop";
+          ctx.fillStyle = color;
+          ctx.fillRect(x, y, w, h);
+          ctx.globalCompositeOperation = "source-over";
+        }
+        ctx.restore();
+      } else {
+        // Placeholder while icon image loads
+        ctx.fillStyle = color;
+        ctx.globalAlpha *= 0.3;
+        ctx.fillRect(x, y, w, h);
+      }
+    }
+    return;
+  }
+
+  // Font glyph rendering
+  const glyphCode = props.glyphCode || "e88a";
   const fontSize = resolveNumber(props.fontSize, 48);
   const iconSet = props.iconSet || "Material Icons";
 
@@ -639,11 +689,25 @@ function renderFontIcon(ctx: CanvasRenderingContext2D, layer: Layer, x: number, 
   const codePoint = parseInt(glyphCode, 16);
   const char = isNaN(codePoint) ? "?" : String.fromCodePoint(codePoint);
 
-  ctx.font = `${fontSize}px "${fontFamily}", sans-serif`;
-  ctx.fillStyle = color;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(char, x + w / 2, y + h / 2);
+  // Check if the font is actually loaded; show a colored placeholder if not
+  const fontSpec = `${fontSize}px "${fontFamily}"`;
+  const fontReady = document.fonts.check(fontSpec);
+
+  if (fontReady) {
+    ctx.font = `${fontSize}px "${fontFamily}", sans-serif`;
+    ctx.fillStyle = color;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(char, x + w / 2, y + h / 2);
+  } else {
+    // Font not loaded yet — draw a colored square placeholder
+    ctx.fillStyle = color;
+    ctx.globalAlpha *= 0.25;
+    const size = Math.min(w, h) * 0.6;
+    const px = x + (w - size) / 2;
+    const py = y + (h - size) / 2;
+    ctx.fillRect(px, py, size, size);
+  }
 }
 
 function renderOverlap(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, container: ContainerSize, parentAbsX: number, parentAbsY: number, timestamp: number = 0) {
@@ -678,7 +742,7 @@ function renderStack(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   };
 
   for (const child of layer.children) {
-    if (child.visible === false) continue;
+    if (!isLayerVisible(child)) continue;
     ctx.save();
     if (orientation === "horizontal") {
       ctx.translate(offset, 0);

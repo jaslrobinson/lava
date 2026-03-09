@@ -137,6 +137,11 @@ function extractWgData(raw: string, type: string, path: string, index: number): 
         if (enclosure) return enclosure.getAttribute("url") || "";
         const mediaContent = item.querySelector("content[url]");
         if (mediaContent) return mediaContent.getAttribute("url") || "";
+        // Try extracting image from description/content HTML
+        const descEl = item.querySelector("description, summary, content");
+        const descHtml = descEl?.textContent || "";
+        const imgMatch = descHtml.match(/<img[^>]+src=["']([^"']+)["']/);
+        if (imgMatch) return imgMatch[1];
         return "";
       }
       // Feed-level metadata
@@ -935,10 +940,37 @@ export function stopFormulaLoop() {
  * Marks them as pending for re-evaluation on the next tick without removing
  * the stale value from cache, so the UI won't flash.
  */
+/**
+ * Synchronously evaluate a formula string (for click actions, URL resolution, etc.)
+ * Uses cached RSS data from wgRawCache when available.
+ */
+export function evaluateSync(formula: string, globals: Record<string, string>): string {
+  if (!hasFormula(formula)) return formula;
+  return formula.replace(formulaPattern, (match) => {
+    // Try cache first
+    if (cache.has(match)) return cache.get(match)!;
+    // Evaluate client-side (works if wgRawCache has the data)
+    return evaluateClientSide(match, globals);
+  });
+}
+
 export function invalidateGlobalsFormulas() {
   for (const [key] of cache) {
     if (key.includes("gv(")) {
       pending.add(key);
+    }
+  }
+}
+
+/**
+ * Immediately re-evaluate all pending formulas that depend on globals.
+ * Call after changing a global variable to avoid 1-second stale visibility.
+ */
+export function flushGlobalsNow(globals: Record<string, string>) {
+  for (const key of [...pending]) {
+    if (key.includes("gv(") || key.includes("if(")) {
+      cache.set(key, evaluateClientSide(key, globals));
+      pending.delete(key);
     }
   }
 }

@@ -35,6 +35,17 @@
     fonticon: "\u2606",
   };
 
+  const typeColors: Record<string, string> = {
+    text: "#5dade2",
+    shape: "#e74c3c",
+    image: "#2ecc71",
+    progress: "#f39c12",
+    group: "#bb8fce",
+    stack: "#a569bd",
+    overlap: "#8e44ad",
+    fonticon: "#f1c40f",
+  };
+
   function stop(fn: (e: MouseEvent) => void) {
     return (e: MouseEvent) => { e.stopPropagation(); fn(e); };
   }
@@ -197,7 +208,7 @@
     class:container-target={isSelected && isContainer}
     class:hidden-layer={layer.visible === false}
     class:dragging={dragSourceId === layer.id}
-    style="padding-left: {12 + depth * 16}px;{isDropBefore ? ' border-top: 2px solid var(--accent);' : ''}{isDropAfter ? ' border-bottom: 2px solid var(--accent);' : ''}{isDropInside ? ' background: var(--accent-dim); outline: 1px dashed var(--accent);' : ''}"
+    style="padding-left: {12 + depth * 16}px;{isContainer ? ` background: ${typeColors[layer.type]}12;` : ''}{isDropBefore ? ' border-top: 2px solid var(--accent);' : ''}{isDropAfter ? ' border-bottom: 2px solid var(--accent);' : ''}{isDropInside ? ' background: var(--accent-dim); outline: 1px dashed var(--accent);' : ''}"
     draggable="true"
     onclick={() => setSelectedLayerId(layer.id)}
     ondblclick={(e) => handleDblClick(e, layer)}
@@ -237,8 +248,8 @@
         onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); drillInto(layer.id); } }}
       >{"\u{279C}"}</span>
     {/if}
-    <span class="layer-type-icon">{typeIcons[layer.type] || "?"}</span>
-    <span class="layer-name">{layer.name}</span>
+    <span class="layer-type-icon" style="color: {typeColors[layer.type] || 'var(--text-muted)'};">{typeIcons[layer.type] || "?"}</span>
+    <span class="layer-name" style="{isContainer ? 'font-weight: 600;' : ''}">{layer.name}</span>
     {#if isContainer && hasChildren}
       <span class="child-count">{layer.children!.length}</span>
     {/if}
@@ -251,7 +262,7 @@
       title="Delete layer"
       role="button"
       tabindex="0"
-      onclick={stop(() => removeLayer(layer.id))}
+      onclick={stop(() => { if (confirm(`Delete "${layer.name}"?`)) removeLayer(layer.id); })}
       onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); removeLayer(layer.id); } }}
     >
       \u00D7

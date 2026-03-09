@@ -85,6 +85,12 @@ export interface LayerProperties {
   // Stack/Group
   orientation?: "horizontal" | "vertical";
   spacing?: number;
+
+  // Click action (for fullscreen/wallpaper mode)
+  clickAction?: string; // e.g. "overlay:news", "url:https://..."
+
+  // Icon source (SVG/PNG path for imported icons)
+  iconSrc?: string;
 }
 
 export interface Layer {
@@ -122,6 +128,18 @@ export function createDefaultProject(): Project {
 let nextId = 0;
 export function generateId(): string {
   return `layer_${Date.now()}_${nextId++}`;
+}
+
+/** Deep clone a layer tree, assigning fresh IDs to every node */
+export function cloneLayerWithNewIds(layer: Layer, newName?: string): Layer {
+  return {
+    ...layer,
+    id: generateId(),
+    name: newName ?? layer.name,
+    properties: { ...layer.properties },
+    animations: layer.animations?.map(a => ({ ...a })),
+    children: layer.children?.map(c => cloneLayerWithNewIds(c)),
+  };
 }
 
 export function createLayer(type: LayerType, name: string): Layer {

@@ -267,6 +267,14 @@ pub struct LayerProperties {
     pub orientation: Option<Orientation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spacing: Option<f64>,
+
+    // Click action (for fullscreen/wallpaper mode)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub click_action: Option<String>,
+
+    // Icon source (SVG/PNG path for imported icons)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon_src: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -318,5 +326,7 @@ pub struct Project {
     pub background: Background,
     pub globals: Vec<GlobalVariable>,
     pub layers: Vec<Layer>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub asset_dir: Option<String>,
 }
 

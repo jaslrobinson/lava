@@ -1,4 +1,4 @@
-import { type Project, type Layer, type Animation, createDefaultProject, createLayer, type LayerType, type GlobalVarType } from "../types/project";
+import { type Project, type Layer, type Animation, createDefaultProject, createLayer, cloneLayerWithNewIds, type LayerType, type GlobalVarType } from "../types/project";
 import { clearImageCache } from "../canvas/renderer";
 import { invalidateGlobalsFormulas } from "../formula/service";
 import { resetAnimationState } from "../canvas/animationState";
@@ -7,6 +7,42 @@ let project = $state<Project>(createDefaultProject());
 let selectedLayerId = $state<string | null>(null);
 let isDirty = $state(false);
 let wallpaperMode = $state(false);
+let activeOverlay = $state<string | null>(null);
+let interactiveMode = $state(false);
+let copiedLayer = $state<Layer | null>(null);
+
+// Undo history
+const MAX_UNDO = 30;
+let undoStack = $state<string[]>([]);
+let redoStack = $state<string[]>([]);
+
+function pushUndo() {
+  undoStack = [...undoStack.slice(-(MAX_UNDO - 1)), JSON.stringify(project.layers)];
+  redoStack = [];
+}
+
+export function undo() {
+  if (undoStack.length === 0) return;
+  const current = JSON.stringify(project.layers);
+  redoStack = [...redoStack, current];
+  const prev = undoStack[undoStack.length - 1];
+  undoStack = undoStack.slice(0, -1);
+  project.layers = JSON.parse(prev);
+  isDirty = true;
+}
+
+export function redo() {
+  if (redoStack.length === 0) return;
+  const current = JSON.stringify(project.layers);
+  undoStack = [...undoStack, current];
+  const next = redoStack[redoStack.length - 1];
+  redoStack = redoStack.slice(0, -1);
+  project.layers = JSON.parse(next);
+  isDirty = true;
+}
+
+export function canUndo() { return undoStack.length > 0; }
+export function canRedo() { return redoStack.length > 0; }
 
 export function getProject() { return project; }
 export function setProject(p: Project) { project = p; isDirty = false; clearImageCache(); resetAnimationState(); }
@@ -15,6 +51,31 @@ export function setSelectedLayerId(id: string | null) { selectedLayerId = id; }
 export function getIsDirty() { return isDirty; }
 export function getWallpaperMode() { return wallpaperMode; }
 export function setWallpaperMode(active: boolean) { wallpaperMode = active; }
+export function getActiveOverlay() { return activeOverlay; }
+export function setActiveOverlay(overlay: string | null) { activeOverlay = overlay; }
+export function getInteractiveMode() { return interactiveMode; }
+export function setInteractiveMode(active: boolean) { interactiveMode = active; }
+export function getCopiedLayer() { return copiedLayer; }
+
+export function copySelectedLayer() {
+  const layer = getSelectedLayer();
+  if (layer) copiedLayer = JSON.parse(JSON.stringify(layer));
+}
+
+export function pasteLayer(newName?: string) {
+  if (!copiedLayer) return;
+  pushUndo();
+  const cloned = cloneLayerWithNewIds(copiedLayer, newName ?? copiedLayer.name + " copy");
+  // Paste into selected container, or at root
+  const selected = getSelectedLayer();
+  if (selected && isContainerType(selected.type)) {
+    project.layers = addChildToParent(project.layers, selected.id, cloned);
+  } else {
+    project.layers = [...project.layers, cloned];
+  }
+  selectedLayerId = cloned.id;
+  isDirty = true;
+}
 
 /** Recursively find a layer by ID in a layer tree */
 function findInLayers(layers: Layer[], id: string): Layer | undefined {
@@ -71,6 +132,7 @@ export function isContainerType(type: LayerType): boolean {
 }
 
 export function addLayer(type: LayerType) {
+  pushUndo();
   const allLayers = flattenLayers(project.layers);
   const name = `${type}_${allLayers.length + 1}`;
   const layer = createLayer(type, name);
@@ -101,12 +163,18 @@ function addChildToParent(layers: Layer[], parentId: string, child: Layer): Laye
 }
 
 export function removeLayer(id: string) {
+  pushUndo();
   project.layers = removeFromLayers(project.layers, id);
   if (selectedLayerId === id) selectedLayerId = null;
   isDirty = true;
 }
 
+let lastUndoPropTime = 0;
 export function updateLayerProperty(id: string, key: string, value: any) {
+  // Batch property edits: only push undo if >500ms since last property change
+  const now = Date.now();
+  if (now - lastUndoPropTime > 500) pushUndo();
+  lastUndoPropTime = now;
   project.layers = updateInLayers(project.layers, id, key, value);
   isDirty = true;
 }
@@ -125,6 +193,7 @@ function updateLayerAnimations(layers: Layer[], id: string, updater: (anims: Ani
 }
 
 export function addAnimation(layerId: string, anim: Animation) {
+  pushUndo();
   project.layers = updateLayerAnimations(project.layers, layerId, (anims) => [...anims, anim]);
   isDirty = true;
 }
@@ -139,6 +208,7 @@ export function updateAnimation(layerId: string, index: number, anim: Animation)
 }
 
 export function removeAnimation(layerId: string, index: number) {
+  pushUndo();
   project.layers = updateLayerAnimations(project.layers, layerId, (anims) =>
     anims.filter((_, i) => i !== index)
   );
@@ -186,6 +256,7 @@ function findParentArrayInner(layers: Layer[], id: string, parent: Layer): { arr
  */
 export function moveLayer(layerId: string, targetId: string, position: "before" | "after" | "inside") {
   if (layerId === targetId) return;
+  pushUndo();
   // Prevent circular: can't drop a layer into its own descendants
   if (isDescendant(project.layers, layerId, targetId)) return;
 
@@ -237,8 +308,16 @@ export function removeGlobal(name: string) {
 
 /** Insert a fully-constructed layer tree (widget preset) into the project */
 export function insertWidget(layer: Layer) {
+  pushUndo();
   project.layers = [...project.layers, layer];
   selectedLayerId = layer.id;
+  isDirty = true;
+}
+
+/** Ensure a global variable exists; if not, create it with the given defaults */
+export function ensureGlobal(name: string, type: GlobalVarType, defaultValue: string | number | boolean) {
+  if (project.globals.find(g => g.name === name)) return;
+  project.globals = [...project.globals, { name, type, value: defaultValue }];
   isDirty = true;
 }
 

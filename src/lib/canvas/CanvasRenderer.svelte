@@ -7,9 +7,13 @@
     setSelectedLayerId,
     updateLayerProperty,
     getSelectedLayer,
+    updateGlobal,
+    getInteractiveMode,
   } from "../stores/project.svelte";
-  import { startFormulaLoop, stopFormulaLoop } from "../formula/service";
+  import type { Layer } from "../types/project";
+  import { startFormulaLoop, stopFormulaLoop, evaluateSync, flushGlobalsNow } from "../formula/service";
   import { setScrollPosition, triggerTap } from "./animationState";
+  import { loadBundledIconFonts } from "../fonts/fontLoader";
 
   interface Props {
     fullscreen?: boolean;
@@ -45,6 +49,7 @@
   onMount(() => {
     ctx = canvas.getContext("2d")!;
     updateCanvasSize();
+    loadBundledIconFonts();
     requestAnimationFrame(renderLoop);
 
     startFormulaLoop(() => {
@@ -258,7 +263,14 @@
     // Hit test layers
     const id = hitTest(e.clientX, e.clientY);
     setSelectedLayerId(id);
-    if (id) triggerTap(id, performance.now());
+    if (id) {
+      triggerTap(id, performance.now());
+      if (getInteractiveMode()) {
+        const project = getProject();
+        const action = findClickActionForHit(project.layers, id);
+        if (action) handleClickAction(action, project);
+      }
+    }
 
     if (id) {
       const layer = getSelectedLayer();
@@ -337,9 +349,91 @@
     setScrollPosition(e.clientX / window.innerWidth);
   }
 
+  /** Walk the layer tree to find the path from root to a target layer */
+  function findPathToLayer(layers: Layer[], targetId: string, path: Layer[] = []): Layer[] | null {
+    for (const layer of layers) {
+      if (layer.id === targetId) return [...path, layer];
+      if (layer.children) {
+        const result = findPathToLayer(layer.children, targetId, [...path, layer]);
+        if (result) return result;
+      }
+    }
+    return null;
+  }
+
+  /** Find the nearest clickAction walking from hit layer up to root */
+  function findClickActionForHit(layers: Layer[], hitId: string): string | null {
+    const path = findPathToLayer(layers, hitId);
+    if (!path) return null;
+    for (let i = path.length - 1; i >= 0; i--) {
+      if (path[i].properties.clickAction) return path[i].properties.clickAction!;
+    }
+    return null;
+  }
+
   function onFullscreenClick(e: MouseEvent) {
     const id = hitTest(e.clientX, e.clientY);
-    if (id) triggerTap(id, performance.now());
+    if (id) {
+      triggerTap(id, performance.now());
+      const project = getProject();
+      const action = findClickActionForHit(project.layers, id);
+      if (action) {
+        handleClickAction(action, project);
+      }
+    }
+  }
+
+  function buildGlobalsMap(project: ReturnType<typeof getProject>): Record<string, string> {
+    const globals: Record<string, string> = {};
+    for (const g of project.globals) globals[g.name] = String(g.value);
+    return globals;
+  }
+
+  async function handleClickAction(action: string, project: ReturnType<typeof getProject>) {
+    if (action.startsWith("set:")) {
+      // set:varName:value — set a global variable
+      const parts = action.split(":");
+      const varName = parts[1];
+      const value = parts.slice(2).join(":");
+      updateGlobal(varName, "value", value);
+      flushGlobalsNow(buildGlobalsMap(getProject()));
+    } else if (action.startsWith("inc:")) {
+      // inc:varName:amount — increment a numeric global
+      const parts = action.split(":");
+      const varName = parts[1];
+      const amount = parseInt(parts[2]) || 0;
+      const global = project.globals.find(g => g.name === varName);
+      const current = parseInt(String(global?.value ?? "0")) || 0;
+      updateGlobal(varName, "value", Math.max(0, current + amount));
+      flushGlobalsNow(buildGlobalsMap(getProject()));
+    } else if (action.startsWith("url:")) {
+      // url:formulaOrLiteral — resolve formula and open in browser
+      const urlExpr = action.slice(4);
+      let resolved = evaluateSync(urlExpr, buildGlobalsMap(project));
+      // If sync eval didn't resolve (still contains $), try async via Tauri
+      if (resolved.includes("$")) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          resolved = await invoke<string>("evaluate_formula", {
+            formula: urlExpr,
+            globals: buildGlobalsMap(project),
+          });
+        } catch (e) {
+          console.warn("Async formula eval failed:", e);
+        }
+      }
+      resolved = resolved.trim();
+      if (resolved && (resolved.startsWith("http://") || resolved.startsWith("https://"))) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("open_url", { url: resolved });
+        } catch (e) {
+          console.error("Failed to open URL:", e);
+        }
+      } else {
+        console.warn("Click action url: resolved to non-URL:", resolved, "(from:", urlExpr, ")");
+      }
+    }
   }
 
   function resetView() {

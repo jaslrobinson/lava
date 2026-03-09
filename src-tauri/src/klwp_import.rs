@@ -746,6 +746,7 @@ pub fn import_klwp_file(
         background,
         globals: all_globals,
         layers,
+        asset_dir: Some(assets_dir_str.clone()),
     };
 
     warnings.push(format!(
@@ -799,6 +800,8 @@ impl Default for LayerProperties {
             glyph_code: None,
             orientation: None,
             spacing: None,
+            click_action: None,
+            icon_src: None,
         }
     }
 }

@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { insertWidget } from "../stores/project.svelte";
-  import { generateId, type Layer } from "../types/project";
+  import { insertWidget, ensureGlobal } from "../stores/project.svelte";
+  import { generateId, type Layer, type GlobalVarType } from "../types/project";
 
-  type WidgetDef = { name: string; description: string; build: () => Layer };
+  type GlobalDef = { name: string; type: GlobalVarType; value: string | number | boolean };
+  type WidgetDef = { name: string; description: string; build: () => Layer; globals?: GlobalDef[] };
   type Category = { name: string; widgets: WidgetDef[] };
 
   function id() { return generateId(); }
@@ -324,6 +325,11 @@
   let selectedCategory = $state(categories[0].name);
 
   function handleAddWidget(widget: WidgetDef) {
+    if (widget.globals) {
+      for (const g of widget.globals) {
+        ensureGlobal(g.name, g.type, g.value);
+      }
+    }
     insertWidget(widget.build());
   }
 </script>

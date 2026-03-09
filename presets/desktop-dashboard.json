@@ -12,10 +12,13 @@
     { "name": "music_artist", "type": "text", "value": "M83" },
     { "name": "music_album", "type": "text", "value": "Hurry Up, We're Dreaming" },
     { "name": "music_progress", "type": "number", "value": 35 },
-    { "name": "news_1", "type": "text", "value": "Technology sector sees record growth in Q1 2026" },
-    { "name": "news_2", "type": "text", "value": "New open-source AI models challenge proprietary alternatives" },
-    { "name": "news_3", "type": "text", "value": "Linux desktop market share reaches new milestone" },
-    { "name": "news_source", "type": "text", "value": "Tech News" }
+    { "name": "news_1", "type": "text", "value": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, feed, gv(timer))$"},
+    { "name": "news_2", "type": "text", "value": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, feed, gv(timer))$" },
+    { "name": "news_3", "type": "text", "value": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, feed, gv(timer))$" },
+    { "name": "news_source", "type": "text", "value": "Tech News" },
+    { "name": "page", "type": "text", "value": "home" },
+    { "name": "newsIdx", "type": "number", "value": 0 }
+   
   ],
   "layers": [
     {
@@ -27,7 +30,8 @@
         "width": 2048, "height": 400,
         "shapeKind": "rectangle",
         "fill": "#0b0e1780",
-        "opacity": 200
+        "opacity": 200,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$"
       },
       "visible": true
     },
@@ -40,7 +44,8 @@
         "width": 2048, "height": 300,
         "shapeKind": "rectangle",
         "fill": "#00000090",
-        "opacity": 200
+        "opacity": 200,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$"
       },
       "visible": true
     },
@@ -51,7 +56,8 @@
       "type": "overlap",
       "properties": {
         "x": 120, "y": 320,
-        "width": 800, "height": 500
+        "width": 800, "height": 500,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$"
       },
       "visible": true,
       "children": [
@@ -139,7 +145,8 @@
       "type": "overlap",
       "properties": {
         "x": 1500, "y": 80,
-        "width": 460, "height": 280
+        "width": 460, "height": 280,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$"
       },
       "visible": true,
       "children": [
@@ -227,7 +234,8 @@
       "type": "overlap",
       "properties": {
         "x": 1500, "y": 420,
-        "width": 460, "height": 520
+        "width": 460, "height": 520,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$"
       },
       "visible": true,
       "children": [
@@ -345,7 +353,9 @@
       "type": "overlap",
       "properties": {
         "x": 80, "y": 1050,
-        "width": 1350, "height": 180
+        "width": 1350, "height": 180,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$",
+        "clickAction": "set:page:news"
       },
       "visible": true,
       "children": [
@@ -450,6 +460,590 @@
             "textAlign": "left"
           },
           "visible": true
+        }
+      ]
+    },
+
+    {
+      "id": "news_page",
+      "name": "News Page",
+      "type": "overlap",
+      "properties": {
+        "x": 0, "y": 0,
+        "width": 2048, "height": 1280,
+        "visible": "$if(gv(page)=news, ALWAYS, NEVER)$"
+      },
+      "visible": true,
+      "children": [
+        {
+          "id": "np_bg",
+          "name": "Background",
+          "type": "shape",
+          "properties": {
+            "x": 0, "y": 0,
+            "width": 2048, "height": 1280,
+            "shapeKind": "rectangle",
+            "fill": "#0b0e17"
+          },
+          "visible": true
+        },
+        {
+          "id": "np_back_btn",
+          "name": "Back Button",
+          "type": "overlap",
+          "properties": {
+            "x": 40, "y": 30,
+            "width": 50, "height": 50,
+            "clickAction": "set:page:home"
+          },
+          "visible": true,
+          "children": [
+            {
+              "id": "np_back_circle",
+              "name": "Circle",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 50, "height": 50,
+                "shapeKind": "circle",
+                "fill": "#4a9eff"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_back_arrow",
+              "name": "Arrow",
+              "type": "text",
+              "properties": {
+                "x": 0, "y": 10,
+                "width": 50, "height": 34,
+                "text": "\u2190",
+                "fontSize": 24,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "center"
+              },
+              "visible": true
+            }
+          ]
+        },
+        {
+          "id": "np_header",
+          "name": "Header",
+          "type": "text",
+          "properties": {
+            "x": 110, "y": 38,
+            "width": 300, "height": 36,
+            "text": "NEWS",
+            "fontSize": 26,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "np_featured",
+          "name": "Featured Article",
+          "type": "overlap",
+          "properties": {
+            "x": 40, "y": 100,
+            "width": 1968, "height": 560
+          },
+          "visible": true,
+          "children": [
+            {
+              "id": "np_feat_bg",
+              "name": "Image BG",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 1968, "height": 560,
+                "shapeKind": "rectangle",
+                "fill": "#1a1f30",
+                "cornerRadius": 16
+              },
+              "visible": true
+            },
+            {
+              "id": "np_feat_img",
+              "name": "Hero Image",
+              "type": "image",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 1968, "height": 560,
+                "src": "$wg(\"https://news.google.com/rss\", rss, img, gv(newsIdx))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_feat_grad",
+              "name": "Gradient",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 340,
+                "width": 1968, "height": 220,
+                "shapeKind": "rectangle",
+                "fill": "#000000cc"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_feat_open",
+              "name": "Open Button",
+              "type": "overlap",
+              "properties": {
+                "x": 30, "y": 360,
+                "width": 50, "height": 50,
+                "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, gv(newsIdx))$"
+              },
+              "visible": true,
+              "children": [
+                {
+                  "id": "np_feat_open_circle",
+                  "name": "Circle",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0, "y": 0,
+                    "width": 50, "height": 50,
+                    "shapeKind": "circle",
+                    "fill": "#4a9eff"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "np_feat_open_icon",
+                  "name": "Icon",
+                  "type": "text",
+                  "properties": {
+                    "x": 0, "y": 10,
+                    "width": 50, "height": 34,
+                    "text": "\u25B6",
+                    "fontSize": 20,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "center"
+                  },
+                  "visible": true
+                }
+              ]
+            },
+            {
+              "id": "np_feat_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 30, "y": 420,
+                "width": 1900, "height": 80,
+                "text": "$wg(\"https://news.google.com/rss\", rss, feed, gv(newsIdx))$",
+                "fontSize": 32,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2,
+                "shadow": { "color": "#00000080", "dx": 1, "dy": 2, "radius": 6 }
+              },
+              "visible": true
+            },
+            {
+              "id": "np_feat_desc",
+              "name": "Description",
+              "type": "text",
+              "properties": {
+                "x": 30, "y": 500,
+                "width": 1900, "height": 40,
+                "text": "$wg(\"https://news.google.com/rss\", rss, desc, gv(newsIdx))$",
+                "fontSize": 15,
+                "fontFamily": "sans-serif",
+                "color": "#aaaaaa",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            }
+          ]
+        },
+        {
+          "id": "np_card_1",
+          "name": "Card 1",
+          "type": "overlap",
+          "properties": {
+            "x": 40, "y": 690,
+            "width": 472, "height": 340,
+            "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, mu(add, gv(newsIdx), 1))$"
+          },
+          "visible": true,
+          "children": [
+            {
+              "id": "np_c1_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 472, "height": 340,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "cornerRadius": 12,
+                "stroke": "#ffffff10",
+                "strokeWidth": 1
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c1_img",
+              "name": "Image",
+              "type": "image",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 472, "height": 230,
+                "src": "$wg(\"https://news.google.com/rss\", rss, img, mu(add, gv(newsIdx), 1))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c1_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 16, "y": 244,
+                "width": 440, "height": 50,
+                "text": "$wg(\"https://news.google.com/rss\", rss, feed, mu(add, gv(newsIdx), 1))$",
+                "fontSize": 15,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c1_date",
+              "name": "Date",
+              "type": "text",
+              "properties": {
+                "x": 16, "y": 300,
+                "width": 440, "height": 20,
+                "text": "$wg(\"https://news.google.com/rss\", rss, date, mu(add, gv(newsIdx), 1))$",
+                "fontSize": 11,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff40",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ]
+        },
+        {
+          "id": "np_card_2",
+          "name": "Card 2",
+          "type": "overlap",
+          "properties": {
+            "x": 532, "y": 690,
+            "width": 472, "height": 340,
+            "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, mu(add, gv(newsIdx), 2))$"
+          },
+          "visible": true,
+          "children": [
+            {
+              "id": "np_c2_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 472, "height": 340,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "cornerRadius": 12,
+                "stroke": "#ffffff10",
+                "strokeWidth": 1
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c2_img",
+              "name": "Image",
+              "type": "image",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 472, "height": 230,
+                "src": "$wg(\"https://news.google.com/rss\", rss, img, mu(add, gv(newsIdx), 2))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c2_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 16, "y": 244,
+                "width": 440, "height": 50,
+                "text": "$wg(\"https://news.google.com/rss\", rss, feed, mu(add, gv(newsIdx), 2))$",
+                "fontSize": 15,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c2_date",
+              "name": "Date",
+              "type": "text",
+              "properties": {
+                "x": 16, "y": 300,
+                "width": 440, "height": 20,
+                "text": "$wg(\"https://news.google.com/rss\", rss, date, mu(add, gv(newsIdx), 2))$",
+                "fontSize": 11,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff40",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ]
+        },
+        {
+          "id": "np_card_3",
+          "name": "Card 3",
+          "type": "overlap",
+          "properties": {
+            "x": 1024, "y": 690,
+            "width": 472, "height": 340,
+            "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, mu(add, gv(newsIdx), 3))$"
+          },
+          "visible": true,
+          "children": [
+            {
+              "id": "np_c3_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 472, "height": 340,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "cornerRadius": 12,
+                "stroke": "#ffffff10",
+                "strokeWidth": 1
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c3_img",
+              "name": "Image",
+              "type": "image",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 472, "height": 230,
+                "src": "$wg(\"https://news.google.com/rss\", rss, img, mu(add, gv(newsIdx), 3))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c3_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 16, "y": 244,
+                "width": 440, "height": 50,
+                "text": "$wg(\"https://news.google.com/rss\", rss, feed, mu(add, gv(newsIdx), 3))$",
+                "fontSize": 15,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c3_date",
+              "name": "Date",
+              "type": "text",
+              "properties": {
+                "x": 16, "y": 300,
+                "width": 440, "height": 20,
+                "text": "$wg(\"https://news.google.com/rss\", rss, date, mu(add, gv(newsIdx), 3))$",
+                "fontSize": 11,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff40",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ]
+        },
+        {
+          "id": "np_card_4",
+          "name": "Card 4",
+          "type": "overlap",
+          "properties": {
+            "x": 1516, "y": 690,
+            "width": 472, "height": 340,
+            "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, mu(add, gv(newsIdx), 4))$"
+          },
+          "visible": true,
+          "children": [
+            {
+              "id": "np_c4_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 472, "height": 340,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "cornerRadius": 12,
+                "stroke": "#ffffff10",
+                "strokeWidth": 1
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c4_img",
+              "name": "Image",
+              "type": "image",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 472, "height": 230,
+                "src": "$wg(\"https://news.google.com/rss\", rss, img, mu(add, gv(newsIdx), 4))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c4_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 16, "y": 244,
+                "width": 440, "height": 50,
+                "text": "$wg(\"https://news.google.com/rss\", rss, feed, mu(add, gv(newsIdx), 4))$",
+                "fontSize": 15,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c4_date",
+              "name": "Date",
+              "type": "text",
+              "properties": {
+                "x": 16, "y": 300,
+                "width": 440, "height": 20,
+                "text": "$wg(\"https://news.google.com/rss\", rss, date, mu(add, gv(newsIdx), 4))$",
+                "fontSize": 11,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff40",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ]
+        },
+        {
+          "id": "np_nav_prev",
+          "name": "Prev Button",
+          "type": "overlap",
+          "properties": {
+            "x": 840, "y": 1060,
+            "width": 80, "height": 44,
+            "clickAction": "inc:newsIdx:-1"
+          },
+          "visible": true,
+          "children": [
+            {
+              "id": "np_nav_prev_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 80, "height": 44,
+                "shapeKind": "rectangle",
+                "fill": "#4a9eff",
+                "cornerRadius": 22
+              },
+              "visible": true
+            },
+            {
+              "id": "np_nav_prev_arr",
+              "name": "Arrow",
+              "type": "text",
+              "properties": {
+                "x": 0, "y": 6,
+                "width": 80, "height": 32,
+                "text": "\u2039",
+                "fontSize": 28,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "center"
+              },
+              "visible": true
+            }
+          ]
+        },
+        {
+          "id": "np_nav_page",
+          "name": "Page Indicator",
+          "type": "text",
+          "properties": {
+            "x": 940, "y": 1072,
+            "width": 168, "height": 22,
+            "text": "$wg(\"https://news.google.com/rss\", rss, cnt, 0)$ articles",
+            "fontSize": 14,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff50",
+            "textAlign": "center"
+          },
+          "visible": true
+        },
+        {
+          "id": "np_nav_next",
+          "name": "Next Button",
+          "type": "overlap",
+          "properties": {
+            "x": 1128, "y": 1060,
+            "width": 80, "height": 44,
+            "clickAction": "inc:newsIdx:1"
+          },
+          "visible": true,
+          "children": [
+            {
+              "id": "np_nav_next_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0, "y": 0,
+                "width": 80, "height": 44,
+                "shapeKind": "rectangle",
+                "fill": "#4a9eff",
+                "cornerRadius": 22
+              },
+              "visible": true
+            },
+            {
+              "id": "np_nav_next_arr",
+              "name": "Arrow",
+              "type": "text",
+              "properties": {
+                "x": 0, "y": 6,
+                "width": 80, "height": 32,
+                "text": "\u203A",
+                "fontSize": 28,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "center"
+              },
+              "visible": true
+            }
+          ]
         }
       ]
     }

@@ -1,10 +1,15 @@
 <script lang="ts">
-  import { getSelectedLayer, updateLayerProperty } from "../stores/project.svelte";
+  import { getSelectedLayer, updateLayerProperty, getProject } from "../stores/project.svelte";
   import { convertFileSrc } from "@tauri-apps/api/core";
   import FormulaHelper from "./FormulaHelper.svelte";
   import AnimationPanel from "./AnimationPanel.svelte";
+  import IconPicker from "./IconPicker.svelte";
+  import { SYSTEM_FONTS } from "../data/fonts";
+  import { getProjectFontNames, loadFont } from "../fonts/fontLoader";
 
   let formulaHelperOpen = $state(false);
+  let iconPickerOpen = $state(false);
+  let showCustomFont = $state(false);
 
   function handleFormulaInsert(formula: string) {
     const layer = getSelectedLayer();
@@ -59,6 +64,46 @@
     if (!layer) return;
     const target = e.target as HTMLSelectElement;
     updateLayerProperty(layer.id, key, target.value);
+  }
+
+  async function handleImportFont() {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const { invoke } = await import("@tauri-apps/api/core");
+      const path = await open({
+        filters: [{ name: "Fonts", extensions: ["ttf", "otf", "woff", "woff2"] }],
+        multiple: false,
+      });
+      if (path) {
+        const assetDir = getProject().assetDir;
+        if (!assetDir) {
+          alert("Save the project first to import fonts.");
+          return;
+        }
+        const savedPath = await invoke<string>("copy_asset_to_project", { sourcePath: path, assetDir, subfolder: "fonts" });
+        const name = String(path).split("/").pop()?.replace(/\.(ttf|otf|woff2?)$/i, "") ?? "Custom";
+        await loadFont(name, savedPath);
+        const layer = getSelectedLayer();
+        if (layer) updateLayerProperty(layer.id, "fontFamily", name);
+      }
+    } catch (e) {
+      console.error("Font import failed:", e);
+    }
+  }
+
+  function handleIconSelect(iconSet: string, glyphCode: string, iconSrc?: string) {
+    const layer = getSelectedLayer();
+    if (!layer) return;
+    if (iconSrc) {
+      updateLayerProperty(layer.id, "iconSrc", iconSrc);
+    }
+    if (glyphCode) {
+      updateLayerProperty(layer.id, "glyphCode", glyphCode);
+    }
+    if (iconSet && iconSet !== "apk") {
+      updateLayerProperty(layer.id, "iconSet", iconSet);
+    }
+    iconPickerOpen = false;
   }
 
   function onShadowInput(field: "color" | "dx" | "dy" | "radius", e: Event) {
@@ -119,6 +164,8 @@
         <div class="prop-stack" style="margin-top: 6px;">
           <label>Visible (formula)</label>
           <input type="text" value={props.visible ?? ""} placeholder="e.g. $gv(myvar)$" oninput={(e) => onInput("visible", e)} />
+          <label>Click Action</label>
+          <input type="text" value={props.clickAction ?? ""} placeholder="set:var:val / inc:var:amt / url:..." oninput={(e) => onInput("clickAction", e)} />
         </div>
       </section>
 
@@ -134,7 +181,31 @@
             <label>Font Size</label>
             <input type="number" value={props.fontSize ?? 24} oninput={(e) => onInput("fontSize", e)} />
             <label>Font Family</label>
-            <input type="text" value={props.fontFamily ?? "sans-serif"} oninput={(e) => onInput("fontFamily", e)} />
+            {#if showCustomFont}
+              <div class="input-row">
+                <input type="text" value={props.fontFamily ?? "sans-serif"} oninput={(e) => onInput("fontFamily", e)} placeholder="Custom font name" />
+                <button class="browse-btn" title="Back to list" onclick={() => showCustomFont = false}>List</button>
+              </div>
+            {:else}
+              <div class="input-row">
+                <select value={props.fontFamily ?? "sans-serif"} onchange={(e) => onSelectInput("fontFamily", e)}>
+                  <optgroup label="System Fonts">
+                    {#each SYSTEM_FONTS as font}
+                      <option value={font.family}>{font.name}</option>
+                    {/each}
+                  </optgroup>
+                  {#if getProjectFontNames().length > 0}
+                    <optgroup label="Project Fonts">
+                      {#each getProjectFontNames() as name}
+                        <option value={name}>{name}</option>
+                      {/each}
+                    </optgroup>
+                  {/if}
+                </select>
+                <button class="browse-btn" title="Type custom font" onclick={() => showCustomFont = true}>...</button>
+              </div>
+            {/if}
+            <button class="browse-btn" style="margin-top: 2px; width: 100%; text-align: center;" title="Import font file (.ttf, .otf, .woff2)" onclick={handleImportFont}>Import Font</button>
             <label>Color</label>
             <input type="color" value={props.color ?? "#ffffff"} oninput={(e) => onInput("color", e)} />
             <label>Align</label>
@@ -214,6 +285,8 @@
               <option value="crop">Crop</option>
               <option value="stretch">Stretch</option>
             </select>
+            <label>Corner Radius</label>
+            <input type="number" min="0" value={props.cornerRadius ?? 0} oninput={(e) => onInput("cornerRadius", e)} />
             <label>Tint</label>
             <input type="color" value={props.tint ?? "#ffffff"} oninput={(e) => onInput("tint", e)} />
           </div>
@@ -283,10 +356,29 @@
         <section class="prop-section">
           <div class="section-title">Font Icon</div>
           <div class="prop-stack">
+            <button class="browse-btn" style="width: 100%; text-align: center; padding: 6px; font-weight: 600;" onclick={() => iconPickerOpen = true}>Choose Icon</button>
+            {#if props.iconSrc}
+              <div class="image-preview-small">
+                <img src={getImageSrc(String(props.iconSrc))} alt="icon preview" />
+              </div>
+            {:else if props.glyphCode}
+              <div class="icon-preview">
+                {#if (props.iconSet ?? "material") === "material"}
+                  <span style="font-family: 'Material Icons'; font-size: 36px; color: {props.color ?? '#ffffff'};">{String.fromCodePoint(parseInt(props.glyphCode, 16) || 0x3f)}</span>
+                {:else}
+                  <span style="font-family: 'Font Awesome 6 Free'; font-weight: 900; font-size: 32px; color: {props.color ?? '#ffffff'};">{String.fromCodePoint(parseInt(props.glyphCode, 16) || 0x3f)}</span>
+                {/if}
+              </div>
+            {/if}
             <label>Icon Set</label>
-            <input type="text" value={props.iconSet ?? "material"} oninput={(e) => onInput("iconSet", e)} />
-            <label>Glyph Code</label>
-            <input type="text" value={props.glyphCode ?? ""} oninput={(e) => onInput("glyphCode", e)} />
+            <select value={props.iconSet ?? "material"} onchange={(e) => onSelectInput("iconSet", e)}>
+              <option value="material">Material Icons</option>
+              <option value="fontawesome">Font Awesome</option>
+            </select>
+            <label>Glyph Code (hex)</label>
+            <input type="text" value={props.glyphCode ?? ""} placeholder="e.g. e88a" oninput={(e) => onInput("glyphCode", e)} />
+            <label>Icon Source (path)</label>
+            <input type="text" value={props.iconSrc ?? ""} placeholder="SVG/PNG path" oninput={(e) => onInput("iconSrc", e)} />
             <label>Color</label>
             <input type="color" value={props.color ?? "#ffffff"} oninput={(e) => onInput("color", e)} />
             <label>Font Size</label>
@@ -305,6 +397,13 @@
   open={formulaHelperOpen}
   onInsert={handleFormulaInsert}
   onClose={() => formulaHelperOpen = false}
+/>
+
+<IconPicker
+  open={iconPickerOpen}
+  onSelect={handleIconSelect}
+  onClose={() => iconPickerOpen = false}
+  assetDir={getProject().assetDir ?? ""}
 />
 
 <style>
@@ -439,6 +538,16 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+  }
+  .icon-preview {
+    width: 100%;
+    height: 60px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
   }
   .child-count {
     font-size: 11px;

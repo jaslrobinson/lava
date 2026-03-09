@@ -30,3 +30,12 @@ pub fn quit_app(app: tauri::AppHandle) -> Result<(), String> {
 pub fn is_wallpaper_running() -> bool {
     wallpaper::is_wallpaper_active()
 }
+
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    std::process::Command::new("xdg-open")
+        .arg(&url)
+        .spawn()
+        .map_err(|e| format!("Failed to open URL: {}", e))?;
+    Ok(())
+}
