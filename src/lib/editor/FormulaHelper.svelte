@@ -207,10 +207,17 @@
     {
       name: "Web Get",
       options: [
-        { name: "JSON Value", formula: '$wg("URL", json, "$.path.to.value")$' },
-        { name: "RSS Title", formula: '$wg("URL", rss, title, 0)$' },
+        { name: "JSON Value", formula: '$wg("URL", json, path.to.value, 0)$' },
+        { name: "RSS Title", formula: '$wg("URL", rss, feed, 0)$' },
+        { name: "RSS Description", formula: '$wg("URL", rss, desc, 0)$' },
+        { name: "RSS Link", formula: '$wg("URL", rss, link, 0)$' },
+        { name: "RSS Date", formula: '$wg("URL", rss, date, 0)$' },
+        { name: "RSS Image", formula: '$wg("URL", rss, img, 0)$' },
+        { name: "RSS Item Count", formula: '$wg("URL", rss, cnt)$' },
+        { name: "RSS Feed Title", formula: '$wg("URL", rss, ftitle)$' },
+        { name: "RSS Cycling Item", formula: '$wg("URL", rss, feed, gv(timer))$' },
         { name: "Plain Text", formula: '$wg("URL", txt)$' },
-        { name: "Raw Content", formula: '$wg("URL", raw)$' },
+        { name: "Text Line", formula: '$wg("URL", txt, line, 0)$' },
       ],
     },
     {
@@ -227,6 +234,11 @@
     {
       name: "Math",
       options: [
+        { name: "Add", formula: "$mu(add, A, B)$" },
+        { name: "Subtract", formula: "$mu(sub, A, B)$" },
+        { name: "Multiply", formula: "$mu(mul, A, B)$" },
+        { name: "Divide", formula: "$mu(div, A, B)$" },
+        { name: "Modulo", formula: "$mu(mod, A, B)$" },
         { name: "Round", formula: "$mu(round, VALUE, PLACES)$" },
         { name: "Floor", formula: "$mu(floor, VALUE)$" },
         { name: "Ceiling", formula: "$mu(ceil, VALUE)$" },
@@ -240,6 +252,8 @@
         { name: "Cosine", formula: "$mu(cos, DEGREES)$" },
         { name: "Hex to Decimal", formula: "$mu(h2d, HEX)$" },
         { name: "Decimal to Hex", formula: "$mu(d2h, NUMBER)$" },
+        { name: "Inline Arithmetic", formula: "$mu(add, gv(score), 10)$" },
+        { name: "Cycle Timer (10s)", formula: "$mu(mod, mu(floor, mu(div, dp(s), 10)), 10)$" },
       ],
     },
     {
@@ -280,17 +294,21 @@
     {
       name: "Loops",
       options: [
-        { name: "Count 1 to 10", formula: '$fl(1, 10, "i + 1", "i", " ")$' },
-        { name: "Next 7 Days", formula: '$fl(0, 6, "i + 1", df(EEE, a + i + d), " ")$' },
-        { name: "Repeat Symbol", formula: '$fl(1, 5, "i + 1", "#")$' },
-        { name: "Custom Loop", formula: '$fl(START, END, "i + 1", BODY, SEPARATOR)$' },
+        { name: "Count 1 to 10", formula: "$fl(1, 10, 1, lv(i), \" \")$" },
+        { name: "Count by 2s", formula: "$fl(0, 10, 2, lv(i), \", \")$" },
+        { name: "Repeat Symbol", formula: '$fl(1, 5, 1, "#")$' },
+        { name: "Countdown", formula: "$fl(10, 1, -1, lv(i), \" \")$" },
+        { name: "Custom Loop", formula: "$fl(START, END, STEP, BODY, SEPARATOR)$" },
       ],
     },
     {
       name: "Variables",
       options: [
         { name: "Get Global", formula: "$gv(name)$" },
-        { name: "Get Local", formula: "$lv(name)$" },
+        { name: "Get Local (in loop)", formula: "$lv(i)$" },
+        { name: "Global + Arithmetic", formula: "$mu(add, gv(name), 1)$" },
+        { name: "Nested in Web Get", formula: '$wg("URL", rss, feed, gv(index))$' },
+        { name: "Nested in Condition", formula: '$if(gv(toggle), "ON", "OFF")$' },
       ],
     },
   ];

@@ -6,7 +6,6 @@
     removeLayer,
     isContainerType,
     moveLayer,
-    flattenLayers,
   } from "../stores/project.svelte";
   import type { Layer } from "../types/project";
 

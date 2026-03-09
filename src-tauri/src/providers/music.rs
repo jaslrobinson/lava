@@ -22,6 +22,7 @@ impl DataProvider for MusicProvider {
             ("volume", "{{volume}}"),
             ("position", "{{position}}"),
             ("length", "{{mpris:length}}"),
+            ("cover", "{{mpris:artUrl}}"),
         ];
 
         for (field, fmt) in &queries {

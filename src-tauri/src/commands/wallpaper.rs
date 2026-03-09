@@ -4,8 +4,24 @@ use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-static WALLPAPER_ACTIVE: AtomicBool = AtomicBool::new(false);
+pub static WALLPAPER_ACTIVE: AtomicBool = AtomicBool::new(false);
 static WALLPAPER_PID: Mutex<Option<u32>> = Mutex::new(None);
+
+/// Check if wallpaper is currently running.
+pub fn is_wallpaper_active() -> bool {
+    WALLPAPER_ACTIVE.load(Ordering::Relaxed)
+}
+
+/// Kill the wallpaper helper process if running (used by tray quit).
+pub fn kill_wallpaper_process() {
+    if let Some(pid) = WALLPAPER_PID.lock().unwrap().take() {
+        eprintln!("[wallpaper] Killing helper process PID {} (tray quit)", pid);
+        unsafe {
+            libc::kill(pid as i32, libc::SIGTERM);
+        }
+    }
+    WALLPAPER_ACTIVE.store(false, Ordering::Relaxed);
+}
 
 /// Find the klwp-wallpaper binary (next to the main binary, or in target/debug)
 fn find_wallpaper_binary() -> Option<std::path::PathBuf> {
@@ -114,17 +130,6 @@ pub fn stop_wallpaper_mode(window: tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 
-#[tauri::command]
-pub fn is_wallpaper_active() -> bool {
-    WALLPAPER_ACTIVE.load(Ordering::Relaxed)
-}
-
-#[tauri::command]
-pub fn get_display_server() -> String {
-    let ds = if std::env::var("WAYLAND_DISPLAY").is_ok() { "wayland" } else if std::env::var("DISPLAY").is_ok() { "x11" } else { "unknown" };
-    format!("{} ({})", ds, detect_compositor())
-}
-
 fn detect_compositor() -> String {
     if std::env::var("HYPRLAND_INSTANCE_SIGNATURE").is_ok() {
         return "hyprland".to_string();
@@ -137,3 +142,4 @@ fn detect_compositor() -> String {
     }
     "unknown".to_string()
 }
+

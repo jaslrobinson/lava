@@ -27,10 +27,26 @@
 
     // Listen for global shortcut exit event (Super+Escape)
     const { listen } = await import("@tauri-apps/api/event");
-    const unlisten = await listen("exit-wallpaper", () => {
+    const unlistenExit = await listen("exit-wallpaper", () => {
       exitWallpaperMode();
     });
-    return unlisten;
+
+    // Listen for tray "Stop Wallpaper" event
+    const unlistenTrayStop = await listen("tray-stop-wallpaper", () => {
+      exitWallpaperMode();
+    });
+
+    // Listen for tray "Start Wallpaper" event (show editor so user can start)
+    const unlistenTrayStart = await listen("tray-start-wallpaper", () => {
+      // The editor window is already shown by the tray handler;
+      // this event is a hint to the frontend if needed in future.
+    });
+
+    return () => {
+      unlistenExit();
+      unlistenTrayStop();
+      unlistenTrayStart();
+    };
   });
 
   async function exitWallpaperMode() {

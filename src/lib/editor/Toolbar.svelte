@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType, setWallpaperMode } from "../stores/project.svelte";
+  import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType } from "../stores/project.svelte";
   import type { LayerType, Project } from "../types/project";
 
   async function handleSave() {
@@ -7,7 +7,7 @@
       const { save } = await import("@tauri-apps/plugin-dialog");
       const { invoke } = await import("@tauri-apps/api/core");
       const path = await save({
-        filters: [{ name: "KustomLinux Project", extensions: ["klwp", "json"] }],
+        filters: [{ name: "KLLW Project", extensions: ["klwp", "json"] }],
         defaultPath: `${getProject().name}.klwp`,
       });
       if (path) {
@@ -23,7 +23,7 @@
       const { open } = await import("@tauri-apps/plugin-dialog");
       const { invoke } = await import("@tauri-apps/api/core");
       const path = await open({
-        filters: [{ name: "KustomLinux Project", extensions: ["klwp", "json"] }],
+        filters: [{ name: "KLLW Project", extensions: ["klwp", "json"] }],
         multiple: false,
       });
       if (path) {
@@ -147,7 +147,7 @@
     {#if wallpaperStatus}
       <span class="import-status">{wallpaperStatus}</span>
     {/if}
-    <button class="toolbar-btn" title="Import .klwp preset" onclick={handleImportKlwp}>
+    <button class="toolbar-btn" title="Import KLWP preset" onclick={handleImportKlwp}>
       <span class="btn-label">Import KLWP</span>
     </button>
     {#if importStatus}

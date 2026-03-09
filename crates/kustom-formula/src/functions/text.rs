@@ -89,6 +89,23 @@ pub fn eval_tc(args: &[Expr], ctx: &EvalContext) -> Value {
                 None => Value::Text(String::new()),
             }
         }
+        "roman" => {
+            let n = get_num_arg(args, 1, ctx) as i64;
+            Value::Text(to_roman(n))
+        }
+        "url" => {
+            let text = get_text_arg(args, 1, ctx);
+            Value::Text(url_encode(&text))
+        }
+        "html" => {
+            let text = get_text_arg(args, 1, ctx);
+            Value::Text(strip_html(&text))
+        }
+        "json" => {
+            let text = get_text_arg(args, 1, ctx);
+            let path = get_text_arg(args, 2, ctx);
+            Value::Text(json_extract(&text, &path))
+        }
         _ => Value::Text(String::new()),
     }
 }
@@ -172,6 +189,237 @@ fn number_to_words(n: i64) -> String {
             }
         }
         _ => n.to_string(),
+    }
+}
+
+fn to_roman(n: i64) -> String {
+    if n < 1 || n > 3999 {
+        return String::new();
+    }
+    let table: &[(i64, &str)] = &[
+        (1000, "M"),
+        (900, "CM"),
+        (500, "D"),
+        (400, "CD"),
+        (100, "C"),
+        (90, "XC"),
+        (50, "L"),
+        (40, "XL"),
+        (10, "X"),
+        (9, "IX"),
+        (5, "V"),
+        (4, "IV"),
+        (1, "I"),
+    ];
+    let mut result = String::new();
+    let mut remaining = n;
+    for &(value, symbol) in table {
+        while remaining >= value {
+            result.push_str(symbol);
+            remaining -= value;
+        }
+    }
+    result
+}
+
+fn url_encode(s: &str) -> String {
+    let mut result = String::new();
+    for byte in s.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                result.push(byte as char);
+            }
+            _ => {
+                result.push_str(&format!("%{:02X}", byte));
+            }
+        }
+    }
+    result
+}
+
+fn strip_html(s: &str) -> String {
+    let mut result = String::new();
+    let mut in_tag = false;
+    for ch in s.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => result.push(ch),
+            _ => {}
+        }
+    }
+    result
+}
+
+fn json_extract(text: &str, path: &str) -> String {
+    // Minimal JSON value extraction supporting dot-separated paths.
+    // Handles nested objects, strings, numbers, booleans, and null.
+    let trimmed = text.trim();
+    if path.is_empty() {
+        return json_value_to_string(trimmed);
+    }
+
+    let keys: Vec<&str> = path.split('.').collect();
+    let mut current = trimmed;
+
+    for key in &keys {
+        // Find key in current JSON object
+        current = current.trim();
+        if !current.starts_with('{') {
+            return String::new();
+        }
+        match json_find_key(current, key) {
+            Some(val) => current = val,
+            None => return String::new(),
+        }
+    }
+
+    json_value_to_string(current.trim())
+}
+
+/// Find the value for a given key in a JSON object string, returning the raw value substring.
+fn json_find_key<'a>(obj: &'a str, key: &str) -> Option<&'a str> {
+    let bytes = obj.as_bytes();
+    let len = bytes.len();
+    // Skip the opening '{'
+    let mut i = 1;
+
+    loop {
+        // Skip whitespace
+        while i < len && (bytes[i] as char).is_whitespace() {
+            i += 1;
+        }
+        if i >= len || bytes[i] == b'}' {
+            return None;
+        }
+        // Skip comma
+        if bytes[i] == b',' {
+            i += 1;
+            continue;
+        }
+        // Expect a key string
+        if bytes[i] != b'"' {
+            return None;
+        }
+        let key_start = i + 1;
+        i = key_start;
+        while i < len && bytes[i] != b'"' {
+            if bytes[i] == b'\\' {
+                i += 1;
+            }
+            i += 1;
+        }
+        if i >= len {
+            return None;
+        }
+        let found_key = &obj[key_start..i];
+        i += 1; // skip closing '"'
+        // Skip whitespace and colon
+        while i < len && (bytes[i] as char).is_whitespace() {
+            i += 1;
+        }
+        if i >= len || bytes[i] != b':' {
+            return None;
+        }
+        i += 1;
+        while i < len && (bytes[i] as char).is_whitespace() {
+            i += 1;
+        }
+        // Find the extent of the value
+        let val_start = i;
+        i = json_skip_value(obj, i)?;
+        if found_key == key {
+            return Some(obj[val_start..i].trim());
+        }
+    }
+}
+
+/// Skip over a JSON value starting at position `i`, return position after value.
+fn json_skip_value(s: &str, i: usize) -> Option<usize> {
+    let bytes = s.as_bytes();
+    let len = bytes.len();
+    if i >= len {
+        return None;
+    }
+    match bytes[i] {
+        b'"' => {
+            let mut j = i + 1;
+            while j < len {
+                if bytes[j] == b'\\' {
+                    j += 2;
+                    continue;
+                }
+                if bytes[j] == b'"' {
+                    return Some(j + 1);
+                }
+                j += 1;
+            }
+            None
+        }
+        b'{' => {
+            let mut depth = 1;
+            let mut j = i + 1;
+            while j < len && depth > 0 {
+                match bytes[j] {
+                    b'"' => {
+                        j += 1;
+                        while j < len && bytes[j] != b'"' {
+                            if bytes[j] == b'\\' {
+                                j += 1;
+                            }
+                            j += 1;
+                        }
+                    }
+                    b'{' => depth += 1,
+                    b'}' => depth -= 1,
+                    _ => {}
+                }
+                j += 1;
+            }
+            Some(j)
+        }
+        b'[' => {
+            let mut depth = 1;
+            let mut j = i + 1;
+            while j < len && depth > 0 {
+                match bytes[j] {
+                    b'"' => {
+                        j += 1;
+                        while j < len && bytes[j] != b'"' {
+                            if bytes[j] == b'\\' {
+                                j += 1;
+                            }
+                            j += 1;
+                        }
+                    }
+                    b'[' => depth += 1,
+                    b']' => depth -= 1,
+                    _ => {}
+                }
+                j += 1;
+            }
+            Some(j)
+        }
+        _ => {
+            // number, bool, null
+            let mut j = i;
+            while j < len && bytes[j] != b',' && bytes[j] != b'}' && bytes[j] != b']'
+                && !(bytes[j] as char).is_whitespace()
+            {
+                j += 1;
+            }
+            Some(j)
+        }
+    }
+}
+
+fn json_value_to_string(s: &str) -> String {
+    let s = s.trim();
+    if s.starts_with('"') && s.ends_with('"') && s.len() >= 2 {
+        // Strip quotes
+        s[1..s.len() - 1].to_string()
+    } else {
+        s.to_string()
     }
 }
 
@@ -306,5 +554,72 @@ mod tests {
             Expr::Literal(Value::Number(65.0)),
         ];
         assert_eq!(eval_tc(&args, &ctx).as_text(), "A");
+    }
+
+    #[test]
+    fn test_roman() {
+        assert_eq!(to_roman(1), "I");
+        assert_eq!(to_roman(4), "IV");
+        assert_eq!(to_roman(9), "IX");
+        assert_eq!(to_roman(42), "XLII");
+        assert_eq!(to_roman(1994), "MCMXCIV");
+        assert_eq!(to_roman(3999), "MMMCMXCIX");
+        assert_eq!(to_roman(0), "");
+        assert_eq!(to_roman(4000), "");
+    }
+
+    #[test]
+    fn test_tc_roman() {
+        let ctx = EvalContext::new();
+        let args = vec![
+            Expr::Literal(Value::Text("roman".into())),
+            Expr::Literal(Value::Number(42.0)),
+        ];
+        assert_eq!(eval_tc(&args, &ctx).as_text(), "XLII");
+    }
+
+    #[test]
+    fn test_url_encode() {
+        assert_eq!(url_encode("hello world"), "hello%20world");
+        assert_eq!(url_encode("a&b=c"), "a%26b%3Dc");
+        assert_eq!(url_encode("abc"), "abc");
+    }
+
+    #[test]
+    fn test_tc_url() {
+        assert_eq!(eval_tc_simple("url", "hello world").as_text(), "hello%20world");
+    }
+
+    #[test]
+    fn test_strip_html() {
+        assert_eq!(strip_html("<b>bold</b>"), "bold");
+        assert_eq!(strip_html("no tags"), "no tags");
+        assert_eq!(strip_html("<p>one</p><p>two</p>"), "onetwo");
+        assert_eq!(strip_html("<a href=\"x\">link</a>"), "link");
+    }
+
+    #[test]
+    fn test_tc_html() {
+        assert_eq!(eval_tc_simple("html", "<b>bold</b>").as_text(), "bold");
+    }
+
+    #[test]
+    fn test_json_extract() {
+        assert_eq!(json_extract(r#"{"a":1}"#, "a"), "1");
+        assert_eq!(json_extract(r#"{"a":{"b":2}}"#, "a.b"), "2");
+        assert_eq!(json_extract(r#"{"a":"hello"}"#, "a"), "hello");
+        assert_eq!(json_extract(r#"{"x":true}"#, "x"), "true");
+        assert_eq!(json_extract(r#"{"a":1}"#, "b"), "");
+    }
+
+    #[test]
+    fn test_tc_json() {
+        let ctx = EvalContext::new();
+        let args = vec![
+            Expr::Literal(Value::Text("json".into())),
+            Expr::Literal(Value::Text(r#"{"a":{"b":1}}"#.into())),
+            Expr::Literal(Value::Text("a.b".into())),
+        ];
+        assert_eq!(eval_tc(&args, &ctx).as_text(), "1");
     }
 }

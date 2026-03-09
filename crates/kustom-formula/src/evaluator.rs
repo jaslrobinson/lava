@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::functions::{color, date, logic, math, text, variables};
+use crate::functions::{color, date, logic, math, shell, text, variables, web};
 use crate::parser::{BinOp, Expr};
 use crate::value::Value;
 
@@ -75,6 +75,8 @@ impl EvalContext {
             "cm" => color::eval_cm(args, self),
             "gv" => variables::eval_gv(args, self),
             "lv" => variables::eval_lv(args, self),
+            "wg" => web::eval_wg(args, self),
+            "sh" => shell::eval_sh(args, self),
             _ => {
                 // Check if it's a provider function (bi, wi, mi, si, etc.)
                 if name.len() >= 2 {

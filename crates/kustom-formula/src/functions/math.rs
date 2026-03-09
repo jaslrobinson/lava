@@ -68,6 +68,29 @@ pub fn eval_mu(args: &[Expr], ctx: &EvalContext) -> Value {
                 0.0
             }
         }
+        "add" => {
+            nums.iter().sum::<f64>()
+        }
+        "sub" => {
+            if nums.len() >= 2 { nums[0] - nums[1] } else { 0.0 }
+        }
+        "mul" => {
+            if nums.len() >= 2 { nums[0] * nums[1] } else { 0.0 }
+        }
+        "mod" => {
+            if nums.len() >= 2 && nums[1] != 0.0 {
+                nums[0] % nums[1]
+            } else {
+                0.0
+            }
+        }
+        "div" => {
+            if nums.len() >= 2 && nums[1] != 0.0 {
+                nums[0] / nums[1]
+            } else {
+                0.0
+            }
+        }
         "h2d" => {
             // Hex string to decimal (the argument is passed as a text, re-evaluate)
             let hex_str = if args.len() > 1 {

@@ -309,7 +309,26 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
   ctx.restore();
 }
 
-function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, _w: number, _h: number) {
+/** Word-wrap text to fit within maxWidth, splitting on spaces */
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  if (maxWidth <= 0 || ctx.measureText(text).width <= maxWidth) return [text];
+  const words = text.split(/(\s+)/); // keep whitespace tokens for accurate joining
+  const lines: string[] = [];
+  let current = "";
+  for (const word of words) {
+    const test = current + word;
+    if (current && ctx.measureText(test).width > maxWidth) {
+      lines.push(current.trimEnd());
+      current = word.trimStart();
+    } else {
+      current = test;
+    }
+  }
+  if (current) lines.push(current.trimEnd());
+  return lines.length > 0 ? lines : [text];
+}
+
+function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, _h: number) {
   const props = layer.properties;
   const fontSize = resolveNumber(props.fontSize, 24);
   const fontFamily = props.fontFamily || "sans-serif";
@@ -330,13 +349,18 @@ function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: n
   }
 
   let textX = x;
-  if (align === "center") textX = x + resolveNumber(props.width, 100) / 2;
-  else if (align === "right") textX = x + resolveNumber(props.width, 100);
+  if (align === "center") textX = x + w / 2;
+  else if (align === "right") textX = x + w;
 
-  // Multi-line rendering
-  const lines = text.split("\n");
+  // Split on explicit newlines, then word-wrap each line to fit within width
+  const rawLines = text.split("\n");
+  const wrappedLines: string[] = [];
+  for (const line of rawLines) {
+    wrappedLines.push(...wrapText(ctx, line, w));
+  }
+
   const maxLines = resolveNumber(props.maxLines, 0);
-  const displayLines = maxLines > 0 ? lines.slice(0, maxLines) : lines;
+  const displayLines = maxLines > 0 ? wrappedLines.slice(0, maxLines) : wrappedLines;
   const lineSpacing = resolveNumber(props.lineSpacing, 0);
   const lineHeight = fontSize + lineSpacing;
 

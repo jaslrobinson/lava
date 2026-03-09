@@ -4,11 +4,6 @@ use std::fs;
 use std::path::Path;
 
 #[tauri::command]
-pub fn new_project(width: u32, height: u32) -> Project {
-    Project::new(width, height)
-}
-
-#[tauri::command]
 pub fn save_project(path: String, project: Project) -> Result<(), String> {
     let json = serde_json::to_string_pretty(&project).map_err(|e| e.to_string())?;
     fs::write(&path, json).map_err(|e| e.to_string())
@@ -41,7 +36,3 @@ pub fn import_klwp(path: String, target_width: u32, target_height: u32) -> Resul
     )
 }
 
-#[tauri::command]
-pub fn resolve_asset(path: String, asset_dir: String) -> String {
-    klwp_import::resolve_asset_path(&path, &asset_dir)
-}

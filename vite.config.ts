@@ -36,14 +36,40 @@ function klwpAssetsPlugin(): Plugin {
   };
 }
 
+/** Serve provider data from temp file so wallpaper WebKitGTK view can poll it */
+function klwpProviderPlugin(): Plugin {
+  return {
+    name: "klwp-providers",
+    configureServer(server) {
+      server.middlewares.use("/__klwp_providers", (_req, res) => {
+        // Must match Rust's std::env::temp_dir() which uses TMPDIR or /tmp
+        const filePath = path.join(
+          process.env.TMPDIR || "/tmp",
+          "klwp-provider-data.json",
+        );
+        fs.readFile(filePath, "utf-8", (err, data) => {
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          if (err) {
+            res.end("{}");
+          } else {
+            res.end(data);
+          }
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [svelte(), klwpAssetsPlugin()],
+  plugins: [svelte(), klwpAssetsPlugin(), klwpProviderPlugin()],
   clearScreen: false,
   server: {
     port: 1420,
     strictPort: true,
     watch: {
-      ignored: ["**/src-tauri/**"],
+      ignored: ["**/src-tauri/**", "**/*.klwp", "**/*_assets/**"],
     },
   },
 });

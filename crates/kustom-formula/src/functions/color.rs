@@ -48,6 +48,16 @@ pub fn eval_ce(args: &[Expr], ctx: &EvalContext) -> Value {
             let (nr, ng, nb) = hsl_to_rgb(h, s, new_l);
             format_color(a, nr, ng, nb)
         }
+        _ if filter.starts_with('#') => {
+            // Gradient mix: ce(color1, color2, percent)
+            // percent 0 = color1, 100 = color2
+            let (a2, r2, g2, b2) = parse_color(&filter);
+            let t = (amount / 100.0).clamp(0.0, 1.0);
+            let mix = |c1: u8, c2: u8| -> u8 {
+                ((c1 as f64) * (1.0 - t) + (c2 as f64) * t).round() as u8
+            };
+            format_color(mix(a, a2), mix(r, r2), mix(g, g2), mix(b, b2))
+        }
         _ => color_str,
     };
 
@@ -242,6 +252,41 @@ mod tests {
             Expr::Literal(Value::Number(50.0)),  // lightness
         ];
         assert_eq!(eval_cm(&args, &ctx).as_text(), "#FF0000");
+    }
+
+    #[test]
+    fn test_gradient_mix_0() {
+        let ctx = EvalContext::new();
+        let args = vec![
+            Expr::Literal(Value::Text("#FF0000".into())),
+            Expr::Literal(Value::Text("#0000FF".into())),
+            Expr::Literal(Value::Number(0.0)),
+        ];
+        assert_eq!(eval_ce(&args, &ctx).as_text(), "#FF0000");
+    }
+
+    #[test]
+    fn test_gradient_mix_100() {
+        let ctx = EvalContext::new();
+        let args = vec![
+            Expr::Literal(Value::Text("#FF0000".into())),
+            Expr::Literal(Value::Text("#0000FF".into())),
+            Expr::Literal(Value::Number(100.0)),
+        ];
+        assert_eq!(eval_ce(&args, &ctx).as_text(), "#0000FF");
+    }
+
+    #[test]
+    fn test_gradient_mix_50() {
+        let ctx = EvalContext::new();
+        let args = vec![
+            Expr::Literal(Value::Text("#FF0000".into())),
+            Expr::Literal(Value::Text("#0000FF".into())),
+            Expr::Literal(Value::Number(50.0)),
+        ];
+        let result = eval_ce(&args, &ctx).as_text();
+        // 50% mix of red and blue: R=128, G=0, B=128
+        assert_eq!(result, "#800080");
     }
 
     #[test]

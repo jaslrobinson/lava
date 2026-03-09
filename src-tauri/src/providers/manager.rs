@@ -65,9 +65,20 @@ impl ProviderManager {
                     }
                 }
 
-                if changed {
+                // Always write provider data to temp file for wallpaper WebKitGTK view
+                {
                     let data_read = data.read().await;
-                    let _ = app.emit("provider-data-update", &*data_read);
+                    if changed {
+                        let _ = app.emit("provider-data-update", &*data_read);
+                    }
+                    if let Ok(json) = serde_json::to_string(&*data_read) {
+                        let path = std::env::temp_dir().join("klwp-provider-data.json");
+                        // Write atomically: write to temp then rename to avoid partial reads
+                        let tmp_path = std::env::temp_dir().join("klwp-provider-data.json.tmp");
+                        if std::fs::write(&tmp_path, &json).is_ok() {
+                            let _ = std::fs::rename(&tmp_path, &path);
+                        }
+                    }
                 }
             }
         });

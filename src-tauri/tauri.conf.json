@@ -1,7 +1,7 @@
 {
-  "productName": "KustomLinux",
+  "productName": "KLLW",
   "version": "0.1.0",
-  "identifier": "com.kustomlinux.app",
+  "identifier": "com.kllw.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
@@ -11,15 +11,19 @@
   "app": {
     "windows": [
       {
-        "title": "KustomLinux Editor",
+        "title": "Kustom Linux Live Wallpaper",
         "width": 1400,
         "height": 900,
         "resizable": true,
         "fullscreen": false
       }
     ],
+    "trayIcon": {
+      "iconPath": "icons/icon.png",
+      "tooltip": "KLLW - Kustom Linux Live Wallpaper"
+    },
     "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'",
+      "csp": "default-src 'self'; connect-src 'self' https: http:; img-src 'self' asset: https://asset.localhost http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'",
       "assetProtocol": {
         "enable": true,
         "scope": ["**"]

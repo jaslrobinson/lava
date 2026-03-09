@@ -320,18 +320,3 @@ pub struct Project {
     pub layers: Vec<Layer>,
 }
 
-impl Project {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self {
-            version: "0.1.0".to_string(),
-            name: "Untitled".to_string(),
-            resolution: Resolution { width, height },
-            background: Background {
-                bg_type: BackgroundType::Color,
-                value: "#1a1a2e".to_string(),
-            },
-            globals: Vec::new(),
-            layers: Vec::new(),
-        }
-    }
-}

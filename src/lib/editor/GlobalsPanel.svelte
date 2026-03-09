@@ -6,8 +6,10 @@
     updateGlobal as storeUpdateGlobal,
   } from "../stores/project.svelte";
   import type { GlobalVariable, GlobalVarType } from "../types/project";
+  import FormulaHelper from "./FormulaHelper.svelte";
 
   let editingGlobal = $state<string | null>(null);
+  let formulaHelperTarget = $state<string | null>(null);
 
   function handleUpdateGlobal(name: string, field: string, value: any) {
     storeUpdateGlobal(name, field, value);
@@ -39,6 +41,15 @@
     if (g.type === "color") return String(g.value);
     return String(g.value).substring(0, 30) || "(empty)";
   }
+
+  function handleFormulaInsert(formula: string) {
+    if (!formulaHelperTarget) return;
+    const g = getProject().globals.find(v => v.name === formulaHelperTarget);
+    if (!g) return;
+    const current = String(g.value ?? "");
+    handleUpdateGlobal(g.name, "value", current + formula);
+    formulaHelperTarget = null;
+  }
 </script>
 
 <div class="globals-panel">
@@ -47,7 +58,7 @@
     <button class="add-btn" title="Add global variable" onclick={handleAddGlobal}>+</button>
   </div>
   <div class="globals-list">
-    {#each getProject().globals as g (g.name)}
+    {#each getProject().globals as g, i (i)}
       <div
         style="cursor: pointer; border-left: 2px solid {editingGlobal === g.name ? 'var(--accent)' : 'transparent'}; background: {editingGlobal === g.name ? 'var(--accent-dim)' : 'transparent'}; transition: background 0.1s; user-select: none;"
         onclick={() => editingGlobal = editingGlobal === g.name ? null : g.name}
@@ -70,7 +81,11 @@
           <div class="global-edit" onclick={(e) => e.stopPropagation()}>
             <label>Name</label>
             <input type="text" value={g.name}
-              oninput={(e) => handleUpdateGlobal(g.name, 'name', (e.target as HTMLInputElement).value)} />
+              oninput={(e) => {
+                const newName = (e.target as HTMLInputElement).value;
+                handleUpdateGlobal(g.name, 'name', newName);
+                editingGlobal = newName;
+              }} />
             <label>Type</label>
             <select value={g.type}
               onchange={(e) => handleUpdateGlobal(g.name, 'type', (e.target as HTMLSelectElement).value)}>
@@ -93,12 +108,18 @@
               </button>
             {:else if g.type === "number"}
               <label>Value</label>
-              <input type="number" value={g.value}
-                oninput={(e) => handleUpdateGlobal(g.name, 'value', Number((e.target as HTMLInputElement).value))} />
+              <div class="input-with-fx">
+                <input type="number" value={g.value}
+                  oninput={(e) => handleUpdateGlobal(g.name, 'value', Number((e.target as HTMLInputElement).value))} />
+                <button class="fx-btn" title="Formula Helper" onclick={() => formulaHelperTarget = g.name}>fx</button>
+              </div>
             {:else}
               <label>Value</label>
-              <input type="text" value={g.value}
-                oninput={(e) => handleUpdateGlobal(g.name, 'value', (e.target as HTMLInputElement).value)} />
+              <div class="input-with-fx">
+                <input type="text" value={g.value}
+                  oninput={(e) => handleUpdateGlobal(g.name, 'value', (e.target as HTMLInputElement).value)} />
+                <button class="fx-btn" title="Formula Helper" onclick={() => formulaHelperTarget = g.name}>fx</button>
+              </div>
             {/if}
             {#if g.type === "list" && g.options}
               <label>Options</label>
@@ -111,10 +132,16 @@
       </div>
     {/each}
     {#if getProject().globals.length === 0}
-      <div class="empty-state">No global variables. Import a KLWP preset or add one.</div>
+      <div class="empty-state">No global variables. Import a preset or add one.</div>
     {/if}
   </div>
 </div>
+
+<FormulaHelper
+  open={formulaHelperTarget !== null}
+  onInsert={handleFormulaInsert}
+  onClose={() => formulaHelperTarget = null}
+/>
 
 <style>
   .globals-panel {
@@ -212,6 +239,31 @@
     height: 28px;
     padding: 2px;
     cursor: pointer;
+  }
+  .input-with-fx {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .input-with-fx input {
+    flex: 1;
+  }
+  .fx-btn {
+    font-size: 10px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    padding: 3px 6px;
+    border-radius: 3px;
+    background: var(--bg-input);
+    color: var(--accent);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .fx-btn:hover {
+    background: var(--accent-dim);
+    border-color: var(--accent);
   }
   .empty-state {
     padding: 24px 16px;

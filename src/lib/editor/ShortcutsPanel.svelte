@@ -8,7 +8,7 @@
   <div class="shortcuts-list">
     <div class="empty-state">
       <p>No shortcuts configured.</p>
-      <p class="hint">Touch actions from KLWP imports will appear here once the shortcut system is wired up.</p>
+      <p class="hint">Touch actions from preset imports will appear here once the shortcut system is wired up.</p>
     </div>
   </div>
 </div>
