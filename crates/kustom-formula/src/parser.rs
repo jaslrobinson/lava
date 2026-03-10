@@ -1,5 +1,13 @@
 use crate::value::Value;
+use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
+
+const MAX_PARSE_CACHE: usize = 500;
+
+thread_local! {
+    static PARSE_CACHE: RefCell<HashMap<String, Expr>> = RefCell::new(HashMap::new());
+}
 
 /// AST node for a formula expression.
 #[derive(Debug, Clone, PartialEq)]
@@ -533,8 +541,32 @@ impl Parser {
 }
 
 /// Parse a top-level formula string that may contain `$...$` delimited expressions
-/// mixed with literal text.
+/// mixed with literal text. Results are cached per-thread to avoid re-parsing.
 pub fn parse(input: &str) -> Result<Expr, ParseError> {
+    // Check cache first
+    let cached = PARSE_CACHE.with(|cache| cache.borrow().get(input).cloned());
+    if let Some(expr) = cached {
+        return Ok(expr);
+    }
+
+    let result = parse_uncached(input)?;
+
+    PARSE_CACHE.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        // Prune if too large
+        if cache.len() >= MAX_PARSE_CACHE {
+            let keys: Vec<String> = cache.keys().take(MAX_PARSE_CACHE / 4).cloned().collect();
+            for key in keys {
+                cache.remove(&key);
+            }
+        }
+        cache.insert(input.to_string(), result.clone());
+    });
+
+    Ok(result)
+}
+
+fn parse_uncached(input: &str) -> Result<Expr, ParseError> {
     let chars: Vec<char> = input.chars().collect();
     let mut segments: Vec<Expr> = Vec::new();
     let mut i = 0;

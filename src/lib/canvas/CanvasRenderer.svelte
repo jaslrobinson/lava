@@ -45,12 +45,13 @@
 
   const HANDLE_HIT_RADIUS = 10;
   const HANDLE_PAD = 2;
+  let rafId: number;
 
   onMount(() => {
     ctx = canvas.getContext("2d")!;
     updateCanvasSize();
     loadBundledIconFonts();
-    requestAnimationFrame(renderLoop);
+    rafId = requestAnimationFrame(renderLoop);
 
     startFormulaLoop(() => {
       const project = getProject();
@@ -77,6 +78,7 @@
     window.addEventListener("keyup", onKeyUp);
 
     return () => {
+      cancelAnimationFrame(rafId);
       observer.disconnect();
       stopFormulaLoop();
       window.removeEventListener("keydown", onKeyDown);
@@ -111,7 +113,7 @@
 
   function renderLoop(timestamp: number) {
     if (!ctx) {
-      requestAnimationFrame(renderLoop);
+      rafId = requestAnimationFrame(renderLoop);
       return;
     }
     const project = getProject();
@@ -135,7 +137,7 @@
       renderProject(ctx, project, selectedId, timestamp);
     }
 
-    requestAnimationFrame(renderLoop);
+    rafId = requestAnimationFrame(renderLoop);
   }
 
   /** Convert screen coords to project coords, accounting for zoom/pan */

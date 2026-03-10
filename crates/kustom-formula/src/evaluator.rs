@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use crate::functions::{color, date, logic, math, shell, text, variables, web};
 use crate::parser::{BinOp, Expr};
@@ -9,7 +10,9 @@ pub struct EvalContext {
     pub globals: HashMap<String, Value>,
     pub locals: HashMap<String, Value>,
     /// Provider data keyed by prefix (e.g. "bi", "wi", "mi"), then by field name.
-    pub providers: HashMap<String, HashMap<String, Value>>,
+    pub providers: Arc<HashMap<String, HashMap<String, Value>>>,
+    /// Recursion depth counter to prevent stack overflow from deeply nested formulas.
+    pub depth: usize,
 }
 
 impl EvalContext {
@@ -17,7 +20,8 @@ impl EvalContext {
         EvalContext {
             globals: HashMap::new(),
             locals: HashMap::new(),
-            providers: HashMap::new(),
+            providers: Arc::new(HashMap::new()),
+            depth: 0,
         }
     }
 
@@ -27,11 +31,16 @@ impl EvalContext {
             globals: self.globals.clone(),
             locals: self.locals.clone(),
             providers: self.providers.clone(),
+            depth: self.depth + 1,
         }
     }
 
     /// Evaluate an AST expression to a Value.
     pub fn evaluate(&self, expr: &Expr) -> Value {
+        const MAX_DEPTH: usize = 100;
+        if self.depth > MAX_DEPTH {
+            return Value::Text("[max depth]".into());
+        }
         match expr {
             Expr::Literal(v) => v.clone(),
 
@@ -229,9 +238,11 @@ mod tests {
     #[test]
     fn test_provider_lookup() {
         let mut ctx = EvalContext::new();
+        let mut providers = HashMap::new();
         let mut bi = HashMap::new();
         bi.insert("level".into(), Value::Number(75.0));
-        ctx.providers.insert("bi".into(), bi);
+        providers.insert("bi".into(), bi);
+        ctx.providers = Arc::new(providers);
         assert_eq!(eval_with_context("$bi(level)$", &ctx), "75");
     }
 

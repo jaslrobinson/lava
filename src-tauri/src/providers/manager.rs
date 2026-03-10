@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -9,6 +10,18 @@ use super::DataProvider;
 
 /// Shared provider data: prefix -> field -> value
 pub type SharedProviderData = Arc<RwLock<HashMap<String, HashMap<String, String>>>>;
+
+/// Handle to stop the provider polling loop.
+pub struct ProviderHandle {
+    shutdown: Arc<AtomicBool>,
+}
+
+impl ProviderHandle {
+    /// Signal the provider loop to stop.
+    pub fn stop(&self) {
+        self.shutdown.store(true, Ordering::Relaxed);
+    }
+}
 
 pub struct ProviderManager {
     providers: Vec<ProviderEntry>,
@@ -39,21 +52,27 @@ impl ProviderManager {
     }
 
     /// Start the provider loop. This should be called from Tauri's setup hook.
-    pub fn start(self, app: AppHandle) {
+    /// Returns a handle that can be used to stop the loop on app exit.
+    pub fn start(self, app: AppHandle) -> ProviderHandle {
         let data = self.data;
         let mut providers = self.providers;
+        let shutdown = Arc::new(AtomicBool::new(false));
+        let shutdown_flag = shutdown.clone();
 
         tauri::async_runtime::spawn(async move {
             let mut tick = tokio::time::interval(Duration::from_secs(1));
 
             loop {
                 tick.tick().await;
+                if shutdown_flag.load(Ordering::Relaxed) {
+                    break;
+                }
                 let now = Instant::now();
                 let mut changed = false;
 
                 for entry in providers.iter_mut() {
                     if now.duration_since(entry.last_poll) >= entry.interval {
-                        let new_data = entry.provider.poll();
+                        let new_data = tokio::task::block_in_place(|| entry.provider.poll());
                         let prefix = entry.provider.prefix().to_string();
                         let mut data_write = data.write().await;
                         let current = data_write.entry(prefix).or_default();
@@ -81,10 +100,23 @@ impl ProviderManager {
                     }
                 }
             }
+            cleanup_temp_files();
         });
+
+        ProviderHandle { shutdown }
     }
 
     pub fn data(&self) -> SharedProviderData {
         self.data.clone()
     }
+}
+
+/// Clean up temp files used by provider data sharing.
+pub fn cleanup_temp_files() {
+    let path = std::env::temp_dir().join("klwp-provider-data.json");
+    let _ = std::fs::remove_file(&path);
+    let tmp_path = std::env::temp_dir().join("klwp-provider-data.json.tmp");
+    let _ = std::fs::remove_file(&tmp_path);
+    let proj_path = std::env::temp_dir().join("klwp-wallpaper-project.json");
+    let _ = std::fs::remove_file(&proj_path);
 }

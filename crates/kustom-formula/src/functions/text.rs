@@ -1,7 +1,14 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+
 use crate::evaluator::EvalContext;
 use crate::parser::Expr;
 use crate::value::Value;
 use regex::Regex;
+
+thread_local! {
+    static REGEX_CACHE: RefCell<HashMap<String, Regex>> = RefCell::new(HashMap::new());
+}
 
 /// Evaluate `tc(mode, text, ...)` - text functions.
 pub fn eval_tc(args: &[Expr], ctx: &EvalContext) -> Value {
@@ -69,10 +76,18 @@ pub fn eval_tc(args: &[Expr], ctx: &EvalContext) -> Value {
             let text = get_text_arg(args, 1, ctx);
             let pattern = get_text_arg(args, 2, ctx);
             let replacement = get_text_arg(args, 3, ctx);
-            match Regex::new(&pattern) {
-                Ok(re) => Value::Text(re.replace_all(&text, replacement.as_str()).to_string()),
-                Err(_) => Value::Text(text),
-            }
+            let result = REGEX_CACHE.with(|cache| {
+                let mut cache = cache.borrow_mut();
+                if !cache.contains_key(&pattern) {
+                    match Regex::new(&pattern) {
+                        Ok(re) => { cache.insert(pattern.clone(), re); }
+                        Err(_) => return text.clone(),
+                    }
+                }
+                let re = cache.get(&pattern).unwrap();
+                re.replace_all(&text, replacement.as_str()).to_string()
+            });
+            Value::Text(result)
         }
         "n2w" => {
             let num = get_num_arg(args, 1, ctx) as i64;

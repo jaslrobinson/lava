@@ -1820,7 +1820,6 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "kustom-formula",
- "libc",
  "nix",
  "serde",
  "serde_json",

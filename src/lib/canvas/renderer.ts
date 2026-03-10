@@ -40,6 +40,7 @@ const imageCache = new Map<string, HTMLImageElement>();
 const imageLoadingSet = new Set<string>();
 const imageFailedMap = new Map<string, number>(); // URL -> failure timestamp
 const IMAGE_RETRY_MS = 5000; // Retry failed images after 5 seconds
+const MAX_IMAGE_CACHE = 200;
 
 /** Clear the image caches so re-importing a preset can retry previously failed images */
 export function clearImageCache() {
@@ -104,6 +105,11 @@ function getCachedImage(src: string): HTMLImageElement | null {
   img.onload = () => {
     imageCache.set(resolved, img);
     imageLoadingSet.delete(resolved);
+    // Prune oldest entries if cache is too large
+    if (imageCache.size > MAX_IMAGE_CACHE) {
+      const first = imageCache.keys().next().value;
+      if (first) imageCache.delete(first);
+    }
   };
   img.onerror = () => {
     imageLoadingSet.delete(resolved);

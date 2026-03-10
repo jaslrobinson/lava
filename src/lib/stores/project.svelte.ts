@@ -1,6 +1,6 @@
 import { type Project, type Layer, type Animation, createDefaultProject, createLayer, cloneLayerWithNewIds, type LayerType, type GlobalVarType } from "../types/project";
 import { clearImageCache } from "../canvas/renderer";
-import { invalidateGlobalsFormulas } from "../formula/service";
+import { invalidateGlobalsFormulas, clearFormulaCache } from "../formula/service";
 import { resetAnimationState } from "../canvas/animationState";
 
 let project = $state<Project>(createDefaultProject());
@@ -24,7 +24,7 @@ function pushUndo() {
 export function undo() {
   if (undoStack.length === 0) return;
   const current = JSON.stringify(project.layers);
-  redoStack = [...redoStack, current];
+  redoStack = [...redoStack.slice(-(MAX_UNDO - 1)), current];
   const prev = undoStack[undoStack.length - 1];
   undoStack = undoStack.slice(0, -1);
   project.layers = JSON.parse(prev);
@@ -45,7 +45,7 @@ export function canUndo() { return undoStack.length > 0; }
 export function canRedo() { return redoStack.length > 0; }
 
 export function getProject() { return project; }
-export function setProject(p: Project) { project = p; isDirty = false; clearImageCache(); resetAnimationState(); }
+export function setProject(p: Project) { project = p; isDirty = false; clearImageCache(); clearFormulaCache(); resetAnimationState(); }
 export function getSelectedLayerId() { return selectedLayerId; }
 export function setSelectedLayerId(id: string | null) { selectedLayerId = id; }
 export function getIsDirty() { return isDirty; }

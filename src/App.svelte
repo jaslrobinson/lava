@@ -10,20 +10,27 @@
   // Check if this is the wallpaper helper webview (loaded with ?wallpaper=true)
   const isWallpaperView = new URLSearchParams(window.location.search).has("wallpaper");
 
-  onMount(async () => {
-    if (isWallpaperView) {
-      // Wait for injected project data from the helper binary
+  if (isWallpaperView) {
+    onMount(() => {
+      let checkTimer: ReturnType<typeof setTimeout> | null = null;
+      let retries = 0;
       const checkProject = () => {
         const proj = (window as any).__KLWP_PROJECT;
         if (proj) {
           setProject(proj);
-        } else {
-          setTimeout(checkProject, 100);
+        } else if (retries++ < 300) {
+          checkTimer = setTimeout(checkProject, 100);
         }
       };
       checkProject();
-      return;
-    }
+      return () => {
+        if (checkTimer) clearTimeout(checkTimer);
+      };
+    });
+  }
+
+  onMount(() => {
+    if (isWallpaperView) return;
 
     // Editor mode: global keyboard shortcuts
     const onKeyDown = (e: KeyboardEvent) => {
@@ -51,27 +58,16 @@
     window.addEventListener("keydown", onKeyDown);
 
     // Listen for global shortcut exit event (Super+Escape)
-    const { listen } = await import("@tauri-apps/api/event");
-    const unlistenExit = await listen("exit-wallpaper", () => {
-      exitWallpaperMode();
-    });
-
-    // Listen for tray "Stop Wallpaper" event
-    const unlistenTrayStop = await listen("tray-stop-wallpaper", () => {
-      exitWallpaperMode();
-    });
-
-    // Listen for tray "Start Wallpaper" event (show editor so user can start)
-    const unlistenTrayStart = await listen("tray-start-wallpaper", () => {
-      // The editor window is already shown by the tray handler;
-      // this event is a hint to the frontend if needed in future.
+    const cleanups: (() => void)[] = [];
+    import("@tauri-apps/api/event").then(({ listen }) => {
+      listen("exit-wallpaper", () => exitWallpaperMode()).then(u => cleanups.push(u));
+      listen("tray-stop-wallpaper", () => exitWallpaperMode()).then(u => cleanups.push(u));
+      listen("tray-start-wallpaper", () => {}).then(u => cleanups.push(u));
     });
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);
-      unlistenExit();
-      unlistenTrayStop();
-      unlistenTrayStart();
+      cleanups.forEach(fn => fn());
     };
   });
 

@@ -1,11 +1,11 @@
-use std::process::Command;
+use std::process::{Child, Command};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 pub static WALLPAPER_ACTIVE: AtomicBool = AtomicBool::new(false);
-static WALLPAPER_PID: Mutex<Option<u32>> = Mutex::new(None);
+static WALLPAPER_PID: Mutex<Option<Child>> = Mutex::new(None);
 
 /// Check if wallpaper is currently running.
 pub fn is_wallpaper_active() -> bool {
@@ -14,11 +14,10 @@ pub fn is_wallpaper_active() -> bool {
 
 /// Kill the wallpaper helper process if running (used by tray quit).
 pub fn kill_wallpaper_process() {
-    if let Some(pid) = WALLPAPER_PID.lock().unwrap().take() {
-        eprintln!("[wallpaper] Killing helper process PID {} (tray quit)", pid);
-        unsafe {
-            libc::kill(pid as i32, libc::SIGTERM);
-        }
+    if let Some(mut child) = WALLPAPER_PID.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        eprintln!("[wallpaper] Killing helper process PID {} (tray quit)", child.id());
+        let _ = child.kill();
+        let _ = child.wait();
     }
     WALLPAPER_ACTIVE.store(false, Ordering::Relaxed);
 }
@@ -93,11 +92,12 @@ pub fn start_wallpaper_mode(window: tauri::WebviewWindow, project: serde_json::V
 
     let pid = child.id();
     eprintln!("[wallpaper] Helper process started with PID {}", pid);
-    *WALLPAPER_PID.lock().unwrap() = Some(pid);
+    *WALLPAPER_PID.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
 
     // Register global shortcut (Super+Escape) to exit wallpaper mode
     let shortcut = Shortcut::new(Some(Modifiers::SUPER), Code::Escape);
     let app = window.app_handle().clone();
+    let _ = app.global_shortcut().unregister(shortcut);
     app.global_shortcut().on_shortcut(shortcut, move |handle, _shortcut, event| {
         if event.state == ShortcutState::Pressed {
             handle.emit("exit-wallpaper", ()).ok();
@@ -115,11 +115,10 @@ pub fn stop_wallpaper_mode(window: tauri::WebviewWindow) -> Result<(), String> {
     }
 
     // Kill the wallpaper helper process
-    if let Some(pid) = WALLPAPER_PID.lock().unwrap().take() {
-        eprintln!("[wallpaper] Killing helper process PID {}", pid);
-        unsafe {
-            libc::kill(pid as i32, libc::SIGTERM);
-        }
+    if let Some(mut child) = WALLPAPER_PID.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        eprintln!("[wallpaper] Killing helper process PID {}", child.id());
+        let _ = child.kill();
+        let _ = child.wait();
     }
 
     // Unregister global shortcut

@@ -38,6 +38,12 @@
   let searchTimer: ReturnType<typeof setTimeout> | null = null;
   let debouncedQuery = $state("");
 
+  $effect(() => {
+    return () => {
+      if (searchTimer) clearTimeout(searchTimer);
+    };
+  });
+
   // Debounce local search
   function handleSearchInput(e: Event) {
     const value = (e.target as HTMLInputElement).value;

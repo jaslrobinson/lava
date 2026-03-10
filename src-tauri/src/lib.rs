@@ -96,7 +96,8 @@ pub fn run() {
             let data = manager.data();
             app.manage(data);
 
-            manager.start(app.handle().clone());
+            let provider_handle = manager.start(app.handle().clone());
+            app.manage(provider_handle);
 
             setup_tray(app)?;
 

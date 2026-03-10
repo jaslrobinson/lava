@@ -9,6 +9,8 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
   return invoke<T>(cmd, args);
 }
 
+const MAX_CACHE_SIZE = 2000;
+
 // Cache of formula string -> evaluated result
 const cache = new Map<string, string>();
 // Formulas queued for re-evaluation (keeps stale value in cache while pending)
@@ -43,6 +45,14 @@ async function fetchProviderData() {
     // Endpoint not available or partial JSON — keep existing data
   }
   providerFetching = false;
+}
+
+export function clearFormulaCache() {
+  cache.clear();
+  pending.clear();
+  wgRawCache.clear();
+  wgResultCache.clear();
+  wgFetching.clear();
 }
 
 /** Check if a string contains any $formula$ expressions */
@@ -895,6 +905,16 @@ async function flushPending(globals: Record<string, string>) {
     }
   } else {
     evaluating = false;
+  }
+
+  // Prune cache if it gets too large
+  if (cache.size > MAX_CACHE_SIZE) {
+    const excess = cache.size - MAX_CACHE_SIZE;
+    const iter = cache.keys();
+    for (let i = 0; i < excess; i++) {
+      const key = iter.next().value;
+      if (key) cache.delete(key);
+    }
   }
 }
 

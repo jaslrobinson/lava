@@ -10,6 +10,7 @@ struct WeatherConfig {
     location: String,
     units: String,
     source: String,
+    interval_secs: Option<u64>,
 }
 
 /// Shared forecast data so both WeatherProvider and ForecastProvider can access it
@@ -71,11 +72,16 @@ fn read_weather_config() -> Option<WeatherConfig> {
         .unwrap_or("openweathermap")
         .to_string();
 
+    let interval_secs = json.get("providers")
+        .and_then(|p| p.get("weather"))
+        .and_then(|v| v.as_u64());
+
     Some(WeatherConfig {
         api_key,
         location,
         units,
         source,
+        interval_secs,
     })
 }
 
@@ -413,20 +419,10 @@ impl DataProvider for WeatherProvider {
             None => return ProviderData::new(),
         };
 
-        // Update interval from settings
-        let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-        let path = config_dir.join("kllw").join("settings.json");
-        if let Ok(content) = std::fs::read_to_string(&path) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(interval) = json
-                    .get("providers")
-                    .and_then(|p| p.get("weather"))
-                    .and_then(|v| v.as_u64())
-                {
-                    if interval > 0 {
-                        self.interval_secs = interval;
-                    }
-                }
+        // Update interval from settings (extracted during config read)
+        if let Some(interval) = config.interval_secs {
+            if interval > 0 {
+                self.interval_secs = interval;
             }
         }
 
