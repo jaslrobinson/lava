@@ -1,10 +1,10 @@
-export type LayerType = "text" | "shape" | "image" | "group" | "stack" | "overlap" | "progress" | "fonticon";
+export type LayerType = "text" | "shape" | "image" | "group" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer";
 
 export type ShapeKind = "rectangle" | "circle" | "oval" | "triangle" | "arc";
 
 export type AnchorPoint = "center" | "top-left" | "top-center" | "top-right" | "center-left" | "center-right" | "bottom-left" | "bottom-center" | "bottom-right";
 
-export type AnimationTrigger = "time" | "scroll" | "reactive" | "tap" | "show";
+export type AnimationTrigger = "time" | "scroll" | "reactive" | "tap" | "show" | "hover";
 
 export type AnimationType = "fade" | "rotate" | "scale" | "translate" | "color" | "blur";
 
@@ -91,6 +91,15 @@ export interface LayerProperties {
 
   // Icon source (SVG/PNG path for imported icons)
   iconSrc?: string;
+
+  // Visualizer
+  barCount?: number;
+  barSpacing?: number;
+  sensitivity?: number;
+  colorTop?: string;
+  colorMid?: string;
+  colorBottom?: string;
+  peakColor?: string;
 }
 
 export interface Layer {
@@ -214,6 +223,13 @@ export function createLayer(type: LayerType, name: string): Layer {
       base.properties.fontSize = 48;
       base.properties.width = 60;
       base.properties.height = 60;
+      break;
+    case "visualizer":
+      base.properties.width = 400;
+      base.properties.height = 120;
+      base.properties.barCount = 24;
+      base.properties.barSpacing = 3;
+      base.properties.sensitivity = 1.2;
       break;
   }
 

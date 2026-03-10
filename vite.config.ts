@@ -29,6 +29,7 @@ function klwpAssetsPlugin(): Plugin {
           };
           res.setHeader("Content-Type", mimeTypes[ext] || "application/octet-stream");
           res.setHeader("Cache-Control", "max-age=3600");
+          res.setHeader("Access-Control-Allow-Origin", "*");
           fs.createReadStream(filePath).pipe(res);
         });
       });
@@ -62,8 +63,33 @@ function klwpProviderPlugin(): Plugin {
   };
 }
 
+/** Serve audio band data for the wallpaper WebKitGTK view */
+function klwpAudioPlugin(): Plugin {
+  return {
+    name: "klwp-audio",
+    configureServer(server) {
+      server.middlewares.use("/__klwp_audio", (_req, res) => {
+        const filePath = path.join(
+          process.env.TMPDIR || "/tmp",
+          "klwp-audio-bands.json",
+        );
+        fs.readFile(filePath, "utf-8", (err, data) => {
+          res.setHeader("Content-Type", "application/json");
+          res.setHeader("Cache-Control", "no-cache");
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          if (err) {
+            res.end("[]");
+          } else {
+            res.end(data);
+          }
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [svelte(), klwpAssetsPlugin(), klwpProviderPlugin()],
+  plugins: [svelte(), klwpAssetsPlugin(), klwpProviderPlugin(), klwpAudioPlugin()],
   clearScreen: false,
   server: {
     port: 1420,

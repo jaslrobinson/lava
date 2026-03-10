@@ -17,6 +17,18 @@
   // Container drill-in navigation
   let focusedContainerId = $state<string | null>(null);
 
+  let layerListEl: HTMLDivElement;
+
+  // Auto-scroll to selected layer when selection changes
+  $effect(() => {
+    const id = getSelectedLayerId();
+    if (!id || !layerListEl) return;
+    const el = layerListEl.querySelector(`[data-layer-id="${id}"]`);
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  });
+
   function toggleCollapsed(id: string) {
     const next = new Set(collapsedIds);
     if (next.has(id)) next.delete(id);
@@ -181,7 +193,7 @@
     </div>
   {/if}
 
-  <div class="layer-list">
+  <div class="layer-list" bind:this={layerListEl}>
     {#if getDisplayLayers().length === 0}
       <div class="empty-state">
         {focusedContainerId ? "Empty container." : "No layers yet. Add one from the toolbar."}
@@ -208,6 +220,7 @@
     class:container-target={isSelected && isContainer}
     class:hidden-layer={layer.visible === false}
     class:dragging={dragSourceId === layer.id}
+    data-layer-id={layer.id}
     style="padding-left: {12 + depth * 16}px;{isContainer ? ` background: ${typeColors[layer.type]}12;` : ''}{isDropBefore ? ' border-top: 2px solid var(--accent);' : ''}{isDropAfter ? ' border-bottom: 2px solid var(--accent);' : ''}{isDropInside ? ' background: var(--accent-dim); outline: 1px dashed var(--accent);' : ''}"
     draggable="true"
     onclick={() => setSelectedLayerId(layer.id)}

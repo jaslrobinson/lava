@@ -1,6 +1,8 @@
 export interface LayerAnimState {
   firstSeenTime: number | null;
   tapTime: number | null;
+  hoverEnterTime: number | null;
+  hoverExitTime: number | null;
 }
 
 const layerStates = new Map<string, LayerAnimState>();
@@ -32,7 +34,7 @@ export function setScrollPosition(x: number) {
 export function getLayerAnimState(layerId: string): LayerAnimState {
   let state = layerStates.get(layerId);
   if (!state) {
-    state = { firstSeenTime: null, tapTime: null };
+    state = { firstSeenTime: null, tapTime: null, hoverEnterTime: null, hoverExitTime: null };
     layerStates.set(layerId, state);
   }
   return state;
@@ -58,6 +60,29 @@ export function beginFrame() {
 export function triggerTap(layerId: string, timestamp: number) {
   const state = getLayerAnimState(layerId);
   state.tapTime = timestamp;
+}
+
+/** Called each frame with the currently hovered layer ID */
+export function updateHoverState(hoveredLayerId: string | null, timestamp: number) {
+  // For each tracked layer, update hoverEnterTime/hoverExitTime based on whether it's hovered
+  for (const [layerId, state] of layerStates) {
+    const isHovered = layerId === hoveredLayerId;
+    const wasHovered = state.hoverEnterTime !== null && state.hoverExitTime === null;
+    if (isHovered && !wasHovered) {
+      state.hoverEnterTime = timestamp;
+      state.hoverExitTime = null;
+    } else if (!isHovered && wasHovered) {
+      state.hoverExitTime = timestamp;
+    }
+  }
+  // Ensure the currently hovered layer has a state entry
+  if (hoveredLayerId) {
+    const state = getLayerAnimState(hoveredLayerId);
+    if (state.hoverEnterTime === null) {
+      state.hoverEnterTime = timestamp;
+      state.hoverExitTime = null;
+    }
+  }
 }
 
 export function resetAnimationState() {

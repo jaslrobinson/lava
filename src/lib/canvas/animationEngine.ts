@@ -76,6 +76,22 @@ function computeProgress(anim: Animation, layerId: string, timestamp: number): n
       return applyLoop(elapsed / speed, anim.loop || "restart");
     }
 
+    case "hover": {
+      const state = getLayerAnimState(layerId);
+      const speed = anim.speed || 200; // default 200ms transition
+      if (!state.hoverEnterTime) return 0;
+      const enterElapsed = timestamp - state.hoverEnterTime;
+      if (state.hoverExitTime === null) {
+        // Currently hovered — animate toward 1
+        return Math.min(1, enterElapsed / speed);
+      } else {
+        // Hover exited — animate back toward 0
+        const exitElapsed = timestamp - state.hoverExitTime;
+        const enterProgress = Math.min(1, enterElapsed / speed);
+        return Math.max(0, enterProgress - exitElapsed / speed);
+      }
+    }
+
     default:
       return null;
   }

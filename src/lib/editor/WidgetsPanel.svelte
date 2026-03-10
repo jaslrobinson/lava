@@ -26,6 +26,9 @@
   function mkStack(name: string, props: Record<string, any>, children: Layer[]): Layer {
     return { id: id(), name, type: "stack", properties: { x: 0, y: 0, width: 400, height: 200, opacity: 255, anchor: "top-left", orientation: "vertical", spacing: 0, ...props }, children, visible: true, locked: false };
   }
+  function mkVisualizer(name: string, props: Record<string, any>): Layer {
+    return { id: id(), name, type: "visualizer", properties: { x: 0, y: 0, width: 400, height: 120, opacity: 255, anchor: "top-left", barCount: 24, barSpacing: 3, sensitivity: 1.2, colorTop: "#88C0D0", colorMid: "#5E81AC", colorBottom: "#2E3440", peakColor: "#ECEFF4", ...props }, visible: true, locked: false };
+  }
 
   const categories: Category[] = [
     // ── CLOCKS ──
@@ -149,6 +152,35 @@
             mkText("Title", { text: "$mi(title)$", fontSize: 20, color: "#ffffff", x: 16, y: 220, width: 288, height: 26 }),
             mkText("Artist", { text: "$mi(artist)$", fontSize: 14, color: "#cccccc", x: 16, y: 250, width: 288, height: 20 }),
             mkProgress("Progress", { style: "bar", min: 0, max: 100, value: "$mi(percent)$", color: "#e94560", trackColor: "#ffffff20", strokeWidth: 4, width: 288, height: 6, x: 16, y: 280 }),
+          ]),
+        },
+        {
+          name: "Visualizer",
+          description: "Nord-style frequency bars reacting to playing audio",
+          build: () => mkVisualizer("Visualizer", { x: 100, y: 400 }),
+        },
+        {
+          name: "Visualizer + Player",
+          description: "Album art, title, artist and visualizer combined",
+          build: () => mkOverlap("Music Visualizer", { x: 100, y: 350, width: 480, height: 180 }, [
+            mkShape("BG", { shapeKind: "rectangle", fill: "#1a1a2ecc", cornerRadius: 16, width: 480, height: 180, x: 0, y: 0 }),
+            mkImage("Cover", { src: "$mi(cover)$", width: 100, height: 100, x: 20, y: 20, cornerRadius: 10, scaleMode: "fill" }),
+            mkText("Title", { text: "$mi(title)$", fontSize: 16, color: "#ffffff", x: 136, y: 20, width: 326, height: 22 }),
+            mkText("Artist", { text: "$mi(artist)$", fontSize: 12, color: "#81A1C1", x: 136, y: 46, width: 326, height: 18 }),
+            mkVisualizer("Bars", { x: 136, y: 72, width: 324, height: 72, barCount: 32, barSpacing: 2, sensitivity: 1.4 }),
+            mkProgress("Progress", { style: "bar", min: 0, max: 100, value: "$mi(percent)$", color: "#88C0D0", trackColor: "#ffffff10", strokeWidth: 2, width: 440, height: 3, x: 20, y: 168 }),
+          ]),
+        },
+        {
+          name: "Visualizer Wide",
+          description: "Full-width visualizer backdrop",
+          build: () => mkOverlap("Visualizer Wide", { x: 0, y: 900, width: 1920, height: 160 }, [
+            mkShape("BG", { shapeKind: "rectangle", fill: "#0d1117cc", width: 1920, height: 160, x: 0, y: 0 }),
+            mkVisualizer("Bars", { x: 0, y: 0, width: 1920, height: 160, barCount: 64, barSpacing: 2, sensitivity: 1.6, colorTop: "#88C0D0", colorMid: "#5E81AC", colorBottom: "#0d1117" }),
+            mkOverlap("Player Info", { x: 820, y: 30, width: 280, height: 100 }, [
+              mkText("Title", { text: "$mi(title)$", fontSize: 16, color: "#ffffff", textAlign: "center", width: 280, height: 22, x: 0, y: 20 }),
+              mkText("Artist", { text: "$mi(artist)$", fontSize: 12, color: "#81A1C1", textAlign: "center", width: 280, height: 18, x: 0, y: 46 }),
+            ]),
           ]),
         },
       ],

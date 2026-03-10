@@ -2,6 +2,7 @@ mod commands;
 mod klwp_import;
 mod project;
 mod providers;
+mod rainmeter_import;
 
 use providers::manager::ProviderManager;
 use tauri::Emitter;
@@ -102,6 +103,10 @@ pub fn run() {
 
             setup_tray(app)?;
 
+            // Start audio visualizer capture (non-blocking, spawns background thread)
+            let audio_bands = providers::audio::new_shared_bands();
+            providers::audio::start_audio_capture(app.handle().clone(), audio_bands);
+
             Ok(())
         })
         .on_window_event(|window, event| {
@@ -119,6 +124,7 @@ pub fn run() {
             commands::project::save_project,
             commands::project::load_project,
             commands::project::import_komp,
+            commands::project::import_rmskin,
             commands::project::list_project_fonts,
             commands::project::copy_asset_to_project,
             commands::project::extract_apk_icon,
@@ -130,6 +136,8 @@ pub fn run() {
             commands::window::quit_app,
             commands::window::is_wallpaper_running,
             commands::window::open_url,
+            commands::window::music_control,
+            commands::window::launch_app,
             commands::settings::load_settings,
             commands::settings::save_settings,
         ])

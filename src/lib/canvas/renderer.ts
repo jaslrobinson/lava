@@ -1,7 +1,8 @@
 import type { Project, Layer } from "../types/project";
 import { resolveFormula, hasFormula } from "../formula/service";
 import { computeAnimatedDeltas } from "./animationEngine";
-import { initEngineTime, markLayerSeen, beginFrame } from "./animationState";
+import { initEngineTime, markLayerSeen, beginFrame, updateHoverState } from "./animationState";
+import { getAudioBands, getAudioPeaks, initAudioVisualizer } from "./audioVisualizer";
 
 // Detect if we're running inside Tauri (vs plain WebKitGTK wallpaper view)
 const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
@@ -35,6 +36,11 @@ function resolveNumber(value: string | number | undefined, fallback: number = 0)
   return isNaN(n) ? fallback : n;
 }
 
+// Debug overlay: shows bounds, transform info, and position markers on each layer
+let debugOverlay = false;
+export function setDebugOverlay(enabled: boolean) { debugOverlay = enabled; }
+export function getDebugOverlay(): boolean { return debugOverlay; }
+
 // Image cache to avoid reloading every frame
 const imageCache = new Map<string, HTMLImageElement>();
 const imageLoadingSet = new Set<string>();
@@ -65,6 +71,11 @@ function resolveImagePath(src: string): string | null {
     return `${currentAssetDir}/${relative}`;
   }
 
+  // Handle file:// URLs (e.g. MPRIS cover art like file:///tmp/album.png)
+  if (src.startsWith("file://")) {
+    return src.replace("file://", "");
+  }
+
   return src;
 }
 
@@ -77,6 +88,9 @@ function getCachedImage(src: string): HTMLImageElement | null {
     resolved = resolvedPath;
   } else if (convertFileSrc) {
     resolved = convertFileSrc(resolvedPath);
+  } else if (isTauri) {
+    // Tauri context but convertFileSrc not loaded yet — wait rather than failing
+    return null;
   } else {
     // Non-Tauri context (WebKitGTK wallpaper): serve via Vite asset proxy
     resolved = `/__klwp_assets${resolvedPath}`;
@@ -98,8 +112,8 @@ function getCachedImage(src: string): HTMLImageElement | null {
 
   imageLoadingSet.add(resolved);
   const img = new Image();
-  // Only set crossOrigin for local/asset URLs, not external (avoids CORS failures)
-  if (!resolved.startsWith("http")) {
+  // Only set crossOrigin for Tauri asset:// URLs, not http/proxy/external URLs
+  if (!resolved.startsWith("http") && !resolved.startsWith("/__klwp_assets")) {
     img.crossOrigin = "anonymous";
   }
   img.onload = () => {
@@ -141,14 +155,21 @@ export function getLayerBounds(): Map<string, LayerBounds> {
   return computedBounds;
 }
 
-export function renderProject(ctx: CanvasRenderingContext2D, project: Project, selectedId: string | null, timestamp: number = 0) {
+// Base transform at start of renderProject — used to derive absolute project-space
+// positions from the canvas transform matrix (accounts for zoom/pan).
+let baseTransform: DOMMatrix | null = null;
+
+export function renderProject(ctx: CanvasRenderingContext2D, project: Project, selectedId: string | null, timestamp: number = 0, hoveredLayerId: string | null = null) {
   beginFrame();
   initEngineTime(timestamp);
+  updateHoverState(hoveredLayerId, timestamp);
   const { width, height } = project.resolution;
   const container: ContainerSize = { width, height };
 
+  initAudioVisualizer();
   currentAssetDir = project.assetDir;
   computedBounds = new Map();
+  baseTransform = ctx.getTransform();
 
   ctx.clearRect(0, 0, width, height);
   if (project.background.type === "color") {
@@ -263,8 +284,19 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
   // Anchor-based positioning (local to container)
   const { x, y } = anchorPosition(offsetX, offsetY, w, h, props.anchor, container);
 
-  // Store absolute bounds for selection outline and hit testing
-  computedBounds.set(layer.id, { x: parentAbsX + x, y: parentAbsY + y, w: w || 100, h: h || 100 });
+  // Compute absolute project-space position from the canvas transform matrix.
+  // This is more reliable than manually accumulating parentAbsX because the canvas
+  // context naturally tracks all parent translations, rotations, and scales.
+  let absX: number, absY: number;
+  if (baseTransform && baseTransform.a !== 0) {
+    const ct = ctx.getTransform();
+    absX = (ct.e + x * ct.a + y * ct.c - baseTransform.e) / baseTransform.a;
+    absY = (ct.f + x * ct.b + y * ct.d - baseTransform.f) / baseTransform.d;
+  } else {
+    absX = parentAbsX + x;
+    absY = parentAbsY + y;
+  }
+  computedBounds.set(layer.id, { x: absX, y: absY, w: w || 100, h: h || 100 });
 
   ctx.globalAlpha *= opacity;
 
@@ -307,6 +339,9 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
       break;
     case "fonticon":
       renderFontIcon(ctx, layer, x, y, w, h);
+      break;
+    case "visualizer":
+      renderVisualizer(ctx, layer, x, y, w, h);
       break;
   }
 
@@ -380,11 +415,53 @@ function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: n
     ctx.fillText(displayLines[i], textX, y + i * lineHeight);
   }
 
-  // Update computed bounds to reflect multi-line height
+  if (debugOverlay) {
+    // DEBUG: compute actual absolute project-space position from canvas transform
+    const _dt = ctx.getTransform();
+    const _bt = baseTransform;
+    let _debugAbsX = textX; // fallback
+    if (_bt && _bt.a !== 0) {
+      // canvas position of textX: _dt.e + textX * _dt.a
+      // project position: (canvasPos - _bt.e) / _bt.a
+      _debugAbsX = (_dt.e + textX * _dt.a - _bt.e) / _bt.a;
+    }
+    ctx.save();
+    ctx.strokeStyle = "red";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(textX, y);
+    ctx.lineTo(textX, y + fontSize);
+    ctx.stroke();
+    // Show debug values above the text
+    ctx.fillStyle = "yellow";
+    ctx.font = "14px monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(`local=${Math.round(textX)} abs=${Math.round(_debugAbsX)} dt.e=${Math.round(_dt.e)} bt.e=${Math.round(_bt?.e||0)} dt.a=${_dt.a.toFixed(2)}`, textX, y - 2);
+    ctx.restore();
+  }
+
+  // Update computed bounds to reflect actual text dimensions and alignment
+  let maxLineWidth = 0;
+  for (const line of displayLines) {
+    const measured = ctx.measureText(line).width;
+    if (measured > maxLineWidth) maxLineWidth = measured;
+  }
   const totalHeight = displayLines.length * lineHeight - lineSpacing;
   const boundsEntry = computedBounds.get(layer.id);
-  if (boundsEntry && totalHeight > boundsEntry.h) {
-    boundsEntry.h = totalHeight;
+  if (boundsEntry) {
+    // Use the actual measured text width for bounds so the selection outline
+    // wraps the visible text, not the (potentially huge) specified text box.
+    if (align === "center") {
+      // Text centered at x + w/2, visual left = x + w/2 - maxLineWidth/2
+      boundsEntry.x += w / 2 - maxLineWidth / 2;
+    } else if (align === "right") {
+      // Text right-aligned at x + w, visual left = x + w - maxLineWidth
+      boundsEntry.x += w - maxLineWidth;
+    }
+    boundsEntry.w = maxLineWidth;
+    if (totalHeight > boundsEntry.h) boundsEntry.h = totalHeight;
   }
 
   // Reset shadow
@@ -500,6 +577,8 @@ function getImageLabel(src: string): string {
     resolved = resolvedPath;
   } else if (convertFileSrc) {
     resolved = convertFileSrc(resolvedPath);
+  } else if (isTauri) {
+    return "Loading...";
   } else {
     resolved = `/__klwp_assets${resolvedPath}`;
   }
@@ -646,6 +725,7 @@ function resolveImageSrc(src: string): string | null {
   if (convertFileSrc) {
     return convertFileSrc(resolvedPath);
   }
+  if (isTauri) return null; // Still loading convertFileSrc
   // Non-Tauri context (WebKitGTK wallpaper): serve via Vite asset proxy
   return `/__klwp_assets${resolvedPath}`;
 }
@@ -719,6 +799,71 @@ function renderFontIcon(ctx: CanvasRenderingContext2D, layer: Layer, x: number, 
   }
 }
 
+function renderVisualizer(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
+  const props = layer.properties;
+  const barCount = resolveNumber(props.barCount, 24);
+  const barSpacing = resolveNumber(props.barSpacing, 3);
+  const sensitivity = resolveNumber(props.sensitivity, 1.0);
+
+  // Nord-inspired default colors
+  const colorTop = resolve(props.colorTop, "#88C0D0");      // Nord8 frost bright
+  const colorMid = resolve(props.colorMid, "#5E81AC");      // Nord10 deep blue
+  const colorBottom = resolve(props.colorBottom, "#2E3440"); // Nord0 dark
+  const peakColor = resolve(props.peakColor, "#ECEFF4");    // Nord6 snow white
+
+  const bandsData = getAudioBands();
+  const peaksData = getAudioPeaks();
+
+  const totalSpacing = barSpacing * (barCount - 1);
+  const barW = Math.max(1, (w - totalSpacing) / barCount);
+  const cornerR = Math.min(barW / 2, 3);
+
+  for (let i = 0; i < barCount; i++) {
+    // Map bar index to band index (may downsample if barCount > NUM_BANDS)
+    const bandIdx = Math.min(
+      Math.floor((i / barCount) * bandsData.length),
+      bandsData.length - 1
+    );
+    const rawVal = bandsData[bandIdx] ?? 0;
+    const val = Math.min(1, rawVal * sensitivity);
+    const barH = Math.max(2, val * h);
+
+    const bx = x + i * (barW + barSpacing);
+    const by = y + h - barH;
+
+    // Gradient: colorBottom at base → colorMid at middle → colorTop at spike tip
+    const grad = ctx.createLinearGradient(bx, by + barH, bx, by);
+    grad.addColorStop(0, colorBottom + "60"); // 38% alpha at base
+    grad.addColorStop(0.4, colorMid + "cc");   // 80% alpha at mid
+    grad.addColorStop(1, colorTop);            // full at top
+
+    ctx.fillStyle = grad;
+
+    // Rounded top bar
+    if (cornerR > 0 && barH > cornerR * 2) {
+      ctx.beginPath();
+      ctx.moveTo(bx, by + barH);
+      ctx.lineTo(bx, by + cornerR);
+      ctx.quadraticCurveTo(bx, by, bx + cornerR, by);
+      ctx.lineTo(bx + barW - cornerR, by);
+      ctx.quadraticCurveTo(bx + barW, by, bx + barW, by + cornerR);
+      ctx.lineTo(bx + barW, by + barH);
+      ctx.closePath();
+      ctx.fill();
+    } else {
+      ctx.fillRect(bx, by, barW, barH);
+    }
+
+    // Peak indicator dot
+    if (peaksData[bandIdx] > 0.05) {
+      const peakH = Math.min(1, peaksData[bandIdx] * sensitivity) * h;
+      const peakY = y + h - peakH;
+      ctx.fillStyle = peakColor + "cc";
+      ctx.fillRect(bx, peakY - 2, barW, 2);
+    }
+  }
+}
+
 function renderOverlap(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, container: ContainerSize, parentAbsX: number, parentAbsY: number, timestamp: number = 0) {
   if (!layer.children) return;
   ctx.save();
@@ -770,6 +915,24 @@ function renderStack(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
 function drawSelectionOutline(ctx: CanvasRenderingContext2D, bounds: LayerBounds) {
   const { x, y, w, h } = bounds;
   const pad = 2;
+
+  if (debugOverlay) {
+    // DEBUG: green line at bounds origin + show values
+    ctx.save();
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x, y + h);
+    ctx.stroke();
+    ctx.fillStyle = "lime";
+    ctx.font = "14px monospace";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillText(`bounds.x=${Math.round(x)} bounds.y=${Math.round(y)}`, x, y + h + 4);
+    ctx.restore();
+  }
 
   ctx.save();
   ctx.strokeStyle = "#4a9eff";

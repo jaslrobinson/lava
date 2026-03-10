@@ -2,6 +2,7 @@
   import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo, insertWidget, ensureGlobal } from "../stores/project.svelte";
   import type { LayerType, Project, GlobalVarType, Layer } from "../types/project";
   import { createDefaultProject } from "../types/project";
+  import { setDebugOverlay, getDebugOverlay } from "../canvas/renderer";
 
   function handleCopy() {
     if (getSelectedLayerId()) copySelectedLayer();
@@ -77,6 +78,12 @@
           assetDir: string;
         }>("import_komp", { path });
 
+        // Store the asset directory in the project for path resolution
+        const proj = getProject();
+        if (!proj.assetDir && result.assetDir) {
+          setProject({ ...proj, assetDir: result.assetDir });
+        }
+
         // Ensure all globals from the komponent exist in the project
         for (const g of result.globals) {
           ensureGlobal(g.name, g.type, g.value);
@@ -96,6 +103,50 @@
       importStatus = "";
       console.error("Komp import failed:", e);
       alert(`Komponent import failed: ${e}`);
+    }
+  }
+
+  async function handleImportRmskin() {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const { invoke } = await import("@tauri-apps/api/core");
+      const path = await open({
+        filters: [{ name: "Rainmeter Skin", extensions: ["rmskin"] }],
+        multiple: false,
+      });
+      if (path) {
+        importStatus = "Importing Rainmeter skin...";
+        const result = await invoke<{
+          root: Layer;
+          globals: { name: string; type: GlobalVarType; value: string | number | boolean }[];
+          warnings: string[];
+          assetCount: number;
+          assetDir: string;
+        }>("import_rmskin", { path });
+
+        // Store the asset directory in the project for path resolution
+        const proj = getProject();
+        if (!proj.assetDir && result.assetDir) {
+          setProject({ ...proj, assetDir: result.assetDir });
+        }
+
+        for (const g of result.globals) {
+          ensureGlobal(g.name, g.type, g.value);
+        }
+
+        insertWidget(result.root);
+
+        const warnCount = result.warnings.length;
+        importStatus = `Rainmeter imported! ${result.assetCount} assets`;
+        if (warnCount > 0) {
+          console.warn("Rainmeter import warnings:", result.warnings);
+        }
+        setTimeout(() => { importStatus = ""; }, 4000);
+      }
+    } catch (e) {
+      importStatus = "";
+      console.error("Rainmeter import failed:", e);
+      alert(`Rainmeter import failed: ${e}`);
     }
   }
 
@@ -158,7 +209,9 @@
     {#if getSelectedLayer() && isContainerType(getSelectedLayer()!.type)}
       <span class="target-indicator">into {getSelectedLayer()!.name}</span>
     {/if}
-    <span class="separator"></span>
+  </div>
+
+  <div class="toolbar-right">
     <button
       class="toolbar-btn"
       title="Copy selected layer (Ctrl+C)"
@@ -192,9 +245,7 @@
     >
       <span class="btn-icon">{"\u21AA"}</span>
     </button>
-  </div>
-
-  <div class="toolbar-right">
+    <span class="separator"></span>
     <button
       class="toolbar-btn"
       class:interactive-active={getInteractiveMode()}
@@ -203,6 +254,15 @@
     >
       <span class="btn-icon">{getInteractiveMode() ? "\u25B6" : "\u23F8"}</span>
       <span class="btn-label">{getInteractiveMode() ? "Interactive" : "Edit Only"}</span>
+    </button>
+    <button
+      class="toolbar-btn"
+      class:debug-active={getDebugOverlay()}
+      title={getDebugOverlay() ? "Debug overlay ON — showing bounds & coordinates. Click to disable." : "Debug overlay OFF — click to show bounds & coordinate markers."}
+      onclick={() => setDebugOverlay(!getDebugOverlay())}
+    >
+      <span class="btn-icon">{getDebugOverlay() ? "\u{1F41E}" : "\u{1F50D}"}</span>
+      <span class="btn-label">{getDebugOverlay() ? "Debug ON" : "Debug"}</span>
     </button>
     <button
       class="toolbar-btn"
@@ -218,6 +278,9 @@
     {/if}
     <button class="toolbar-btn" title="Import KLWP Komponent" onclick={handleImportKomp}>
       <span class="btn-label">Import .komp</span>
+    </button>
+    <button class="toolbar-btn" title="Import Rainmeter Skin (.rmskin)" onclick={handleImportRmskin}>
+      <span class="btn-label">Import .rmskin</span>
     </button>
     {#if importStatus}
       <span class="import-status">{importStatus}</span>
@@ -267,6 +330,11 @@
     align-items: center;
     justify-content: center;
     gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .toolbar-center::-webkit-scrollbar {
+    display: none;
   }
   .toolbar-right {
     display: flex;
@@ -303,6 +371,13 @@
   }
   .toolbar-btn.interactive-active:hover {
     background: #d4a017;
+  }
+  .toolbar-btn.debug-active {
+    background: #e74c3c;
+    color: #fff;
+  }
+  .toolbar-btn.debug-active:hover {
+    background: #c0392b;
   }
   .toolbar-btn.wallpaper-active {
     background: #2d7d46;

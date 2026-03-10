@@ -9,6 +9,7 @@
     getSelectedLayer,
     updateGlobal,
     getInteractiveMode,
+    flattenLayers,
   } from "../stores/project.svelte";
   import type { Layer } from "../types/project";
   import { startFormulaLoop, stopFormulaLoop, evaluateSync, flushGlobalsNow, resolveFormula, hasFormula } from "../formula/service";
@@ -58,7 +59,24 @@
   let resizeHandleIdx = $state(-1);
   let resizeStartMouse = $state({ x: 0, y: 0 });
   let resizeStartProps = $state({ x: 0, y: 0, w: 0, h: 0 });
+  let resizeAnchorFx = $state(0);
+  let resizeAnchorFy = $state(0);
+
+  function getAnchorFactors(anchor: string): { fx: number; fy: number } {
+    switch (anchor) {
+      case "top-center":    return { fx: -0.5, fy: 0 };
+      case "top-right":     return { fx: -1,   fy: 0 };
+      case "center-left":   return { fx: 0,    fy: -0.5 };
+      case "center":        return { fx: -0.5, fy: -0.5 };
+      case "center-right":  return { fx: -1,   fy: -0.5 };
+      case "bottom-left":   return { fx: 0,    fy: -1 };
+      case "bottom-center": return { fx: -0.5, fy: -1 };
+      case "bottom-right":  return { fx: -1,   fy: -1 };
+      default:              return { fx: 0,    fy: 0 }; // top-left
+    }
+  }
   let hoveredHandle = $state(-1);
+  let hoveredLayerId = $state<string | null>(null);
   let spaceHeld = $state(false);
 
   const HANDLE_HIT_RADIUS = 10;
@@ -149,10 +167,10 @@
       ctx.save();
       ctx.translate(panX, panY);
       ctx.scale(zoom, zoom);
-      renderProject(ctx, project, selectedId, timestamp);
+      renderProject(ctx, project, selectedId, timestamp, hoveredLayerId);
       ctx.restore();
     } else {
-      renderProject(ctx, project, selectedId, timestamp);
+      renderProject(ctx, project, selectedId, timestamp, hoveredLayerId);
     }
 
     rafId = requestAnimationFrame(renderLoop);
@@ -277,6 +295,10 @@
             w: Number(layer.properties.width) || 100,
             h: Number(layer.properties.height) || 100,
           };
+          const anchor = layer.properties.anchor || "top-left";
+          const factors = getAnchorFactors(anchor);
+          resizeAnchorFx = factors.fx;
+          resizeAnchorFy = factors.fy;
           return;
         }
       }
@@ -328,26 +350,44 @@
       const dy = proj.y - resizeStartMouse.y;
       const s = resizeStartProps;
 
-      let newX = s.x, newY = s.y, newW = s.w, newH = s.h;
-
+      // Compute the visual edge deltas for each handle
+      let dLeft = 0, dRight = 0, dTop = 0, dBottom = 0;
       switch (resizeHandleIdx) {
-        case 0: newX = s.x + dx; newY = s.y + dy; newW = s.w - dx; newH = s.h - dy; break;
-        case 1: newY = s.y + dy; newH = s.h - dy; break;
-        case 2: newY = s.y + dy; newW = s.w + dx; newH = s.h - dy; break;
-        case 3: newW = s.w + dx; break;
-        case 4: newW = s.w + dx; newH = s.h + dy; break;
-        case 5: newH = s.h + dy; break;
-        case 6: newX = s.x + dx; newW = s.w - dx; newH = s.h + dy; break;
-        case 7: newX = s.x + dx; newW = s.w - dx; break;
+        case 0: dLeft = dx; dTop = dy; break;           // top-left
+        case 1: dTop = dy; break;                         // top-center
+        case 2: dRight = dx; dTop = dy; break;           // top-right
+        case 3: dRight = dx; break;                       // center-right
+        case 4: dRight = dx; dBottom = dy; break;        // bottom-right
+        case 5: dBottom = dy; break;                      // bottom-center
+        case 6: dLeft = dx; dBottom = dy; break;         // bottom-left
+        case 7: dLeft = dx; break;                        // center-left
       }
 
-      if (newW < 10) { if ([0, 6, 7].includes(resizeHandleIdx)) newX = s.x + s.w - 10; newW = 10; }
-      if (newH < 10) { if ([0, 1, 2].includes(resizeHandleIdx)) newY = s.y + s.h - 10; newH = 10; }
+      let newW = s.w + dRight - dLeft;
+      let newH = s.h + dBottom - dTop;
+
+      // Clamp minimum dimensions
+      if (newW < 10) {
+        if (dLeft !== 0) dLeft = s.w - 10;
+        if (dRight !== 0) dRight = 10 - s.w + dLeft;
+        newW = 10;
+      }
+      if (newH < 10) {
+        if (dTop !== 0) dTop = s.h - 10;
+        if (dBottom !== 0) dBottom = 10 - s.h + dTop;
+        newH = 10;
+      }
+
+      // Apply anchor correction: compensate for how anchor positioning shifts the origin when width/height change
+      const dw = newW - s.w;
+      const dh = newH - s.h;
+      const newX = s.x + dLeft - resizeAnchorFx * dw;
+      const newY = s.y + dTop - resizeAnchorFy * dh;
 
       updateLayerProperty(selectedId, "width", Math.round(newW));
       updateLayerProperty(selectedId, "height", Math.round(newH));
-      if ([0, 6, 7].includes(resizeHandleIdx)) updateLayerProperty(selectedId, "x", Math.round(newX));
-      if ([0, 1, 2].includes(resizeHandleIdx)) updateLayerProperty(selectedId, "y", Math.round(newY));
+      if (dLeft !== 0 || resizeAnchorFx !== 0) updateLayerProperty(selectedId, "x", Math.round(newX));
+      if (dTop !== 0 || resizeAnchorFy !== 0) updateLayerProperty(selectedId, "y", Math.round(newY));
       return;
     }
 
@@ -363,6 +403,14 @@
     // Hover: update cursor based on handle proximity
     const proj = canvasToProject(e.clientX, e.clientY);
     hoveredHandle = hitTestHandle(proj.x, proj.y);
+
+    // Track hovered layer for hover animations
+    if (fullscreen || getInteractiveMode()) {
+      const hit = hitTest(e.clientX, e.clientY);
+      if (hit !== hoveredLayerId) {
+        hoveredLayerId = hit;
+      }
+    }
   }
 
   function onMouseUp() {
@@ -372,6 +420,12 @@
 
   function onFullscreenMouseMove(e: MouseEvent) {
     setScrollPosition(e.clientX / window.innerWidth);
+
+    // Track hovered layer for hover animations
+    const hit = hitTest(e.clientX, e.clientY);
+    if (hit !== hoveredLayerId) {
+      hoveredLayerId = hit;
+    }
   }
 
   /** Walk the layer tree to find the path from root to a target layer */
@@ -457,6 +511,34 @@
         openUrl(resolved);
       } else {
         console.warn("Click action url: resolved to non-URL:", resolved, "(from:", urlExpr, ")");
+      }
+    } else if (action.startsWith("music:")) {
+      // music:play-pause, music:next, music:previous, music:play, music:pause, music:stop
+      const musicAction = action.slice(6);
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("music_control", { action: musicAction });
+      } catch (e) {
+        console.warn("Music control failed:", e);
+      }
+    } else if (action.startsWith("app:")) {
+      // app:command — launch application
+      const cmd = action.slice(4);
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("launch_app", { command: cmd });
+      } catch (e) {
+        console.warn("Launch app failed:", e);
+      }
+    } else if (action.startsWith("overlay:")) {
+      // overlay:layerName — toggle visibility of a named layer
+      const targetName = action.slice(8).toLowerCase();
+      const allLayers = flattenLayers(project.layers);
+      const target = allLayers.find(l => l.name.toLowerCase() === targetName);
+      if (target) {
+        // Toggle: if currently hidden, show; if visible, hide
+        const isVisible = target.visible !== false && target.properties.visible !== false && target.properties.visible !== "NEVER";
+        updateLayerProperty(target.id, "visible", isVisible ? false : true);
       }
     }
   }

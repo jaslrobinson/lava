@@ -1,3 +1,4 @@
+pub mod audio;
 pub mod battery;
 pub mod datetime;
 pub mod manager;

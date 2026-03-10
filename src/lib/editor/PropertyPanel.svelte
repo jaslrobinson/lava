@@ -11,6 +11,20 @@
   let iconPickerOpen = $state(false);
   let showCustomFont = $state(false);
 
+  // Derived state for click action UI
+  let clickActionType = $derived.by(() => {
+    const ca = getSelectedLayer()?.properties.clickAction ?? "";
+    if (!ca) return "none";
+    const prefix = ca.split(":")[0];
+    return ["music", "app", "overlay", "set", "url"].includes(prefix) ? prefix : "none";
+  });
+
+  let clickActionArg = $derived.by(() => {
+    const ca = getSelectedLayer()?.properties.clickAction ?? "";
+    const idx = ca.indexOf(":");
+    return idx >= 0 ? ca.slice(idx + 1) : "";
+  });
+
   function handleFormulaInsert(formula: string) {
     const layer = getSelectedLayer();
     if (!layer) return;
@@ -50,7 +64,7 @@
     const target = e.target as HTMLInputElement | HTMLSelectElement;
     const raw = target.value;
     // Try to parse as number for numeric fields
-    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY"];
+    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity"];
     if (numericKeys.includes(key)) {
       const num = Number(raw);
       updateLayerProperty(layer.id, key, isNaN(num) ? raw : num);
@@ -165,7 +179,67 @@
           <label>Visible (formula)</label>
           <input type="text" value={props.visible ?? ""} placeholder="e.g. $gv(myvar)$" oninput={(e) => onInput("visible", e)} />
           <label>Click Action</label>
-          <input type="text" value={props.clickAction ?? ""} placeholder="set:var:val / inc:var:amt / url:..." oninput={(e) => onInput("clickAction", e)} />
+          <select
+            value={clickActionType}
+            onchange={(e) => {
+              const newType = (e.target as HTMLSelectElement).value;
+              const layer = getSelectedLayer()!;
+              if (newType === "none") {
+                updateLayerProperty(layer.id, "clickAction", undefined);
+              } else {
+                updateLayerProperty(layer.id, "clickAction", newType + ":");
+              }
+            }}
+          >
+            <option value="none">None</option>
+            <option value="music">Music Control</option>
+            <option value="app">Launch App</option>
+            <option value="overlay">Toggle Layer</option>
+            <option value="set">Set Variable</option>
+            <option value="url">Open URL</option>
+          </select>
+          {#if clickActionType === "music"}
+            <select
+              value={clickActionArg}
+              onchange={(e) => {
+                const newArg = (e.target as HTMLSelectElement).value;
+                const layer = getSelectedLayer()!;
+                updateLayerProperty(layer.id, "clickAction", "music:" + newArg);
+              }}
+            >
+              <option value="play-pause">Play / Pause</option>
+              <option value="next">Next Track</option>
+              <option value="previous">Previous Track</option>
+              <option value="play">Play</option>
+              <option value="pause">Pause</option>
+              <option value="stop">Stop</option>
+            </select>
+          {:else if clickActionType === "app"}
+            <input type="text" value={clickActionArg} placeholder="e.g. spotify, firefox, vlc" oninput={(e) => {
+              const newArg = (e.target as HTMLInputElement).value;
+              const layer = getSelectedLayer()!;
+              updateLayerProperty(layer.id, "clickAction", "app:" + newArg);
+            }} />
+          {:else if clickActionType === "overlay"}
+            <input type="text" value={clickActionArg} placeholder="Layer name to show/hide" oninput={(e) => {
+              const newArg = (e.target as HTMLInputElement).value;
+              const layer = getSelectedLayer()!;
+              updateLayerProperty(layer.id, "clickAction", "overlay:" + newArg);
+            }} />
+            <span class="prop-hint">Toggles visibility of the named layer</span>
+          {:else if clickActionType === "set"}
+            <input type="text" value={clickActionArg} placeholder="varName:value" oninput={(e) => {
+              const newArg = (e.target as HTMLInputElement).value;
+              const layer = getSelectedLayer()!;
+              updateLayerProperty(layer.id, "clickAction", "set:" + newArg);
+            }} />
+          {:else if clickActionType === "url"}
+            <input type="text" value={clickActionArg} placeholder="https://... or $gv(urlVar)$" oninput={(e) => {
+              const newArg = (e.target as HTMLInputElement).value;
+              const layer = getSelectedLayer()!;
+              updateLayerProperty(layer.id, "clickAction", "url:" + newArg);
+            }} />
+          {/if}
         </div>
       </section>
 
@@ -270,9 +344,10 @@
           <div class="prop-stack">
             <label>Source</label>
             <div class="input-row">
-              <input type="text" value={props.src ?? ""} placeholder="Path or URL" oninput={(e) => onInput("src", e)} />
+              <input type="text" value={props.src ?? ""} placeholder="Path, URL, or $mi(cover)$" oninput={(e) => onInput("src", e)} />
               <button class="browse-btn" title="Browse for image" onclick={handleBrowseImage}>...</button>
             </div>
+            <span class="prop-hint">Tip: use <code>$mi(cover)$</code> for album art</span>
             {#if props.src}
               <div class="image-preview-small">
                 <img src={getImageSrc(String(props.src))} alt="preview" />
@@ -308,7 +383,8 @@
             <label>Max</label>
             <input type="number" value={props.max ?? 100} oninput={(e) => onInput("max", e)} />
             <label>Value</label>
-            <input type="number" value={props.value ?? 50} oninput={(e) => onInput("value", e)} />
+            <input type="text" value={props.value ?? 50} placeholder="0–100 or $mi(percent)$" oninput={(e) => onInput("value", e)} />
+            <span class="prop-hint">Tip: <code>$mi(percent)$</code> = music progress, <code>$bi(level)$</code> = battery</span>
             <label>Color</label>
             <input type="color" value={props.color ?? "#e94560"} oninput={(e) => onInput("color", e)} />
             <label>Track Color</label>
@@ -348,6 +424,29 @@
             <label>Height</label>
             <input type="number" value={props.height} oninput={(e) => onInput("height", e)} />
             <div class="child-count">Children: {layer.children?.length ?? 0}</div>
+          </div>
+        </section>
+      {/if}
+
+      {#if layer.type === "visualizer"}
+        <section class="prop-section">
+          <div class="section-title">Visualizer</div>
+          <div class="prop-stack">
+            <label>Bars</label>
+            <input type="number" min="4" max="64" value={props.barCount ?? 24} oninput={(e) => onInput("barCount", e)} />
+            <label>Spacing</label>
+            <input type="number" min="0" max="20" value={props.barSpacing ?? 3} oninput={(e) => onInput("barSpacing", e)} />
+            <label>Sensitivity</label>
+            <input type="number" min="0.1" max="5" step="0.1" value={props.sensitivity ?? 1} oninput={(e) => onInput("sensitivity", e)} />
+            <label>Top Color</label>
+            <input type="color" value={props.colorTop ?? "#88C0D0"} oninput={(e) => onInput("colorTop", e)} />
+            <label>Mid Color</label>
+            <input type="color" value={props.colorMid ?? "#5E81AC"} oninput={(e) => onInput("colorMid", e)} />
+            <label>Base Color</label>
+            <input type="color" value={props.colorBottom ?? "#2E3440"} oninput={(e) => onInput("colorBottom", e)} />
+            <label>Peak Color</label>
+            <input type="color" value={props.peakColor ?? "#ECEFF4"} oninput={(e) => onInput("peakColor", e)} />
+            <span class="prop-hint">Requires <code>parec</code> (PulseAudio/PipeWire). Reacts to playing audio.</span>
           </div>
         </section>
       {/if}
@@ -562,5 +661,18 @@
     color: var(--text-muted);
     font-size: 12px;
     line-height: 1.6;
+  }
+  .prop-hint {
+    font-size: 10px;
+    color: var(--text-dim, #6a7a8a);
+    line-height: 1.4;
+    margin-top: 2px;
+  }
+  .prop-hint code {
+    background: var(--bg-secondary);
+    padding: 1px 3px;
+    border-radius: 2px;
+    font-family: monospace;
+    color: var(--accent);
   }
 </style>

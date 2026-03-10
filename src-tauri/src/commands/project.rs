@@ -1,4 +1,5 @@
 use crate::klwp_import::{self, KompImportResult};
+use crate::rainmeter_import;
 use crate::project::Project;
 use std::fs;
 use std::io;
@@ -33,6 +34,24 @@ pub fn import_komp(path: String) -> Result<KompImportResult, String> {
         output_dir.to_str().unwrap_or("."),
         1920,
         1080,
+    )
+}
+
+#[tauri::command]
+pub fn import_rmskin(path: String) -> Result<KompImportResult, String> {
+    let rmskin_path = Path::new(&path);
+    let stem = rmskin_path.file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("imported_rmskin");
+    let output_dir = rmskin_path.parent()
+        .unwrap_or(Path::new("."))
+        .join(format!("{}_assets", stem));
+
+    fs::create_dir_all(&output_dir).map_err(|e| format!("Cannot create output dir: {}", e))?;
+
+    rainmeter_import::import_rmskin_file(
+        &path,
+        output_dir.to_str().unwrap_or("."),
     )
 }
 

@@ -39,3 +39,33 @@ pub fn open_url(url: String) -> Result<(), String> {
         .map_err(|e| format!("Failed to open URL: {}", e))?;
     Ok(())
 }
+
+/// Control music playback via playerctl.
+/// action: "play", "pause", "play-pause", "next", "previous", "stop"
+#[tauri::command]
+pub fn music_control(action: String) -> Result<(), String> {
+    let allowed = ["play", "pause", "play-pause", "next", "previous", "stop"];
+    if !allowed.contains(&action.as_str()) {
+        return Err(format!("Unknown music action: {}", action));
+    }
+    std::process::Command::new("playerctl")
+        .arg(&action)
+        .spawn()
+        .map_err(|e| format!("playerctl failed: {}", e))?;
+    Ok(())
+}
+
+/// Launch an application by command string.
+#[tauri::command]
+pub fn launch_app(command: String) -> Result<(), String> {
+    // Split on whitespace for simple commands with args
+    let parts: Vec<&str> = command.split_whitespace().collect();
+    if parts.is_empty() {
+        return Err("Empty command".into());
+    }
+    std::process::Command::new(parts[0])
+        .args(&parts[1..])
+        .spawn()
+        .map_err(|e| format!("Failed to launch '{}': {}", command, e))?;
+    Ok(())
+}

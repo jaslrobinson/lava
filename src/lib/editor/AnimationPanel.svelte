@@ -17,6 +17,7 @@
     { value: "show", label: "Show" },
     { value: "time", label: "Time" },
     { value: "reactive", label: "Reactive" },
+    { value: "hover", label: "Hover" },
   ];
 
   const easingTypes: { value: EasingType; label: string }[] = [
