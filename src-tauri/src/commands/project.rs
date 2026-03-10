@@ -1,4 +1,4 @@
-use crate::klwp_import::{self, ImportResult};
+use crate::klwp_import::{self, KompImportResult};
 use crate::project::Project;
 use std::fs;
 use std::io;
@@ -17,23 +17,22 @@ pub fn load_project(path: String) -> Result<Project, String> {
 }
 
 #[tauri::command]
-pub fn import_klwp(path: String, target_width: u32, target_height: u32) -> Result<ImportResult, String> {
-    // Create output directory next to the klwp file
-    let klwp_path = Path::new(&path);
-    let stem = klwp_path.file_stem()
+pub fn import_komp(path: String) -> Result<KompImportResult, String> {
+    let komp_path = Path::new(&path);
+    let stem = komp_path.file_stem()
         .and_then(|s| s.to_str())
-        .unwrap_or("imported");
-    let output_dir = klwp_path.parent()
+        .unwrap_or("imported_komp");
+    let output_dir = komp_path.parent()
         .unwrap_or(Path::new("."))
         .join(format!("{}_assets", stem));
 
     fs::create_dir_all(&output_dir).map_err(|e| format!("Cannot create output dir: {}", e))?;
 
-    klwp_import::import_klwp_file(
+    klwp_import::import_komp_file(
         &path,
         output_dir.to_str().unwrap_or("."),
-        target_width,
-        target_height,
+        1920,
+        1080,
     )
 }
 

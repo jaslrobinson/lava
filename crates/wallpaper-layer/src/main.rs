@@ -1,6 +1,6 @@
 use gtk::prelude::*;
 use gtk_layer_shell::LayerShell;
-use webkit2gtk::{gio, WebView, WebViewExt};
+use webkit2gtk::{gio, UserContentManager, UserContentManagerExt, WebView, WebViewExt};
 
 fn main() {
     let url = std::env::args().nth(1).unwrap_or_else(|| {
@@ -30,14 +30,26 @@ fn main() {
     window.set_exclusive_zone(-1);
     window.set_namespace("klwp-wallpaper");
 
-    let webview = WebView::new();
+    // Set up a UserContentManager with a message handler so JS can call into Rust.
+    // Frontend uses: window.webkit.messageHandlers.klwp.postMessage(jsonString)
+    let ucm = UserContentManager::new();
+    ucm.register_script_message_handler("klwp");
+
+    ucm.connect_script_message_received(Some("klwp"), |_ucm, js_result| {
+        if let Some(js_val) = js_result.js_value() {
+            use javascriptcore::ValueExt;
+            let msg = js_val.to_str();
+            handle_message(&msg);
+        }
+    });
+
+    let webview = WebView::with_user_content_manager(&ucm);
 
     // Once the page finishes loading, inject the project data via JS
     if let Some(json) = project_json {
         eprintln!("[klwp-wallpaper] Will inject project ({} bytes) after page load", json.len());
         webview.connect_load_changed(move |wv, event| {
             if event == webkit2gtk::LoadEvent::Finished {
-                // Valid JSON is valid JS, so we can assign directly
                 let js = format!("window.__KLWP_PROJECT = {};", json);
                 eprintln!("[klwp-wallpaper] Injecting project data now");
                 wv.run_javascript(&js, None::<&gio::Cancellable>, |result| {
@@ -61,4 +73,28 @@ fn main() {
     });
 
     gtk::main();
+}
+
+/// Handle a message from the frontend JS.
+/// Messages are JSON strings like: {"type":"open_url","url":"https://..."}
+fn handle_message(msg: &str) {
+    if let Some(url) = extract_json_field(msg, "url") {
+        if url.starts_with("http://") || url.starts_with("https://") {
+            eprintln!("[klwp-wallpaper] Opening URL: {}", url);
+            let _ = std::process::Command::new("xdg-open")
+                .arg(url)
+                .spawn();
+        }
+    }
+}
+
+/// Extract a string field value from a simple JSON object.
+fn extract_json_field<'a>(json: &'a str, field: &str) -> Option<&'a str> {
+    let key = format!("\"{}\"", field);
+    let start = json.find(&key)? + key.len();
+    let rest = &json[start..];
+    let quote_start = rest.find('"')? + 1;
+    let inner = &rest[quote_start..];
+    let quote_end = inner.find('"')?;
+    Some(&inner[..quote_end])
 }

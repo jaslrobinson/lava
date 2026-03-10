@@ -1789,6 +1789,7 @@ version = "0.1.0"
 dependencies = [
  "gtk",
  "gtk-layer-shell",
+ "javascriptcore-rs",
  "webkit2gtk",
 ]
 

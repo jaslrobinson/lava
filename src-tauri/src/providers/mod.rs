@@ -3,6 +3,7 @@ pub mod datetime;
 pub mod manager;
 pub mod music;
 pub mod network;
+pub mod radar;
 pub mod resource_monitor;
 pub mod sysinfo_provider;
 pub mod traffic;

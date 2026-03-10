@@ -92,6 +92,7 @@ pub fn run() {
             let (weather, forecast) = providers::weather::create_providers();
             manager.register(Box::new(weather));
             manager.register(Box::new(forecast));
+            manager.register(Box::new(providers::radar::RadarProvider));
 
             let data = manager.data();
             app.manage(data);
@@ -117,7 +118,7 @@ pub fn run() {
             commands::formula::evaluate_formula,
             commands::project::save_project,
             commands::project::load_project,
-            commands::project::import_klwp,
+            commands::project::import_komp,
             commands::project::list_project_fonts,
             commands::project::copy_asset_to_project,
             commands::project::extract_apk_icon,

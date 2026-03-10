@@ -23,32 +23,32 @@
     {
       "name": "weather_hi",
       "type": "text",
-      "value": "$wf(0, max)$"
+      "value": "$wf(1, max)$"
     },
     {
       "name": "weather_lo",
       "type": "text",
-      "value": "$wf(0, min)$"
+      "value": "$wf(1, min)$"
     },
     {
       "name": "music_title",
       "type": "text",
-      "value": "$mi(title)$"
+      "value": "Midnight City"
     },
     {
       "name": "music_artist",
       "type": "text",
-      "value": "$mi(artist)$"
+      "value": "M83"
     },
     {
       "name": "music_album",
       "type": "text",
-      "value": "$mi(album)$"
+      "value": "Hurry Up, We're Dreaming"
     },
     {
       "name": "music_progress",
-      "type": "text",
-      "value": "$mi(pos)$"
+      "type": "number",
+      "value": 35.0
     },
     {
       "name": "news_1",
@@ -68,12 +68,22 @@
     {
       "name": "news_source",
       "type": "text",
-      "value": "Tech News"
+      "value": "https://moxie.foxnews.com/google-publisher/latest.xml"
+    },
+    {
+      "name": "page",
+      "type": "text",
+      "value": "weather"
+    },
+    {
+      "name": "newsIdx",
+      "type": "number",
+      "value": 3.0
     },
     {
       "name": "timer",
       "type": "text",
-      "value": " $mu(mod, mu(floor, mu(div, dp(s), 5)), 30)$"
+      "value": "$mu(mod, mu(floor, mu(div, dp(s), 5)), 30)$"
     }
   ],
   "layers": [
@@ -87,6 +97,7 @@
         "width": 2048.0,
         "height": 400.0,
         "opacity": 200.0,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$",
         "shapeKind": "rectangle",
         "fill": "#0b0e1780"
       },
@@ -102,6 +113,7 @@
         "width": 2048.0,
         "height": 300.0,
         "opacity": 200.0,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$",
         "shapeKind": "rectangle",
         "fill": "#00000090"
       },
@@ -112,10 +124,13 @@
       "name": "Clock",
       "type": "overlap",
       "properties": {
-        "x": 120.0,
-        "y": 356.0,
-        "width": 800.0,
-        "height": 500.0
+        "x": 137.0,
+        "y": 395.0,
+        "width": 724.0,
+        "height": 508.0,
+        "scaleX": 1.2,
+        "scaleY": 1.2,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$"
       },
       "children": [
         {
@@ -219,7 +234,9 @@
         "x": 1500.0,
         "y": 80.0,
         "width": 460.0,
-        "height": 280.0
+        "height": 280.0,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$",
+        "clickAction": "set:page:weather"
       },
       "children": [
         {
@@ -308,435 +325,17 @@
           "visible": true
         },
         {
-          "id": "layer_1773068644895_68",
-          "name": "5-Day Forecast",
-          "type": "overlap",
-          "properties": {
-            "x": 120.0,
-            "y": 188.0,
-            "width": 380.0,
-            "height": 104.0,
-            "scaleX": 0.8,
-            "scaleY": 0.8,
-            "opacity": 255.0,
-            "anchor": "top-left"
-          },
-          "children": [
-            {
-              "id": "layer_1773068644895_67",
-              "name": "Days",
-              "type": "stack",
-              "properties": {
-                "x": 5.0,
-                "y": 10.0,
-                "width": 370.0,
-                "height": 110.0,
-                "opacity": 255.0,
-                "anchor": "top-left",
-                "orientation": "horizontal",
-                "spacing": 4.0
-              },
-              "children": [
-                {
-                  "id": "layer_1773068644895_49",
-                  "name": "Day 0",
-                  "type": "stack",
-                  "properties": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "width": 70.0,
-                    "height": 100.0,
-                    "opacity": 255.0,
-                    "anchor": "top-left",
-                    "orientation": "vertical",
-                    "spacing": 2.0
-                  },
-                  "children": [
-                    {
-                      "id": "layer_1773068644895_46",
-                      "name": "Day",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(0, day)$",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#aaaaaa",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_47",
-                      "name": "Icon",
-                      "type": "image",
-                      "properties": {
-                        "x": 15.0,
-                        "y": 0.0,
-                        "width": 40.0,
-                        "height": 40.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "src": "$wf(0, iconurl)$",
-                        "scaleMode": "fit"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_48",
-                      "name": "Temp",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(0, max)$°/$wf(0, min)$°",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#ffffff",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    }
-                  ],
-                  "locked": false,
-                  "visible": true
-                },
-                {
-                  "id": "layer_1773068644895_53",
-                  "name": "Day 1",
-                  "type": "stack",
-                  "properties": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "width": 70.0,
-                    "height": 100.0,
-                    "opacity": 255.0,
-                    "anchor": "top-left",
-                    "orientation": "vertical",
-                    "spacing": 2.0
-                  },
-                  "children": [
-                    {
-                      "id": "layer_1773068644895_50",
-                      "name": "Day",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(1, day)$",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#aaaaaa",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_51",
-                      "name": "Icon",
-                      "type": "image",
-                      "properties": {
-                        "x": 15.0,
-                        "y": 0.0,
-                        "width": 40.0,
-                        "height": 40.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "src": "$wf(1, iconurl)$",
-                        "scaleMode": "fit"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_52",
-                      "name": "Temp",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(1, max)$°/$wf(1, min)$°",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#ffffff",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    }
-                  ],
-                  "locked": false,
-                  "visible": true
-                },
-                {
-                  "id": "layer_1773068644895_57",
-                  "name": "Day 2",
-                  "type": "stack",
-                  "properties": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "width": 70.0,
-                    "height": 100.0,
-                    "opacity": 255.0,
-                    "anchor": "top-left",
-                    "orientation": "vertical",
-                    "spacing": 2.0
-                  },
-                  "children": [
-                    {
-                      "id": "layer_1773068644895_54",
-                      "name": "Day",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(2, day)$",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#aaaaaa",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_55",
-                      "name": "Icon",
-                      "type": "image",
-                      "properties": {
-                        "x": 15.0,
-                        "y": 0.0,
-                        "width": 40.0,
-                        "height": 40.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "src": "$wf(2, iconurl)$",
-                        "scaleMode": "fit"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_56",
-                      "name": "Temp",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(2, max)$°/$wf(2, min)$°",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#ffffff",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    }
-                  ],
-                  "locked": false,
-                  "visible": true
-                },
-                {
-                  "id": "layer_1773068644895_61",
-                  "name": "Day 3",
-                  "type": "stack",
-                  "properties": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "width": 70.0,
-                    "height": 100.0,
-                    "opacity": 255.0,
-                    "anchor": "top-left",
-                    "orientation": "vertical",
-                    "spacing": 2.0
-                  },
-                  "children": [
-                    {
-                      "id": "layer_1773068644895_58",
-                      "name": "Day",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(3, day)$",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#aaaaaa",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_59",
-                      "name": "Icon",
-                      "type": "image",
-                      "properties": {
-                        "x": 15.0,
-                        "y": 0.0,
-                        "width": 40.0,
-                        "height": 40.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "src": "$wf(3, iconurl)$",
-                        "scaleMode": "fit"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_60",
-                      "name": "Temp",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(3, max)$°/$wf(3, min)$°",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#ffffff",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    }
-                  ],
-                  "locked": false,
-                  "visible": true
-                },
-                {
-                  "id": "layer_1773068644895_65",
-                  "name": "Day 4",
-                  "type": "stack",
-                  "properties": {
-                    "x": 0.0,
-                    "y": 0.0,
-                    "width": 70.0,
-                    "height": 100.0,
-                    "opacity": 255.0,
-                    "anchor": "top-left",
-                    "orientation": "vertical",
-                    "spacing": 2.0
-                  },
-                  "children": [
-                    {
-                      "id": "layer_1773068644895_62",
-                      "name": "Day",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(4, day)$",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#aaaaaa",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_63",
-                      "name": "Icon",
-                      "type": "image",
-                      "properties": {
-                        "x": 15.0,
-                        "y": 0.0,
-                        "width": 40.0,
-                        "height": 40.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "src": "$wf(4, iconurl)$",
-                        "scaleMode": "fit"
-                      },
-                      "locked": false,
-                      "visible": true
-                    },
-                    {
-                      "id": "layer_1773068644895_64",
-                      "name": "Temp",
-                      "type": "text",
-                      "properties": {
-                        "x": 0.0,
-                        "y": 0.0,
-                        "width": 70.0,
-                        "height": 16.0,
-                        "opacity": 255.0,
-                        "anchor": "top-left",
-                        "text": "$wf(4, max)$°/$wf(4, min)$°",
-                        "fontSize": 11.0,
-                        "fontFamily": "sans-serif",
-                        "color": "#ffffff",
-                        "textAlign": "center"
-                      },
-                      "locked": false,
-                      "visible": true
-                    }
-                  ],
-                  "locked": false,
-                  "visible": true
-                }
-              ],
-              "locked": false,
-              "visible": true
-            }
-          ],
-          "locked": false,
-          "visible": true
-        },
-        {
-          "id": "layer_1773039593586_2",
-          "name": "image_32",
+          "id": "layer_1773079719183_0",
+          "name": "image_73",
           "type": "image",
           "properties": {
-            "x": 222.0,
-            "y": 46.0,
-            "width": 200.0,
-            "height": 200.0,
+            "x": 151.0,
+            "y": -69.0,
+            "width": 331.0,
+            "height": 411.0,
             "opacity": 255.0,
             "anchor": "top-left",
-            "src": "$wf(1, iconurl)$ ",
+            "src": "$wf(0, iconurl)$",
             "scaleMode": "fit"
           },
           "locked": false,
@@ -754,7 +353,7 @@
         "y": 420.0,
         "width": 460.0,
         "height": 520.0,
-        "visible": " $if(mi(state)=PLAYING, ALWAYS, NEVER)$ "
+        "visible": "$if(mi(state)=PLAYING, ALWAYS, NEVER)$ "
       },
       "children": [
         {
@@ -766,6 +365,7 @@
             "y": 0.0,
             "width": 460.0,
             "height": 520.0,
+            "visible": "",
             "shapeKind": "rectangle",
             "fill": "#ffffff08",
             "stroke": "#ffffff10",
@@ -813,21 +413,13 @@
           "properties": {
             "x": 30.0,
             "y": 350.0,
-            "width": 407.0,
+            "width": 400.0,
             "height": 40.0,
             "text": "$gv(music_title)$",
-            "fontSize": 23.0,
+            "fontSize": 26.0,
             "fontFamily": "sans-serif",
             "color": "#ffffff",
-            "textAlign": "left",
-            "maxLines": 2,
-            "lineSpacing": 0.0,
-            "shadow": {
-              "color": "#00000080",
-              "dx": 2.0,
-              "dy": 2.0,
-              "radius": 4.0
-            }
+            "textAlign": "left"
           },
           "visible": true
         },
@@ -883,35 +475,6 @@
             "trackColor": "#ffffff15"
           },
           "visible": true
-        },
-        {
-          "id": "layer_1773038176793_1",
-          "name": "image_31",
-          "type": "image",
-          "properties": {
-            "x": 50.0,
-            "y": 36.0,
-            "width": 367.0,
-            "height": 282.0,
-            "opacity": 255.0,
-            "anchor": "top-left",
-            "src": "$mi(cover)$",
-            "scaleMode": "stretch"
-          },
-          "animations": [
-            {
-              "type": "fade",
-              "trigger": "reactive",
-              "rule": "",
-              "amount": 255.0,
-              "speed": 1000.0,
-              "easing": "ease-in",
-              "delay": 0.0,
-              "loop": "none"
-            }
-          ],
-          "locked": false,
-          "visible": true
         }
       ],
       "visible": true
@@ -924,7 +487,9 @@
         "x": 80.0,
         "y": 1050.0,
         "width": 1350.0,
-        "height": 180.0
+        "height": 180.0,
+        "visible": "$if(gv(page)=home, ALWAYS, NEVER)$",
+        "clickAction": "set:page:news"
       },
       "children": [
         {
@@ -1041,6 +606,2484 @@
             "color": "#ffffff60",
             "textAlign": "left"
           },
+          "visible": true
+        }
+      ],
+      "visible": true
+    },
+    {
+      "id": "news_page",
+      "name": "News Page",
+      "type": "overlap",
+      "properties": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 2048.0,
+        "height": 1280.0,
+        "visible": "$if(gv(page)=news, ALWAYS, NEVER)$"
+      },
+      "animations": [
+        {
+          "type": "fade",
+          "trigger": "show",
+          "rule": "",
+          "amount": 255.0,
+          "speed": 2400.0,
+          "easing": "ease-out",
+          "delay": 0.0,
+          "loop": "none"
+        }
+      ],
+      "children": [
+        {
+          "id": "np_bg",
+          "name": "Background",
+          "type": "shape",
+          "properties": {
+            "x": -704.0,
+            "y": -210.0,
+            "width": 2048.0,
+            "height": 1280.0,
+            "shapeKind": "rectangle",
+            "fill": "#0b0e17"
+          },
+          "visible": true
+        },
+        {
+          "id": "np_header",
+          "name": "Header",
+          "type": "text",
+          "properties": {
+            "x": 110.0,
+            "y": 38.0,
+            "width": 300.0,
+            "height": 36.0,
+            "text": "NEWS",
+            "fontSize": 26.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "np_featured",
+          "name": "Featured Article",
+          "type": "overlap",
+          "properties": {
+            "x": 40.0,
+            "y": 100.0,
+            "width": 1968.0,
+            "height": 560.0
+          },
+          "children": [
+            {
+              "id": "np_feat_bg",
+              "name": "Image BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 1968.0,
+                "height": 560.0,
+                "shapeKind": "rectangle",
+                "fill": "#1a1f30",
+                "cornerRadius": 16.0
+              },
+              "visible": true
+            },
+            {
+              "id": "np_feat_img",
+              "name": "Hero Image",
+              "type": "image",
+              "properties": {
+                "x": -41.0,
+                "y": -100.0,
+                "width": 2062.0,
+                "height": 1281.0,
+                "cornerRadius": 0.0,
+                "src": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, img, gv(newsIdx))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_feat_grad",
+              "name": "Gradient",
+              "type": "shape",
+              "properties": {
+                "x": -40.0,
+                "y": 531.0,
+                "width": 2048.0,
+                "height": 677.0,
+                "opacity": 169.0,
+                "shadow": {
+                  "color": "#00000080",
+                  "dx": 2.0,
+                  "dy": 2.0,
+                  "radius": 4.0
+                },
+                "shapeKind": "rectangle",
+                "fill": "#000000"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_feat_open",
+              "name": "Open Button",
+              "type": "overlap",
+              "properties": {
+                "x": 1855.0,
+                "y": 556.0,
+                "width": 50.0,
+                "height": 50.0,
+                "clickAction": "url:$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, link, gv(newsIdx))$"
+              },
+              "children": [
+                {
+                  "id": "np_feat_open_circle",
+                  "name": "Circle",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 50.0,
+                    "height": 50.0,
+                    "shapeKind": "circle",
+                    "fill": "#4a9eff",
+                    "clickAction": "url:$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, link, gv(newsIdx))$"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "np_feat_open_icon",
+                  "name": "Icon",
+                  "type": "text",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 10.0,
+                    "width": 50.0,
+                    "height": 34.0,
+                    "text": "▶",
+                    "fontSize": 20.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "center",
+                    "clickAction": "url:$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, link, gv(newsIdx))$"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "np_feat_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 30.0,
+                "y": 547.0,
+                "width": 1817.0,
+                "height": 80.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, feed, gv(newsIdx))$",
+                "fontSize": 32.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2,
+                "shadow": {
+                  "color": "#00000080",
+                  "dx": 1.0,
+                  "dy": 2.0,
+                  "radius": 6.0
+                }
+              },
+              "visible": true
+            },
+            {
+              "id": "np_feat_desc",
+              "name": "Description",
+              "type": "text",
+              "properties": {
+                "x": 30.0,
+                "y": 626.0,
+                "width": 1900.0,
+                "height": 63.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, desc, gv(newsIdx))$",
+                "fontSize": 19.0,
+                "fontFamily": "sans-serif",
+                "color": "#aaaaaa",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "np_card_1",
+          "name": "Card 1",
+          "type": "overlap",
+          "properties": {
+            "x": 40.0,
+            "y": 805.0,
+            "width": 472.0,
+            "height": 340.0,
+            "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, mu(add, gv(newsIdx), 1))$"
+          },
+          "children": [
+            {
+              "id": "np_c1_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 472.0,
+                "height": 340.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "stroke": "#ffffff10",
+                "strokeWidth": 1.0,
+                "cornerRadius": 12.0
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c1_img",
+              "name": "Image",
+              "type": "image",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 472.0,
+                "height": 230.0,
+                "cornerRadius": 15.0,
+                "src": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, img, mu(add, gv(newsIdx), 1))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c1_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 16.0,
+                "y": 244.0,
+                "width": 440.0,
+                "height": 50.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, feed, mu(add, gv(newsIdx), 1))$",
+                "fontSize": 15.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c1_date",
+              "name": "Date",
+              "type": "text",
+              "properties": {
+                "x": 16.0,
+                "y": 300.0,
+                "width": 440.0,
+                "height": 20.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, date, mu(add, gv(newsIdx), 1))$",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff40",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "np_card_2",
+          "name": "Card 2",
+          "type": "overlap",
+          "properties": {
+            "x": 532.0,
+            "y": 805.0,
+            "width": 472.0,
+            "height": 340.0,
+            "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, mu(add, gv(newsIdx), 2))$"
+          },
+          "children": [
+            {
+              "id": "np_c2_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 472.0,
+                "height": 340.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "stroke": "#ffffff10",
+                "strokeWidth": 1.0,
+                "cornerRadius": 12.0
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c2_img",
+              "name": "Image",
+              "type": "image",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 472.0,
+                "height": 230.0,
+                "cornerRadius": 15.0,
+                "src": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, img, mu(add, gv(newsIdx), 2))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c2_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 16.0,
+                "y": 244.0,
+                "width": 440.0,
+                "height": 50.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, feed, mu(add, gv(newsIdx), 2))$",
+                "fontSize": 15.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c2_date",
+              "name": "Date",
+              "type": "text",
+              "properties": {
+                "x": 16.0,
+                "y": 300.0,
+                "width": 440.0,
+                "height": 20.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, date, mu(add, gv(newsIdx), 2))$",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff40",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "np_card_3",
+          "name": "Card 3",
+          "type": "overlap",
+          "properties": {
+            "x": 1024.0,
+            "y": 805.0,
+            "width": 472.0,
+            "height": 340.0,
+            "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, mu(add, gv(newsIdx), 3))$"
+          },
+          "children": [
+            {
+              "id": "np_c3_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 472.0,
+                "height": 340.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "stroke": "#ffffff10",
+                "strokeWidth": 1.0,
+                "cornerRadius": 12.0
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c3_img",
+              "name": "Image",
+              "type": "image",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 472.0,
+                "height": 230.0,
+                "cornerRadius": 15.0,
+                "src": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, img, mu(add, gv(newsIdx), 3))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c3_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 16.0,
+                "y": 244.0,
+                "width": 440.0,
+                "height": 50.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, feed, mu(add, gv(newsIdx), 3))$",
+                "fontSize": 15.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c3_date",
+              "name": "Date",
+              "type": "text",
+              "properties": {
+                "x": 16.0,
+                "y": 300.0,
+                "width": 440.0,
+                "height": 20.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, date, mu(add, gv(newsIdx), 3))$",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff40",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "np_card_4",
+          "name": "Card 4",
+          "type": "overlap",
+          "properties": {
+            "x": 1516.0,
+            "y": 805.0,
+            "width": 472.0,
+            "height": 340.0,
+            "clickAction": "url:$wg(\"https://news.google.com/rss\", rss, link, mu(add, gv(newsIdx), 4))$"
+          },
+          "children": [
+            {
+              "id": "np_c4_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 472.0,
+                "height": 340.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "stroke": "#ffffff10",
+                "strokeWidth": 1.0,
+                "cornerRadius": 12.0
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c4_img",
+              "name": "Image",
+              "type": "image",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 472.0,
+                "height": 230.0,
+                "cornerRadius": 15.0,
+                "src": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, img, mu(add, gv(newsIdx), 4))$",
+                "scaleMode": "fill"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c4_title",
+              "name": "Title",
+              "type": "text",
+              "properties": {
+                "x": 16.0,
+                "y": 244.0,
+                "width": 440.0,
+                "height": 50.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, feed, mu(add, gv(newsIdx), 4))$",
+                "fontSize": 15.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left",
+                "maxLines": 2
+              },
+              "visible": true
+            },
+            {
+              "id": "np_c4_date",
+              "name": "Date",
+              "type": "text",
+              "properties": {
+                "x": 16.0,
+                "y": 300.0,
+                "width": 440.0,
+                "height": 20.0,
+                "text": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, date, mu(add, gv(newsIdx), 4))$",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff40",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "np_nav_next",
+          "name": "Next Button",
+          "type": "overlap",
+          "properties": {
+            "x": 1128.0,
+            "y": 1160.0,
+            "width": 80.0,
+            "height": 44.0,
+            "clickAction": "inc:newsIdx:1"
+          },
+          "children": [
+            {
+              "id": "np_nav_next_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 80.0,
+                "height": 44.0,
+                "shapeKind": "rectangle",
+                "fill": "#4a9eff",
+                "cornerRadius": 22.0
+              },
+              "visible": true
+            },
+            {
+              "id": "np_nav_next_arr",
+              "name": "Arrow",
+              "type": "text",
+              "properties": {
+                "x": 0.0,
+                "y": 6.0,
+                "width": 80.0,
+                "height": 32.0,
+                "text": "›",
+                "fontSize": 28.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "center"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "np_nav_prev",
+          "name": "Prev Button",
+          "type": "overlap",
+          "properties": {
+            "x": 840.0,
+            "y": 1160.0,
+            "width": 80.0,
+            "height": 44.0,
+            "clickAction": "inc:newsIdx:-1"
+          },
+          "children": [
+            {
+              "id": "np_nav_prev_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 80.0,
+                "height": 44.0,
+                "shapeKind": "rectangle",
+                "fill": "#4a9eff",
+                "cornerRadius": 22.0,
+                "clickAction": "url:$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\", rss, link, gv(newsIdx))$"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_nav_prev_arr",
+              "name": "Arrow",
+              "type": "text",
+              "properties": {
+                "x": 0.0,
+                "y": 6.0,
+                "width": 80.0,
+                "height": 32.0,
+                "text": "‹",
+                "fontSize": 28.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "center"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "np_nav_page",
+          "name": "Page Indicator",
+          "type": "text",
+          "properties": {
+            "x": 940.0,
+            "y": 1172.0,
+            "width": 168.0,
+            "height": 22.0,
+            "text": "$wg(\"https://news.google.com/rss\", rss, cnt, 0)$ articles",
+            "fontSize": 14.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff50",
+            "textAlign": "center"
+          },
+          "visible": true
+        },
+        {
+          "id": "np_back_btn",
+          "name": "Back Button",
+          "type": "overlap",
+          "properties": {
+            "x": 64.0,
+            "y": 30.0,
+            "width": 50.0,
+            "height": 50.0,
+            "clickAction": "set:page:home"
+          },
+          "children": [
+            {
+              "id": "np_back_circle",
+              "name": "Circle",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 50.0,
+                "height": 50.0,
+                "shapeKind": "circle",
+                "fill": "#4a9eff",
+                "clickAction": "set:page:home"
+              },
+              "visible": true
+            },
+            {
+              "id": "np_back_arrow",
+              "name": "Arrow",
+              "type": "text",
+              "properties": {
+                "x": 0.0,
+                "y": 10.0,
+                "width": 50.0,
+                "height": 34.0,
+                "text": "←",
+                "fontSize": 24.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "center",
+                "clickAction": "set:page:home"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        }
+      ],
+      "visible": true
+    },
+    {
+      "id": "weather_page",
+      "name": "Weather Page",
+      "type": "overlap",
+      "properties": {
+        "x": 0.0,
+        "y": 0.0,
+        "width": 2048.0,
+        "height": 1280.0,
+        "visible": "$if(gv(page)=weather, ALWAYS, NEVER)$"
+      },
+      "animations": [
+        {
+          "type": "fade",
+          "trigger": "show",
+          "rule": "",
+          "amount": 255.0,
+          "speed": 2400.0,
+          "easing": "ease-out",
+          "delay": 0.0,
+          "loop": "none"
+        }
+      ],
+      "children": [
+        {
+          "id": "wp_bg",
+          "name": "Background",
+          "type": "shape",
+          "properties": {
+            "x": -704.0,
+            "y": -210.0,
+            "width": 2753.0,
+            "height": 1489.0,
+            "shapeKind": "rectangle",
+            "fill": "#0b0e17"
+          },
+          "visible": true
+        },
+        {
+          "id": "wp_back_btn",
+          "name": "Back Button",
+          "type": "overlap",
+          "properties": {
+            "x": 64.0,
+            "y": 30.0,
+            "width": 50.0,
+            "height": 50.0,
+            "clickAction": "set:page:home"
+          },
+          "children": [
+            {
+              "id": "wp_back_circle",
+              "name": "Circle",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 50.0,
+                "height": 50.0,
+                "shapeKind": "circle",
+                "fill": "#4a9eff",
+                "clickAction": "set:page:home"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_back_arrow",
+              "name": "Arrow",
+              "type": "text",
+              "properties": {
+                "x": 0.0,
+                "y": 10.0,
+                "width": 50.0,
+                "height": 34.0,
+                "text": "←",
+                "fontSize": 24.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "center",
+                "clickAction": "set:page:home"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "wp_header",
+          "name": "Header",
+          "type": "text",
+          "properties": {
+            "x": 130.0,
+            "y": 38.0,
+            "width": 300.0,
+            "height": 36.0,
+            "text": "WEATHER",
+            "fontSize": 26.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff",
+            "textAlign": "left"
+          },
+          "visible": true
+        },
+        {
+          "id": "wp_updated",
+          "name": "Updated",
+          "type": "text",
+          "properties": {
+            "x": 1700.0,
+            "y": 44.0,
+            "width": 300.0,
+            "height": 24.0,
+            "text": "Updated $wi(updated)$",
+            "fontSize": 13.0,
+            "fontFamily": "sans-serif",
+            "color": "#ffffff40",
+            "textAlign": "right"
+          },
+          "visible": true
+        },
+        {
+          "id": "wp_current_card",
+          "name": "Current Conditions",
+          "type": "overlap",
+          "properties": {
+            "x": 40.0,
+            "y": 100.0,
+            "width": 1200.0,
+            "height": 440.0
+          },
+          "children": [
+            {
+              "id": "wp_cur_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 1200.0,
+                "height": 440.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "stroke": "#ffffff10",
+                "strokeWidth": 1.0,
+                "cornerRadius": 20.0
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_icon",
+              "name": "Weather Icon",
+              "type": "image",
+              "properties": {
+                "x": 30.0,
+                "y": 20.0,
+                "width": 200.0,
+                "height": 200.0,
+                "src": "$wi(iconurl)$",
+                "scaleMode": "fit"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_temp",
+              "name": "Temperature",
+              "type": "text",
+              "properties": {
+                "x": 240.0,
+                "y": 40.0,
+                "width": 400.0,
+                "height": 140.0,
+                "text": "$wi(temp)$°",
+                "fontSize": 120.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_cond",
+              "name": "Condition",
+              "type": "text",
+              "properties": {
+                "x": 250.0,
+                "y": 180.0,
+                "width": 500.0,
+                "height": 40.0,
+                "text": "$wi(cond)$",
+                "fontSize": 28.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffffcc",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_feels",
+              "name": "Feels Like",
+              "type": "text",
+              "properties": {
+                "x": 250.0,
+                "y": 220.0,
+                "width": 400.0,
+                "height": 30.0,
+                "text": "Feels like $wi(flik)$°",
+                "fontSize": 18.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff60",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_hilo",
+              "name": "Hi / Lo",
+              "type": "text",
+              "properties": {
+                "x": 250.0,
+                "y": 255.0,
+                "width": 400.0,
+                "height": 30.0,
+                "text": "H: $wf(0, max)$°  L: $wf(0, min)$°",
+                "fontSize": 18.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff50",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_wind_label",
+              "name": "Wind Label",
+              "type": "text",
+              "properties": {
+                "x": 700.0,
+                "y": 60.0,
+                "width": 460.0,
+                "height": 24.0,
+                "text": "WIND",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#4a9eff60",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_wind_val",
+              "name": "Wind Value",
+              "type": "text",
+              "properties": {
+                "x": 700.0,
+                "y": 82.0,
+                "width": 460.0,
+                "height": 40.0,
+                "text": "$wi(wspeed)$ m/s $wi(wdir)$",
+                "fontSize": 24.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_hum_label",
+              "name": "Humidity Label",
+              "type": "text",
+              "properties": {
+                "x": 700.0,
+                "y": 140.0,
+                "width": 460.0,
+                "height": 24.0,
+                "text": "HUMIDITY",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#4a9eff60",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_hum_val",
+              "name": "Humidity Value",
+              "type": "text",
+              "properties": {
+                "x": 700.0,
+                "y": 162.0,
+                "width": 460.0,
+                "height": 40.0,
+                "text": "$wi(hum)$%",
+                "fontSize": 24.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_press_label",
+              "name": "Pressure Label",
+              "type": "text",
+              "properties": {
+                "x": 700.0,
+                "y": 220.0,
+                "width": 460.0,
+                "height": 24.0,
+                "text": "PRESSURE",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#4a9eff60",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_press_val",
+              "name": "Pressure Value",
+              "type": "text",
+              "properties": {
+                "x": 700.0,
+                "y": 242.0,
+                "width": 460.0,
+                "height": 40.0,
+                "text": "$wi(press)$ hPa",
+                "fontSize": 24.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffff",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_divider",
+              "name": "Divider",
+              "type": "shape",
+              "properties": {
+                "x": 30.0,
+                "y": 310.0,
+                "width": 1140.0,
+                "height": 1.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff10"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_vis_label",
+              "name": "Visibility Label",
+              "type": "text",
+              "properties": {
+                "x": 30.0,
+                "y": 330.0,
+                "width": 220.0,
+                "height": 20.0,
+                "text": "VISIBILITY",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#4a9eff60",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_vis_val",
+              "name": "Visibility Value",
+              "type": "text",
+              "properties": {
+                "x": 30.0,
+                "y": 352.0,
+                "width": 220.0,
+                "height": 34.0,
+                "text": "$wi(vis)$ km",
+                "fontSize": 20.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffffcc",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_clouds_label",
+              "name": "Clouds Label",
+              "type": "text",
+              "properties": {
+                "x": 280.0,
+                "y": 330.0,
+                "width": 220.0,
+                "height": 20.0,
+                "text": "CLOUD COVER",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#4a9eff60",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_clouds_val",
+              "name": "Clouds Value",
+              "type": "text",
+              "properties": {
+                "x": 280.0,
+                "y": 352.0,
+                "width": 220.0,
+                "height": 34.0,
+                "text": "$wi(clouds)$%",
+                "fontSize": 20.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffffcc",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_dew_label",
+              "name": "Dew Point Label",
+              "type": "text",
+              "properties": {
+                "x": 530.0,
+                "y": 330.0,
+                "width": 220.0,
+                "height": 20.0,
+                "text": "DEW POINT",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#4a9eff60",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_dew_val",
+              "name": "Dew Point Value",
+              "type": "text",
+              "properties": {
+                "x": 530.0,
+                "y": 352.0,
+                "width": 220.0,
+                "height": 34.0,
+                "text": "$wi(dpoint)$°",
+                "fontSize": 20.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffffcc",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_gust_label",
+              "name": "Wind Gust Label",
+              "type": "text",
+              "properties": {
+                "x": 780.0,
+                "y": 330.0,
+                "width": 220.0,
+                "height": 20.0,
+                "text": "WIND GUST",
+                "fontSize": 11.0,
+                "fontFamily": "sans-serif",
+                "color": "#4a9eff60",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_cur_gust_val",
+              "name": "Wind Gust Value",
+              "type": "text",
+              "properties": {
+                "x": 780.0,
+                "y": 352.0,
+                "width": 220.0,
+                "height": 34.0,
+                "text": "$wi(wgust)$ m/s",
+                "fontSize": 20.0,
+                "fontFamily": "sans-serif",
+                "color": "#ffffffcc",
+                "textAlign": "left"
+              },
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "wp_forecast_section",
+          "name": "5-Day Forecast",
+          "type": "overlap",
+          "properties": {
+            "x": 1280.0,
+            "y": 100.0,
+            "width": 728.0,
+            "height": 440.0
+          },
+          "children": [
+            {
+              "id": "wp_fc_bg",
+              "name": "BG",
+              "type": "shape",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 728.0,
+                "height": 440.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08",
+                "stroke": "#ffffff10",
+                "strokeWidth": 1.0,
+                "cornerRadius": 20.0
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_fc_label",
+              "name": "Forecast Label",
+              "type": "text",
+              "properties": {
+                "x": 30.0,
+                "y": 20.0,
+                "width": 300.0,
+                "height": 24.0,
+                "text": "5-DAY FORECAST",
+                "fontSize": 12.0,
+                "fontFamily": "sans-serif",
+                "color": "#4a9eff80",
+                "textAlign": "left"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_fc_day0",
+              "name": "Day 0 - Today",
+              "type": "overlap",
+              "properties": {
+                "x": 30.0,
+                "y": 60.0,
+                "width": 668.0,
+                "height": 64.0
+              },
+              "children": [
+                {
+                  "id": "wp_fc_d0_name",
+                  "name": "Day Name",
+                  "type": "text",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 18.0,
+                    "width": 100.0,
+                    "height": 28.0,
+                    "text": "$wf(0, day)$",
+                    "fontSize": 18.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d0_icon",
+                  "name": "Icon",
+                  "type": "image",
+                  "properties": {
+                    "x": 110.0,
+                    "y": 6.0,
+                    "width": 50.0,
+                    "height": 50.0,
+                    "src": "$wf(0, iconurl)$",
+                    "scaleMode": "fit"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d0_cond",
+                  "name": "Condition",
+                  "type": "text",
+                  "properties": {
+                    "x": 174.0,
+                    "y": 18.0,
+                    "width": 200.0,
+                    "height": 28.0,
+                    "text": "$wf(0, cond)$",
+                    "fontSize": 14.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff60",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d0_bar_track",
+                  "name": "Bar Track",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff15",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d0_bar_fill",
+                  "name": "Bar Fill",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#4a9eff",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d0_lo",
+                  "name": "Lo",
+                  "type": "text",
+                  "properties": {
+                    "x": 570.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(0, min)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff50",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d0_hi",
+                  "name": "Hi",
+                  "type": "text",
+                  "properties": {
+                    "x": 622.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(0, max)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_fc_div0",
+              "name": "Divider",
+              "type": "shape",
+              "properties": {
+                "x": 30.0,
+                "y": 128.0,
+                "width": 668.0,
+                "height": 1.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_fc_day1",
+              "name": "Day 1",
+              "type": "overlap",
+              "properties": {
+                "x": 30.0,
+                "y": 138.0,
+                "width": 668.0,
+                "height": 64.0
+              },
+              "children": [
+                {
+                  "id": "wp_fc_d1_name",
+                  "name": "Day Name",
+                  "type": "text",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 18.0,
+                    "width": 100.0,
+                    "height": 28.0,
+                    "text": "$wf(1, day)$",
+                    "fontSize": 18.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d1_icon",
+                  "name": "Icon",
+                  "type": "image",
+                  "properties": {
+                    "x": 110.0,
+                    "y": 6.0,
+                    "width": 50.0,
+                    "height": 50.0,
+                    "src": "$wf(1, iconurl)$",
+                    "scaleMode": "fit"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d1_cond",
+                  "name": "Condition",
+                  "type": "text",
+                  "properties": {
+                    "x": 174.0,
+                    "y": 18.0,
+                    "width": 200.0,
+                    "height": 28.0,
+                    "text": "$wf(1, cond)$",
+                    "fontSize": 14.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff60",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d1_bar_track",
+                  "name": "Bar Track",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff15",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d1_bar_fill",
+                  "name": "Bar Fill",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#4a9eff",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d1_lo",
+                  "name": "Lo",
+                  "type": "text",
+                  "properties": {
+                    "x": 570.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(1, min)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff50",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d1_hi",
+                  "name": "Hi",
+                  "type": "text",
+                  "properties": {
+                    "x": 622.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(1, max)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_fc_div1",
+              "name": "Divider",
+              "type": "shape",
+              "properties": {
+                "x": 30.0,
+                "y": 206.0,
+                "width": 668.0,
+                "height": 1.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_fc_day2",
+              "name": "Day 2",
+              "type": "overlap",
+              "properties": {
+                "x": 30.0,
+                "y": 216.0,
+                "width": 668.0,
+                "height": 64.0
+              },
+              "children": [
+                {
+                  "id": "wp_fc_d2_name",
+                  "name": "Day Name",
+                  "type": "text",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 18.0,
+                    "width": 100.0,
+                    "height": 28.0,
+                    "text": "$wf(2, day)$",
+                    "fontSize": 18.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d2_icon",
+                  "name": "Icon",
+                  "type": "image",
+                  "properties": {
+                    "x": 110.0,
+                    "y": 6.0,
+                    "width": 50.0,
+                    "height": 50.0,
+                    "src": "$wf(2, iconurl)$",
+                    "scaleMode": "fit"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d2_cond",
+                  "name": "Condition",
+                  "type": "text",
+                  "properties": {
+                    "x": 174.0,
+                    "y": 18.0,
+                    "width": 200.0,
+                    "height": 28.0,
+                    "text": "$wf(2, cond)$",
+                    "fontSize": 14.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff60",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d2_bar_track",
+                  "name": "Bar Track",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff15",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d2_bar_fill",
+                  "name": "Bar Fill",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#4a9eff",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d2_lo",
+                  "name": "Lo",
+                  "type": "text",
+                  "properties": {
+                    "x": 570.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(2, min)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff50",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d2_hi",
+                  "name": "Hi",
+                  "type": "text",
+                  "properties": {
+                    "x": 622.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(2, max)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_fc_div2",
+              "name": "Divider",
+              "type": "shape",
+              "properties": {
+                "x": 30.0,
+                "y": 284.0,
+                "width": 668.0,
+                "height": 1.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_fc_day3",
+              "name": "Day 3",
+              "type": "overlap",
+              "properties": {
+                "x": 30.0,
+                "y": 294.0,
+                "width": 668.0,
+                "height": 64.0
+              },
+              "children": [
+                {
+                  "id": "wp_fc_d3_name",
+                  "name": "Day Name",
+                  "type": "text",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 18.0,
+                    "width": 100.0,
+                    "height": 28.0,
+                    "text": "$wf(3, day)$",
+                    "fontSize": 18.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d3_icon",
+                  "name": "Icon",
+                  "type": "image",
+                  "properties": {
+                    "x": 110.0,
+                    "y": 6.0,
+                    "width": 50.0,
+                    "height": 50.0,
+                    "src": "$wf(3, iconurl)$",
+                    "scaleMode": "fit"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d3_cond",
+                  "name": "Condition",
+                  "type": "text",
+                  "properties": {
+                    "x": 174.0,
+                    "y": 18.0,
+                    "width": 200.0,
+                    "height": 28.0,
+                    "text": "$wf(3, cond)$",
+                    "fontSize": 14.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff60",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d3_bar_track",
+                  "name": "Bar Track",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff15",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d3_bar_fill",
+                  "name": "Bar Fill",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#4a9eff",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d3_lo",
+                  "name": "Lo",
+                  "type": "text",
+                  "properties": {
+                    "x": 570.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(3, min)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff50",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d3_hi",
+                  "name": "Hi",
+                  "type": "text",
+                  "properties": {
+                    "x": 622.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(3, max)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_fc_div3",
+              "name": "Divider",
+              "type": "shape",
+              "properties": {
+                "x": 30.0,
+                "y": 362.0,
+                "width": 668.0,
+                "height": 1.0,
+                "shapeKind": "rectangle",
+                "fill": "#ffffff08"
+              },
+              "visible": true
+            },
+            {
+              "id": "wp_fc_day4",
+              "name": "Day 4",
+              "type": "overlap",
+              "properties": {
+                "x": 30.0,
+                "y": 372.0,
+                "width": 668.0,
+                "height": 64.0
+              },
+              "children": [
+                {
+                  "id": "wp_fc_d4_name",
+                  "name": "Day Name",
+                  "type": "text",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 18.0,
+                    "width": 100.0,
+                    "height": 28.0,
+                    "text": "$wf(4, day)$",
+                    "fontSize": 18.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d4_icon",
+                  "name": "Icon",
+                  "type": "image",
+                  "properties": {
+                    "x": 110.0,
+                    "y": 6.0,
+                    "width": 50.0,
+                    "height": 50.0,
+                    "src": "$wf(4, iconurl)$",
+                    "scaleMode": "fit"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d4_cond",
+                  "name": "Condition",
+                  "type": "text",
+                  "properties": {
+                    "x": 174.0,
+                    "y": 18.0,
+                    "width": 200.0,
+                    "height": 28.0,
+                    "text": "$wf(4, cond)$",
+                    "fontSize": 14.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff60",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d4_bar_track",
+                  "name": "Bar Track",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff15",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d4_bar_fill",
+                  "name": "Bar Fill",
+                  "type": "shape",
+                  "properties": {
+                    "x": 400.0,
+                    "y": 26.0,
+                    "width": 160.0,
+                    "height": 8.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#4a9eff",
+                    "cornerRadius": 4.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d4_lo",
+                  "name": "Lo",
+                  "type": "text",
+                  "properties": {
+                    "x": 570.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(4, min)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff50",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_fc_d4_hi",
+                  "name": "Hi",
+                  "type": "text",
+                  "properties": {
+                    "x": 622.0,
+                    "y": 18.0,
+                    "width": 50.0,
+                    "height": 28.0,
+                    "text": "$wf(4, max)$°",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "right"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            }
+          ],
+          "visible": true
+        },
+        {
+          "id": "wp_metrics_section",
+          "name": "Metrics & Radar",
+          "type": "overlap",
+          "properties": {
+            "x": 40.0,
+            "y": 580.0,
+            "width": 1968.0,
+            "height": 660.0
+          },
+          "children": [
+            {
+              "id": "wp_radar_card",
+              "name": "Radar Map",
+              "type": "overlap",
+              "properties": {
+                "x": 0.0,
+                "y": 0.0,
+                "width": 660.0,
+                "height": 660.0
+              },
+              "children": [
+                {
+                  "id": "wp_radar_bg",
+                  "name": "BG",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 660.0,
+                    "height": 660.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#0a1628",
+                    "stroke": "#ffffff10",
+                    "strokeWidth": 1.0,
+                    "cornerRadius": 20.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_radar_label",
+                  "name": "Label",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 20.0,
+                    "width": 200.0,
+                    "height": 24.0,
+                    "text": "RADAR",
+                    "fontSize": 12.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#4a9eff80",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_radar_basemap",
+                  "name": "Base Map",
+                  "type": "image",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 54.0,
+                    "width": 612.0,
+                    "height": 580.0,
+                    "cornerRadius": 12.0,
+                    "src": "$wm(mapurl)$",
+                    "scaleMode": "fill"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_radar_overlay",
+                  "name": "Radar Overlay",
+                  "type": "image",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 54.0,
+                    "width": 612.0,
+                    "height": 580.0,
+                    "opacity": 255.0,
+                    "cornerRadius": 12.0,
+                    "src": "$wm(radarurl)$",
+                    "scaleMode": "fill"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_m_hum",
+              "name": "Humidity",
+              "type": "overlap",
+              "properties": {
+                "x": 690.0,
+                "y": 0.0,
+                "width": 415.0,
+                "height": 200.0
+              },
+              "children": [
+                {
+                  "id": "wp_m_hum_bg",
+                  "name": "BG",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 415.0,
+                    "height": 200.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff08",
+                    "stroke": "#ffffff10",
+                    "strokeWidth": 1.0,
+                    "cornerRadius": 16.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_hum_label",
+                  "name": "Label",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 20.0,
+                    "width": 200.0,
+                    "height": 20.0,
+                    "text": "HUMIDITY",
+                    "fontSize": 12.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#4a9eff80",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_hum_val",
+                  "name": "Value",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 50.0,
+                    "width": 200.0,
+                    "height": 55.0,
+                    "text": "$wi(hum)$%",
+                    "fontSize": 44.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_hum_bar",
+                  "name": "Bar",
+                  "type": "progress",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 140.0,
+                    "width": 367.0,
+                    "height": 30.0,
+                    "color": "#4a9eff",
+                    "strokeWidth": 8.0,
+                    "style": "bar",
+                    "min": 0.0,
+                    "max": 100.0,
+                    "value": "$wi(hum)$",
+                    "trackColor": "#ffffff15"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_m_wind",
+              "name": "Wind",
+              "type": "overlap",
+              "properties": {
+                "x": 1135.0,
+                "y": 0.0,
+                "width": 415.0,
+                "height": 200.0
+              },
+              "children": [
+                {
+                  "id": "wp_m_wind_bg",
+                  "name": "BG",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 415.0,
+                    "height": 200.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff08",
+                    "stroke": "#ffffff10",
+                    "strokeWidth": 1.0,
+                    "cornerRadius": 16.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_wind_label",
+                  "name": "Label",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 20.0,
+                    "width": 200.0,
+                    "height": 20.0,
+                    "text": "WIND",
+                    "fontSize": 12.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#4a9eff80",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_wind_val",
+                  "name": "Value",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 50.0,
+                    "width": 300.0,
+                    "height": 55.0,
+                    "text": "$wi(wspeed)$ m/s",
+                    "fontSize": 40.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_wind_dir",
+                  "name": "Direction",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 130.0,
+                    "width": 367.0,
+                    "height": 40.0,
+                    "text": "$wi(wdir)$  Gust: $wi(wgust)$ m/s",
+                    "fontSize": 14.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff50",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_m_press",
+              "name": "Pressure",
+              "type": "overlap",
+              "properties": {
+                "x": 1580.0,
+                "y": 0.0,
+                "width": 388.0,
+                "height": 200.0
+              },
+              "children": [
+                {
+                  "id": "wp_m_press_bg",
+                  "name": "BG",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 388.0,
+                    "height": 200.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff08",
+                    "stroke": "#ffffff10",
+                    "strokeWidth": 1.0,
+                    "cornerRadius": 16.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_press_label",
+                  "name": "Label",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 20.0,
+                    "width": 200.0,
+                    "height": 20.0,
+                    "text": "PRESSURE",
+                    "fontSize": 12.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#4a9eff80",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_press_val",
+                  "name": "Value",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 50.0,
+                    "width": 300.0,
+                    "height": 55.0,
+                    "text": "$wi(press)$",
+                    "fontSize": 44.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_press_unit",
+                  "name": "Unit",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 130.0,
+                    "width": 200.0,
+                    "height": 30.0,
+                    "text": "hPa",
+                    "fontSize": 16.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff50",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_m_vis",
+              "name": "Visibility",
+              "type": "overlap",
+              "properties": {
+                "x": 690.0,
+                "y": 230.0,
+                "width": 415.0,
+                "height": 200.0
+              },
+              "children": [
+                {
+                  "id": "wp_m_vis_bg",
+                  "name": "BG",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 415.0,
+                    "height": 200.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff08",
+                    "stroke": "#ffffff10",
+                    "strokeWidth": 1.0,
+                    "cornerRadius": 16.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_vis_label",
+                  "name": "Label",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 20.0,
+                    "width": 200.0,
+                    "height": 20.0,
+                    "text": "VISIBILITY",
+                    "fontSize": 12.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#4a9eff80",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_vis_val",
+                  "name": "Value",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 50.0,
+                    "width": 300.0,
+                    "height": 55.0,
+                    "text": "$wi(vis)$ km",
+                    "fontSize": 44.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_m_clouds",
+              "name": "Cloud Cover",
+              "type": "overlap",
+              "properties": {
+                "x": 1135.0,
+                "y": 230.0,
+                "width": 415.0,
+                "height": 200.0
+              },
+              "children": [
+                {
+                  "id": "wp_m_clouds_bg",
+                  "name": "BG",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 415.0,
+                    "height": 200.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff08",
+                    "stroke": "#ffffff10",
+                    "strokeWidth": 1.0,
+                    "cornerRadius": 16.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_clouds_label",
+                  "name": "Label",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 20.0,
+                    "width": 200.0,
+                    "height": 20.0,
+                    "text": "CLOUD COVER",
+                    "fontSize": 12.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#4a9eff80",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_clouds_val",
+                  "name": "Value",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 50.0,
+                    "width": 200.0,
+                    "height": 55.0,
+                    "text": "$wi(clouds)$%",
+                    "fontSize": 44.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_clouds_bar",
+                  "name": "Bar",
+                  "type": "progress",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 140.0,
+                    "width": 367.0,
+                    "height": 30.0,
+                    "color": "#4a9eff",
+                    "strokeWidth": 8.0,
+                    "style": "bar",
+                    "min": 0.0,
+                    "max": 100.0,
+                    "value": "$wi(clouds)$",
+                    "trackColor": "#ffffff15"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            },
+            {
+              "id": "wp_m_dew",
+              "name": "Dew Point",
+              "type": "overlap",
+              "properties": {
+                "x": 1580.0,
+                "y": 230.0,
+                "width": 388.0,
+                "height": 200.0
+              },
+              "children": [
+                {
+                  "id": "wp_m_dew_bg",
+                  "name": "BG",
+                  "type": "shape",
+                  "properties": {
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 388.0,
+                    "height": 200.0,
+                    "shapeKind": "rectangle",
+                    "fill": "#ffffff08",
+                    "stroke": "#ffffff10",
+                    "strokeWidth": 1.0,
+                    "cornerRadius": 16.0
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_dew_label",
+                  "name": "Label",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 20.0,
+                    "width": 200.0,
+                    "height": 20.0,
+                    "text": "DEW POINT",
+                    "fontSize": 12.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#4a9eff80",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                },
+                {
+                  "id": "wp_m_dew_val",
+                  "name": "Value",
+                  "type": "text",
+                  "properties": {
+                    "x": 24.0,
+                    "y": 50.0,
+                    "width": 200.0,
+                    "height": 55.0,
+                    "text": "$wi(dpoint)$°",
+                    "fontSize": 44.0,
+                    "fontFamily": "sans-serif",
+                    "color": "#ffffff",
+                    "textAlign": "left"
+                  },
+                  "visible": true
+                }
+              ],
+              "visible": true
+            }
+          ],
           "visible": true
         }
       ],

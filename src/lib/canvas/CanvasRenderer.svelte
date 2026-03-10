@@ -11,7 +11,7 @@
     getInteractiveMode,
   } from "../stores/project.svelte";
   import type { Layer } from "../types/project";
-  import { startFormulaLoop, stopFormulaLoop, evaluateSync, flushGlobalsNow } from "../formula/service";
+  import { startFormulaLoop, stopFormulaLoop, evaluateSync, flushGlobalsNow, resolveFormula, hasFormula } from "../formula/service";
   import { setScrollPosition, triggerTap } from "./animationState";
   import { loadBundledIconFonts } from "../fonts/fontLoader";
 
@@ -19,6 +19,24 @@
     fullscreen?: boolean;
   }
   let { fullscreen = false }: Props = $props();
+
+  const isWallpaperView = new URLSearchParams(window.location.search).has("wallpaper");
+
+  /** Open a URL — uses webkit message handler in wallpaper mode, Tauri IPC otherwise */
+  async function openUrl(url: string) {
+    if (isWallpaperView && (window as any).webkit?.messageHandlers?.klwp) {
+      (window as any).webkit.messageHandlers.klwp.postMessage(
+        JSON.stringify({ type: "open_url", url })
+      );
+    } else {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        await invoke("open_url", { url });
+      } catch (e) {
+        console.error("Failed to open URL:", e);
+      }
+    }
+  }
 
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D;
@@ -244,21 +262,23 @@
 
     const proj = canvasToProject(e.clientX, e.clientY);
 
-    // Check resize handles first
-    const hIdx = hitTestHandle(proj.x, proj.y);
-    if (hIdx >= 0) {
-      const layer = getSelectedLayer();
-      if (layer) {
-        dragMode = "resize";
-        resizeHandleIdx = hIdx;
-        resizeStartMouse = { x: proj.x, y: proj.y };
-        resizeStartProps = {
-          x: Number(layer.properties.x) || 0,
-          y: Number(layer.properties.y) || 0,
-          w: Number(layer.properties.width) || 100,
-          h: Number(layer.properties.height) || 100,
-        };
-        return;
+    // Check resize handles first (skip in interactive mode — click actions take priority)
+    if (!getInteractiveMode()) {
+      const hIdx = hitTestHandle(proj.x, proj.y);
+      if (hIdx >= 0) {
+        const layer = getSelectedLayer();
+        if (layer) {
+          dragMode = "resize";
+          resizeHandleIdx = hIdx;
+          resizeStartMouse = { x: proj.x, y: proj.y };
+          resizeStartProps = {
+            x: Number(layer.properties.x) || 0,
+            y: Number(layer.properties.y) || 0,
+            w: Number(layer.properties.width) || 100,
+            h: Number(layer.properties.height) || 100,
+          };
+          return;
+        }
       }
     }
 
@@ -270,7 +290,10 @@
       if (getInteractiveMode()) {
         const project = getProject();
         const action = findClickActionForHit(project.layers, id);
-        if (action) handleClickAction(action, project);
+        if (action) {
+          handleClickAction(action, project);
+          return; // Don't start a drag after firing a click action
+        }
       }
     }
 
@@ -387,7 +410,12 @@
 
   function buildGlobalsMap(project: ReturnType<typeof getProject>): Record<string, string> {
     const globals: Record<string, string> = {};
-    for (const g of project.globals) globals[g.name] = String(g.value);
+    for (const g of project.globals) {
+      const raw = String(g.value);
+      // Resolve formula-valued globals through the cache so downstream
+      // gv() lookups return the evaluated value, not the raw formula text.
+      globals[g.name] = hasFormula(raw) ? resolveFormula(raw) : raw;
+    }
     return globals;
   }
 
@@ -426,12 +454,7 @@
       }
       resolved = resolved.trim();
       if (resolved && (resolved.startsWith("http://") || resolved.startsWith("https://"))) {
-        try {
-          const { invoke } = await import("@tauri-apps/api/core");
-          await invoke("open_url", { url: resolved });
-        } catch (e) {
-          console.error("Failed to open URL:", e);
-        }
+        openUrl(resolved);
       } else {
         console.warn("Click action url: resolved to non-URL:", resolved, "(from:", urlExpr, ")");
       }

@@ -10,4 +10,5 @@ path = "src/main.rs"
 [dependencies]
 gtk = "0.18"
 gtk-layer-shell = "0.8"
-webkit2gtk = "2.0"
+webkit2gtk = { version = "2.0", features = ["v2_22"] }
+javascriptcore-rs = "1.1"

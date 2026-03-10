@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo } from "../stores/project.svelte";
-  import type { LayerType, Project } from "../types/project";
+  import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo, insertWidget, ensureGlobal } from "../stores/project.svelte";
+  import type { LayerType, Project, GlobalVarType, Layer } from "../types/project";
   import { createDefaultProject } from "../types/project";
 
   function handleCopy() {
@@ -59,39 +59,43 @@
 
   let importStatus = $state("");
 
-  async function handleImportKlwp() {
+  async function handleImportKomp() {
     try {
       const { open } = await import("@tauri-apps/plugin-dialog");
       const { invoke } = await import("@tauri-apps/api/core");
       const path = await open({
-        filters: [{ name: "KLWP Preset", extensions: ["klwp"] }],
+        filters: [{ name: "KLWP Komponent", extensions: ["komp"] }],
         multiple: false,
       });
       if (path) {
-        importStatus = "Importing...";
+        importStatus = "Importing komponent...";
         const result = await invoke<{
-          project: Project;
+          root: Layer;
+          globals: { name: string; type: GlobalVarType; value: string | number | boolean }[];
           warnings: string[];
           assetCount: number;
           assetDir: string;
-        }>("import_klwp", {
-          path,
-          targetWidth: getProject().resolution.width || 1920,
-          targetHeight: getProject().resolution.height || 1080,
-        });
-        result.project.assetDir = result.assetDir;
-        setProject(result.project);
+        }>("import_komp", { path });
+
+        // Ensure all globals from the komponent exist in the project
+        for (const g of result.globals) {
+          ensureGlobal(g.name, g.type, g.value);
+        }
+
+        // Insert the komponent as a widget layer
+        insertWidget(result.root);
+
         const warnCount = result.warnings.length;
-        importStatus = `Imported! ${result.assetCount} assets, ${result.project.layers.length} layers`;
+        importStatus = `Komponent imported! ${result.assetCount} assets`;
         if (warnCount > 0) {
-          console.warn("KLWP Import warnings:", result.warnings);
+          console.warn("Komp import warnings:", result.warnings);
         }
         setTimeout(() => { importStatus = ""; }, 4000);
       }
     } catch (e) {
       importStatus = "";
-      console.error("KLWP Import failed:", e);
-      alert(`Import failed: ${e}`);
+      console.error("Komp import failed:", e);
+      alert(`Komponent import failed: ${e}`);
     }
   }
 
@@ -212,8 +216,8 @@
     {#if wallpaperStatus}
       <span class="import-status">{wallpaperStatus}</span>
     {/if}
-    <button class="toolbar-btn" title="Import KLWP preset" onclick={handleImportKlwp}>
-      <span class="btn-label">Import KLWP</span>
+    <button class="toolbar-btn" title="Import KLWP Komponent" onclick={handleImportKomp}>
+      <span class="btn-label">Import .komp</span>
     </button>
     {#if importStatus}
       <span class="import-status">{importStatus}</span>
