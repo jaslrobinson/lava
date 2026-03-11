@@ -6,11 +6,11 @@ pub enum LayerType {
     Text,
     Shape,
     Image,
-    Group,
     Stack,
     Overlap,
     Progress,
     Fonticon,
+    Visualizer,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,6 +77,7 @@ pub enum GlobalVarType {
     Color,
     Switch,
     List,
+    Image,
 }
 
 /// A value that can be either a number or a string (formula).

@@ -17,6 +17,7 @@ tauri-plugin-global-shortcut = "2"
 dirs = "5"
 ureq = { version = "2", features = ["json"] }
 rustfft = "6.2"
+rusqlite = { version = "0.31", features = ["bundled"] }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

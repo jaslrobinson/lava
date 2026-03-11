@@ -10,6 +10,28 @@
   let formulaHelperOpen = $state(false);
   let iconPickerOpen = $state(false);
   let showCustomFont = $state(false);
+  let appPickerOpen = $state(false);
+  let appPickerSearch = $state("");
+  let appList = $state<{ name: string; exec: string; icon: string }[]>([]);
+
+  async function openAppPicker() {
+    appPickerOpen = true;
+    if (appList.length === 0) {
+      try {
+        const { invoke } = await import("@tauri-apps/api/core");
+        appList = await invoke<{ name: string; exec: string; icon: string }[]>("list_apps");
+      } catch (e) {
+        console.warn("list_apps failed:", e);
+      }
+    }
+  }
+
+  function selectApp(exec: string) {
+    const layer = getSelectedLayer();
+    if (layer) updateLayerProperty(layer.id, "clickAction", "app:" + exec);
+    appPickerOpen = false;
+    appPickerSearch = "";
+  }
 
   // Derived state for click action UI
   let clickActionType = $derived.by(() => {
@@ -215,11 +237,14 @@
               <option value="stop">Stop</option>
             </select>
           {:else if clickActionType === "app"}
-            <input type="text" value={clickActionArg} placeholder="e.g. spotify, firefox, vlc" oninput={(e) => {
-              const newArg = (e.target as HTMLInputElement).value;
-              const layer = getSelectedLayer()!;
-              updateLayerProperty(layer.id, "clickAction", "app:" + newArg);
-            }} />
+            <div class="input-with-browse">
+              <input type="text" value={clickActionArg} placeholder="e.g. spotify, firefox, vlc" oninput={(e) => {
+                const newArg = (e.target as HTMLInputElement).value;
+                const layer = getSelectedLayer()!;
+                updateLayerProperty(layer.id, "clickAction", "app:" + newArg);
+              }} />
+              <button class="browse-btn" title="Browse installed apps" onclick={openAppPicker}>...</button>
+            </div>
           {:else if clickActionType === "overlay"}
             <input type="text" value={clickActionArg} placeholder="Layer name to show/hide" oninput={(e) => {
               const newArg = (e.target as HTMLInputElement).value;
@@ -415,9 +440,9 @@
         </section>
       {/if}
 
-      {#if layer.type === "group" || layer.type === "overlap"}
+      {#if layer.type === "overlap"}
         <section class="prop-section">
-          <div class="section-title">{layer.type === "group" ? "Group" : "Overlap"}</div>
+          <div class="section-title">Overlap</div>
           <div class="prop-stack">
             <label>Width</label>
             <input type="number" value={props.width} oninput={(e) => onInput("width", e)} />
@@ -504,6 +529,36 @@
   onClose={() => iconPickerOpen = false}
   assetDir={getProject().assetDir ?? ""}
 />
+
+{#if appPickerOpen}
+  <div class="modal-backdrop" onclick={() => { appPickerOpen = false; appPickerSearch = ""; }}>
+    <div class="app-picker-modal" onclick={(e) => e.stopPropagation()}>
+      <div class="app-picker-header">
+        <span>Select App</span>
+        <span style="cursor:pointer;font-size:18px;line-height:1;" onclick={() => { appPickerOpen = false; appPickerSearch = ""; }}>&times;</span>
+      </div>
+      <input
+        class="app-picker-search"
+        type="text"
+        placeholder="Search apps..."
+        value={appPickerSearch}
+        oninput={(e) => appPickerSearch = (e.target as HTMLInputElement).value}
+      />
+      <div class="app-picker-list">
+        {#each appList.filter(a => a.name.toLowerCase().includes(appPickerSearch.toLowerCase())) as app}
+          <div class="app-picker-item" onclick={() => selectApp(app.exec)} role="button" tabindex="0"
+            onkeydown={(e) => { if (e.key === 'Enter') selectApp(app.exec); }}>
+            <span class="app-picker-name">{app.name}</span>
+            <span class="app-picker-exec">{app.exec}</span>
+          </div>
+        {/each}
+        {#if appList.length === 0}
+          <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px;">Loading apps...</div>
+        {/if}
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .property-panel {
@@ -675,4 +730,75 @@
     font-family: monospace;
     color: var(--accent);
   }
+  .input-with-browse {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .input-with-browse input { flex: 1; }
+  .browse-btn {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 3px;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .browse-btn:hover { background: var(--bg-secondary); color: var(--accent); }
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  .app-picker-modal {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    width: 420px;
+    max-height: 520px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .app-picker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: 13px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-primary);
+  }
+  .app-picker-search {
+    margin: 8px;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 4px;
+    width: calc(100% - 16px);
+    box-sizing: border-box;
+  }
+  .app-picker-list {
+    overflow-y: auto;
+    flex: 1;
+  }
+  .app-picker-item {
+    padding: 7px 14px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-picker-item:hover { background: var(--bg-secondary); }
+  .app-picker-name { font-size: 13px; color: var(--text-primary); }
+  .app-picker-exec { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
 </style>

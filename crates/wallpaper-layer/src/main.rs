@@ -78,12 +78,28 @@ fn main() {
 /// Handle a message from the frontend JS.
 /// Messages are JSON strings like: {"type":"open_url","url":"https://..."}
 fn handle_message(msg: &str) {
-    if let Some(url) = extract_json_field(msg, "url") {
-        if url.starts_with("http://") || url.starts_with("https://") {
-            eprintln!("[klwp-wallpaper] Opening URL: {}", url);
-            let _ = std::process::Command::new("xdg-open")
-                .arg(url)
-                .spawn();
+    match extract_json_field(msg, "type") {
+        Some("open_url") => {
+            if let Some(url) = extract_json_field(msg, "url") {
+                if url.starts_with("http://") || url.starts_with("https://") {
+                    eprintln!("[klwp-wallpaper] Opening URL: {}", url);
+                    let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+                }
+            }
+        }
+        Some("launch_app") => {
+            if let Some(cmd) = extract_json_field(msg, "command") {
+                eprintln!("[klwp-wallpaper] Launching app: {}", cmd);
+                let _ = std::process::Command::new("sh").arg("-c").arg(cmd).spawn();
+            }
+        }
+        _ => {
+            // Legacy: no type field — try url field directly
+            if let Some(url) = extract_json_field(msg, "url") {
+                if url.starts_with("http://") || url.starts_with("https://") {
+                    let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+                }
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-export type LayerType = "text" | "shape" | "image" | "group" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer";
+export type LayerType = "text" | "shape" | "image" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer";
 
 export type ShapeKind = "rectangle" | "circle" | "oval" | "triangle" | "arc";
 
@@ -6,11 +6,11 @@ export type AnchorPoint = "center" | "top-left" | "top-center" | "top-right" | "
 
 export type AnimationTrigger = "time" | "scroll" | "reactive" | "tap" | "show" | "hover";
 
-export type AnimationType = "fade" | "rotate" | "scale" | "translate" | "color" | "blur";
+export type AnimationType = "fade" | "rotate" | "scale" | "translate" | "color" | "blur" | "jiggle";
 
 export type EasingType = "linear" | "ease-in" | "ease-out" | "ease-in-out" | "bounce" | "elastic";
 
-export type GlobalVarType = "text" | "number" | "color" | "switch" | "list";
+export type GlobalVarType = "text" | "number" | "color" | "switch" | "list" | "image";
 
 export interface GlobalVariable {
   name: string;
@@ -198,11 +198,6 @@ export function createLayer(type: LayerType, name: string): Layer {
       base.properties.strokeWidth = 6;
       base.properties.width = 80;
       base.properties.height = 80;
-      break;
-    case "group":
-      base.children = [];
-      base.properties.width = 400;
-      base.properties.height = 400;
       break;
     case "stack":
       base.children = [];

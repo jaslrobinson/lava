@@ -1,5 +1,6 @@
 mod commands;
 mod klwp_import;
+mod plugins;
 mod project;
 mod providers;
 mod rainmeter_import;
@@ -95,6 +96,10 @@ pub fn run() {
             manager.register(Box::new(forecast));
             manager.register(Box::new(providers::radar::RadarProvider));
 
+            for provider in plugins::load_plugins() {
+                manager.register(provider);
+            }
+
             let data = manager.data();
             app.manage(data);
 
@@ -140,6 +145,7 @@ pub fn run() {
             commands::window::launch_app,
             commands::settings::load_settings,
             commands::settings::save_settings,
+            commands::apps::list_apps,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

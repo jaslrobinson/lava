@@ -62,11 +62,11 @@ export function triggerTap(layerId: string, timestamp: number) {
   state.tapTime = timestamp;
 }
 
-/** Called each frame with the currently hovered layer ID */
-export function updateHoverState(hoveredLayerId: string | null, timestamp: number) {
+/** Called each frame with the set of hovered layer IDs (hit layer + all ancestors) */
+export function updateHoverState(hoveredIds: Set<string>, timestamp: number) {
   // For each tracked layer, update hoverEnterTime/hoverExitTime based on whether it's hovered
   for (const [layerId, state] of layerStates) {
-    const isHovered = layerId === hoveredLayerId;
+    const isHovered = hoveredIds.has(layerId);
     const wasHovered = state.hoverEnterTime !== null && state.hoverExitTime === null;
     if (isHovered && !wasHovered) {
       state.hoverEnterTime = timestamp;
@@ -75,9 +75,9 @@ export function updateHoverState(hoveredLayerId: string | null, timestamp: numbe
       state.hoverExitTime = timestamp;
     }
   }
-  // Ensure the currently hovered layer has a state entry
-  if (hoveredLayerId) {
-    const state = getLayerAnimState(hoveredLayerId);
+  // Ensure all hovered layers have a state entry
+  for (const layerId of hoveredIds) {
+    const state = getLayerAnimState(layerId);
     if (state.hoverEnterTime === null) {
       state.hoverEnterTime = timestamp;
       state.hoverExitTime = null;

@@ -45,6 +45,7 @@
   let baseScale = $state(1);
   let canvasStyleWidth = $state(800);
   let canvasStyleHeight = $state(450);
+  let canvasReady = $state(false);
 
   // Zoom/pan state — applied as canvas context transform, not CSS
   let zoom = $state(1);
@@ -96,7 +97,7 @@
         globals[g.name] = String(g.value);
       }
       return globals;
-    });
+    }).then(() => { canvasReady = true; });
 
     const observer = new ResizeObserver(() => updateCanvasSize());
     observer.observe(containerEl);
@@ -524,11 +525,18 @@
     } else if (action.startsWith("app:")) {
       // app:command — launch application
       const cmd = action.slice(4);
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        await invoke("launch_app", { command: cmd });
-      } catch (e) {
-        console.warn("Launch app failed:", e);
+      const isTauriCtx = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
+      if (isTauriCtx) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("launch_app", { command: cmd });
+        } catch (e) {
+          console.warn("Launch app failed:", e);
+        }
+      } else {
+        (window as any).webkit?.messageHandlers?.klwp?.postMessage(
+          JSON.stringify({ type: "launch_app", command: cmd })
+        );
       }
     } else if (action.startsWith("overlay:")) {
       // overlay:layerName — toggle visibility of a named layer
@@ -559,7 +567,7 @@
 <div class="canvas-container" bind:this={containerEl} style={fullscreen ? "background: transparent;" : ""}>
   <canvas
     bind:this={canvas}
-    style="width: {canvasStyleWidth}px; height: {canvasStyleHeight}px;{fullscreen ? ' box-shadow: none;' : ''} cursor: {fullscreen ? 'default' : getCursorStyle()};"
+    style="width: {canvasStyleWidth}px; height: {canvasStyleHeight}px;{fullscreen ? ' box-shadow: none;' : ''} cursor: {fullscreen ? 'default' : getCursorStyle()}; opacity: {canvasReady ? 1 : 0}; transition: opacity 0.3s ease;"
     onmousedown={fullscreen ? undefined : onMouseDown}
     onmousemove={fullscreen ? onFullscreenMouseMove : onMouseMove}
     onmouseup={fullscreen ? undefined : onMouseUp}

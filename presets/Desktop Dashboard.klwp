@@ -73,12 +73,12 @@
     {
       "name": "page",
       "type": "text",
-      "value": "weather"
+      "value": "news"
     },
     {
       "name": "newsIdx",
       "type": "number",
-      "value": 3.0
+      "value": 0.0
     },
     {
       "name": "timer",
@@ -92,10 +92,10 @@
       "name": "Gradient Top",
       "type": "shape",
       "properties": {
-        "x": 0.0,
+        "x": -121.0,
         "y": 0.0,
-        "width": 2048.0,
-        "height": 400.0,
+        "width": 2282.0,
+        "height": 352.0,
         "opacity": 200.0,
         "visible": "$if(gv(page)=home, ALWAYS, NEVER)$",
         "shapeKind": "rectangle",
@@ -108,9 +108,9 @@
       "name": "Gradient Bottom",
       "type": "shape",
       "properties": {
-        "x": 0.0,
+        "x": -112.0,
         "y": 980.0,
-        "width": 2048.0,
+        "width": 2272.0,
         "height": 300.0,
         "opacity": 200.0,
         "visible": "$if(gv(page)=home, ALWAYS, NEVER)$",
@@ -232,7 +232,7 @@
       "type": "overlap",
       "properties": {
         "x": 1500.0,
-        "y": 80.0,
+        "y": 26.0,
         "width": 460.0,
         "height": 280.0,
         "visible": "$if(gv(page)=home, ALWAYS, NEVER)$",
@@ -257,12 +257,32 @@
           "visible": true
         },
         {
+          "id": "layer_1773079719183_0",
+          "name": "image_73",
+          "type": "image",
+          "properties": {
+            "x": 185.0,
+            "y": -56.0,
+            "width": 297.0,
+            "height": 357.0,
+            "rotation": 0.0,
+            "scaleX": 1.0,
+            "scaleY": 1.0,
+            "opacity": 255.0,
+            "anchor": "top-left",
+            "src": "$wf(0, iconurl)$",
+            "scaleMode": "fill"
+          },
+          "locked": false,
+          "visible": true
+        },
+        {
           "id": "weather_temp_text",
           "name": "Temperature",
           "type": "text",
           "properties": {
-            "x": 30.0,
-            "y": 30.0,
+            "x": 22.0,
+            "y": 31.0,
             "width": 300.0,
             "height": 100.0,
             "text": "$gv(weather_temp)$",
@@ -322,23 +342,6 @@
             "color": "#4a9eff60",
             "textAlign": "left"
           },
-          "visible": true
-        },
-        {
-          "id": "layer_1773079719183_0",
-          "name": "image_73",
-          "type": "image",
-          "properties": {
-            "x": 151.0,
-            "y": -69.0,
-            "width": 331.0,
-            "height": 411.0,
-            "opacity": 255.0,
-            "anchor": "top-left",
-            "src": "$wf(0, iconurl)$",
-            "scaleMode": "fit"
-          },
-          "locked": false,
           "visible": true
         }
       ],
@@ -697,13 +700,13 @@
               "name": "Hero Image",
               "type": "image",
               "properties": {
-                "x": -41.0,
-                "y": -100.0,
-                "width": 2062.0,
-                "height": 1281.0,
+                "x": -34.0,
+                "y": -340.0,
+                "width": 2039.0,
+                "height": 1509.0,
                 "cornerRadius": 0.0,
                 "src": "$wg(\"https://moxie.foxnews.com/google-publisher/latest.xml\\\", rss, img, gv(newsIdx))$",
-                "scaleMode": "fill"
+                "scaleMode": "fit"
               },
               "visible": true
             },
@@ -712,10 +715,10 @@
               "name": "Gradient",
               "type": "shape",
               "properties": {
-                "x": -40.0,
-                "y": 531.0,
+                "x": -37.0,
+                "y": 522.0,
                 "width": 2048.0,
-                "height": 677.0,
+                "height": 687.0,
                 "opacity": 169.0,
                 "shadow": {
                   "color": "#00000080",

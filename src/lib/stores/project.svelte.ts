@@ -128,7 +128,7 @@ export function flattenLayers(layers: Layer[]): Layer[] {
 
 /** Check if a layer type is a container that can hold children */
 export function isContainerType(type: LayerType): boolean {
-  return type === "group" || type === "stack" || type === "overlap";
+  return type === "stack" || type === "overlap";
 }
 
 export function addLayer(type: LayerType) {

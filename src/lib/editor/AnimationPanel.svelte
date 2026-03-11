@@ -9,6 +9,7 @@
     { value: "translate", label: "Translate" },
     { value: "blur", label: "Blur" },
     { value: "color", label: "Color" },
+    { value: "jiggle", label: "Jiggle" },
   ];
 
   const triggerTypes: { value: AnimationTrigger; label: string }[] = [
@@ -80,12 +81,14 @@
       case "translate": return "Pixels";
       case "blur": return "Blur Radius (px)";
       case "color": return "Strength";
+      case "jiggle": return "Max Rotation (degrees)";
     }
   }
 
   function getRuleLabel(trigger: AnimationTrigger, type: AnimationType): string | null {
     if (type === "translate") return "Direction (x, y, or x,y)";
     if (type === "color") return "Target Color (#hex)";
+    if (type === "jiggle") return "Cycle Period (ms, default 80)";
     if (trigger === "reactive") return "Formula ($...$)";
     return null;
   }
@@ -132,7 +135,14 @@
 
           {#if getRuleLabel(anim.trigger, anim.type)}
             <label>{getRuleLabel(anim.trigger, anim.type)}</label>
-            <input type="text" value={anim.rule} oninput={(e) => handleUpdate(i, "rule", (e.target as HTMLInputElement).value)} />
+            {#if anim.type === "color"}
+              <div class="color-rule-row">
+                <input type="color" value={anim.rule || "#ffffff"} oninput={(e) => handleUpdate(i, "rule", (e.target as HTMLInputElement).value)} />
+                <input type="text" value={anim.rule} placeholder="#rrggbb" oninput={(e) => handleUpdate(i, "rule", (e.target as HTMLInputElement).value)} />
+              </div>
+            {:else}
+              <input type="text" value={anim.rule} oninput={(e) => handleUpdate(i, "rule", (e.target as HTMLInputElement).value)} />
+            {/if}
           {/if}
 
           {#if anim.trigger !== "scroll" && anim.trigger !== "reactive"}
@@ -262,5 +272,19 @@
     width: 100%;
     font-size: 11px;
     padding: 2px 4px;
+  }
+  .color-rule-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .color-rule-row input[type="color"] {
+    width: 28px;
+    height: 22px;
+    padding: 1px 2px;
+    flex-shrink: 0;
+  }
+  .color-rule-row input[type="text"] {
+    flex: 1;
   }
 </style>

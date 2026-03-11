@@ -32,7 +32,21 @@
       case "color": return "\u25CF";
       case "switch": return "\u21C4";
       case "list": return "\u2630";
+      case "image": return "\u{1F5BC}";
       default: return "?";
+    }
+  }
+
+  async function handleBrowseImage(name: string) {
+    try {
+      const { open } = await import("@tauri-apps/plugin-dialog");
+      const path = await open({
+        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"] }],
+        multiple: false,
+      });
+      if (path) handleUpdateGlobal(name, "value", path);
+    } catch (e) {
+      console.error("Browse failed:", e);
     }
   }
 
@@ -94,6 +108,7 @@
               <option value="color">Color</option>
               <option value="switch">Switch</option>
               <option value="list">List</option>
+              <option value="image">Image</option>
             </select>
             {#if g.type === "color"}
               <label>Value</label>
@@ -112,6 +127,13 @@
                 <input type="number" value={g.value}
                   oninput={(e) => handleUpdateGlobal(g.name, 'value', Number((e.target as HTMLInputElement).value))} />
                 <button class="fx-btn" title="Formula Helper" onclick={() => formulaHelperTarget = g.name}>fx</button>
+              </div>
+            {:else if g.type === "image"}
+              <label>Value</label>
+              <div class="input-with-fx">
+                <input type="text" value={g.value} placeholder="Select an image file..."
+                  oninput={(e) => handleUpdateGlobal(g.name, 'value', (e.target as HTMLInputElement).value)} />
+                <button class="fx-btn" title="Browse image" onclick={() => handleBrowseImage(g.name)}>...</button>
               </div>
             {:else}
               <label>Value</label>

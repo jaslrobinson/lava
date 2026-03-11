@@ -159,10 +159,31 @@ export function getLayerBounds(): Map<string, LayerBounds> {
 // positions from the canvas transform matrix (accounts for zoom/pan).
 let baseTransform: DOMMatrix | null = null;
 
+/** Walk layer tree to collect the hovered layer ID + all ancestor IDs */
+function collectAncestors(targetId: string, layers: Layer[], ancestors: Set<string>): boolean {
+  for (const layer of layers) {
+    if (layer.id === targetId) return true;
+    if (layer.children?.length) {
+      if (collectAncestors(targetId, layer.children, ancestors)) {
+        ancestors.add(layer.id);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function getHoveredIds(hoveredLayerId: string | null, layers: Layer[]): Set<string> {
+  if (!hoveredLayerId) return new Set();
+  const ids = new Set<string>([hoveredLayerId]);
+  collectAncestors(hoveredLayerId, layers, ids);
+  return ids;
+}
+
 export function renderProject(ctx: CanvasRenderingContext2D, project: Project, selectedId: string | null, timestamp: number = 0, hoveredLayerId: string | null = null) {
   beginFrame();
   initEngineTime(timestamp);
-  updateHoverState(hoveredLayerId, timestamp);
+  updateHoverState(getHoveredIds(hoveredLayerId, project.layers), timestamp);
   const { width, height } = project.resolution;
   const container: ContainerSize = { width, height };
 
@@ -331,7 +352,6 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
       renderProgress(ctx, layer, x, y, w, h);
       break;
     case "overlap":
-    case "group":
       renderOverlap(ctx, layer, x, y, container, parentAbsX, parentAbsY, timestamp);
       break;
     case "stack":

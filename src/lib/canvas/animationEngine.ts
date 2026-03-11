@@ -111,7 +111,7 @@ function applyLoop(cycles: number, mode: "none" | "restart" | "reverse"): number
 }
 
 /** Apply a single animation's effect to the accumulated deltas */
-function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDeltas, trigger: string) {
+function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDeltas, trigger: string, timestamp: number) {
   const t = applyEasing(progress, anim.easing || "linear");
   const amount = anim.amount;
 
@@ -155,6 +155,15 @@ function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDelta
         deltas.colorOverride = anim.rule;
       }
       break;
+
+    case "jiggle": {
+      // t is the amplitude envelope (0 = still, 1 = full intensity)
+      // rule optionally overrides the oscillation period in ms (default 80ms = fast buzz)
+      const cyclePeriod = parseFloat(anim.rule) || 80;
+      const oscillation = Math.sin(timestamp * (2 * Math.PI / cyclePeriod));
+      deltas.dRotation += amount * t * oscillation;
+      break;
+    }
   }
 }
 
@@ -166,7 +175,7 @@ export function computeAnimatedDeltas(layer: Layer, timestamp: number): Animated
   for (const anim of layer.animations) {
     const progress = computeProgress(anim, layer.id, timestamp);
     if (progress === null) continue;
-    applyAnimation(anim, progress, deltas, anim.trigger);
+    applyAnimation(anim, progress, deltas, anim.trigger, timestamp);
   }
 
   return deltas;

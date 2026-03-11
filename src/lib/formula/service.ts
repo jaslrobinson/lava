@@ -662,7 +662,7 @@ function evalArithmetic(expr: string): string {
 function resolveInnerFormulas(argsStr: string, globals: Record<string, string>): string {
   // Match innermost function calls (no nested parens in args)
   // Exclude lv() — it's resolved by fl() during loop iteration
-  const pattern = /\b(df|gv|wg|tf|dp|tu|mu|tc|ce|cm|fl|if|bi|mi|ai|rm|ts|ni|si|wi|wf)\(([^()]*)\)/;
+  const pattern = /\b(?!lv\b)([a-z]{2,})\(([^()]*)\)/;
   let result = argsStr;
   let safety = 50;
 
@@ -776,7 +776,7 @@ function evaluateClientSide(formula: string, globals: Record<string, string>): s
   }
 
   // Provider formulas: mi(field), bi(field), wi(field), wf(day, field), etc.
-  const providerMatch = inner.match(/^([a-z]{2})\((.+)\)$/);
+  const providerMatch = inner.match(/^([a-z]{2,})\((.+)\)$/);
   if (providerMatch) {
     const [, prefix, argsStr] = providerMatch;
     const provider = providerData[prefix];
@@ -921,8 +921,8 @@ async function flushPending(globals: Record<string, string>) {
 /** Start the formula evaluation loop */
 let intervalId: ReturnType<typeof setInterval> | null = null;
 
-export function startFormulaLoop(getGlobals: () => Record<string, string>) {
-  if (intervalId) return;
+export function startFormulaLoop(getGlobals: () => Record<string, string>): Promise<void> {
+  if (intervalId) return Promise.resolve();
 
   // Fetch provider data for non-Tauri wallpaper view
   if (!isTauri) fetchProviderData();
@@ -943,9 +943,9 @@ export function startFormulaLoop(getGlobals: () => Record<string, string>) {
     flushPending(resolved);
   }, 1000);
 
-  // Initial flush
+  // Initial flush — return promise so callers can wait for first evaluation
   const resolved = resolveGlobals(getGlobals());
-  flushPending(resolved);
+  return flushPending(resolved);
 }
 
 export function stopFormulaLoop() {

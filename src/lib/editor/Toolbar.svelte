@@ -179,7 +179,6 @@
     { type: "image", label: "Image", icon: "\u{1F5BC}" },
     { type: "progress", label: "Progress", icon: "\u25CB" },
     { type: "fonticon", label: "Icon", icon: "\u2605" },
-    { type: "group", label: "Group", icon: "\u{1F4C1}" },
     { type: "stack", label: "Stack", icon: "\u2261" },
     { type: "overlap", label: "Overlap", icon: "\u29C9" },
   ];
