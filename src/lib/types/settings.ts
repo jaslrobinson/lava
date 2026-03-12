@@ -26,6 +26,8 @@ export interface AppSettings {
   closeToTray: boolean;
   startMinimized: boolean;
   autoStartWallpaper: boolean;
+  wallpaperFadeEnabled: boolean;
+  wallpaperFadeOpacity: number;
   lastProjectPath: string;
   savedThemes: { name: string; path: string }[];
 }
@@ -53,6 +55,8 @@ export const defaultSettings: AppSettings = {
   closeToTray: true,
   startMinimized: false,
   autoStartWallpaper: false,
+  wallpaperFadeEnabled: true,
+  wallpaperFadeOpacity: 0.3,
   lastProjectPath: "",
   savedThemes: [],
 };

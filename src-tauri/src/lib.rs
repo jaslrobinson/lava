@@ -25,7 +25,7 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 
     TrayIconBuilder::new()
         .icon(app.default_window_icon().cloned().unwrap())
-        .tooltip("KLLW - Kustom Linux Live Wallpaper")
+        .tooltip("LAVA - Live Animated Visuals for Arch")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id().as_ref() {
             "show_editor" => {
@@ -157,8 +157,10 @@ pub fn run() {
             commands::window::open_url,
             commands::window::music_control,
             commands::window::launch_app,
+            commands::window::adjust_volume,
             commands::settings::load_settings,
             commands::settings::save_settings,
+            commands::settings::set_autostart,
             commands::apps::list_apps,
         ])
         .run(tauri::generate_context!())

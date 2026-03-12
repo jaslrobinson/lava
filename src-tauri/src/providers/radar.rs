@@ -94,7 +94,7 @@ impl DataProvider for RadarProvider {
 
 fn read_location() -> Option<(f64, f64)> {
     let config_dir = dirs::config_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
-    let path = config_dir.join("kllw").join("settings.json");
+    let path = config_dir.join("lava").join("settings.json");
     let content = std::fs::read_to_string(&path).ok()?;
     let json: serde_json::Value = serde_json::from_str(&content).ok()?;
 

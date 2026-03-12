@@ -93,7 +93,7 @@ function getCachedImage(src: string): HTMLImageElement | null {
     return null;
   } else {
     // Non-Tauri context (WebKitGTK wallpaper): serve via Vite asset proxy
-    resolved = `/__klwp_assets${resolvedPath}`;
+    resolved = `/__lava_assets${resolvedPath}`;
   }
 
   // Check if previously failed — retry after cooldown
@@ -113,7 +113,7 @@ function getCachedImage(src: string): HTMLImageElement | null {
   imageLoadingSet.add(resolved);
   const img = new Image();
   // Only set crossOrigin for Tauri asset:// URLs, not http/proxy/external URLs
-  if (!resolved.startsWith("http") && !resolved.startsWith("/__klwp_assets")) {
+  if (!resolved.startsWith("http") && !resolved.startsWith("/__lava_assets")) {
     img.crossOrigin = "anonymous";
   }
   img.onload = () => {
@@ -503,17 +503,33 @@ function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: n
 function renderShape(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
   const props = layer.properties;
   const kind = props.shapeKind || "rectangle";
-  const fill = resolve(props.fill, "#e94560");
+  const fillRaw = resolve(props.fill, "#e94560");
+  const noFill = fillRaw === "none" || fillRaw === "transparent";
   const stroke = props.stroke ? resolve(props.stroke) : undefined;
   const strokeWidth = resolveNumber(props.strokeWidth, 0);
+  const effectiveStrokeWidth = stroke ? Math.max(strokeWidth, 1) : 0;
   const cornerRadius = resolveNumber(props.cornerRadius, 0);
+  const skewX = resolveNumber(props.skewX, 0);
+  const skewY = resolveNumber(props.skewY, 0);
 
-  ctx.fillStyle = fill;
+  if (!noFill) ctx.fillStyle = fillRaw;
   if (stroke) {
     ctx.strokeStyle = stroke;
-    ctx.lineWidth = strokeWidth;
+    ctx.lineWidth = effectiveStrokeWidth;
   }
 
+  // Apply skew transform around the shape center
+  const hasSkew = skewX !== 0 || skewY !== 0;
+  if (hasSkew) {
+    ctx.save();
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    ctx.translate(cx, cy);
+    ctx.transform(1, Math.tan(skewY * Math.PI / 180), Math.tan(skewX * Math.PI / 180), 1, 0, 0);
+    ctx.translate(-cx, -cy);
+  }
+
+  // Set shadow right before draw calls so it's in the active context
   if (props.shadow) {
     ctx.shadowColor = resolve(props.shadow.color, "#000000");
     ctx.shadowOffsetX = resolveNumber(props.shadow.dx, 0);
@@ -529,24 +545,24 @@ function renderShape(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
         ctx.beginPath();
         ctx.rect(x, y, w, h);
       }
-      ctx.fill();
-      if (stroke) ctx.stroke();
+      if (!noFill) ctx.fill();
+      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
       break;
 
     case "circle": {
       const radius = Math.min(w, h) / 2;
       ctx.beginPath();
       ctx.arc(x + w / 2, y + h / 2, radius, 0, Math.PI * 2);
-      ctx.fill();
-      if (stroke) ctx.stroke();
+      if (!noFill) ctx.fill();
+      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
       break;
     }
 
     case "oval":
       ctx.beginPath();
       ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-      ctx.fill();
-      if (stroke) ctx.stroke();
+      if (!noFill) ctx.fill();
+      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
       break;
 
     case "triangle":
@@ -555,19 +571,21 @@ function renderShape(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
       ctx.lineTo(x + w, y + h);
       ctx.lineTo(x, y + h);
       ctx.closePath();
-      ctx.fill();
-      if (stroke) ctx.stroke();
+      if (!noFill) ctx.fill();
+      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
       break;
 
     case "arc": {
       const r = Math.min(w, h) / 2;
       ctx.beginPath();
       ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI);
-      ctx.fill();
-      if (stroke) ctx.stroke();
+      if (!noFill) ctx.fill();
+      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
       break;
     }
   }
+
+  if (hasSkew) ctx.restore();
 
   // Reset shadow
   ctx.shadowColor = "transparent";
@@ -654,7 +672,7 @@ function getImageLabel(src: string): string {
   } else if (isTauri) {
     return "Loading...";
   } else {
-    resolved = `/__klwp_assets${resolvedPath}`;
+    resolved = `/__lava_assets${resolvedPath}`;
   }
   if (imageFailedMap.has(resolved)) return "Failed to load";
   return "Loading...";
@@ -691,9 +709,28 @@ function renderImage(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   const scaleMode = layer.properties.scaleMode || "fit";
   const imgW = img.naturalWidth;
   const imgH = img.naturalHeight;
+  const cornerRadius = resolveNumber(layer.properties.cornerRadius, 0);
+
+  // Draw shadow by filling the image bounds shape with shadow enabled.
+  // This must happen BEFORE clipping, otherwise the clip eats the shadow.
+  if (layer.properties.shadow) {
+    ctx.save();
+    ctx.shadowColor = resolve(layer.properties.shadow.color, "#000000");
+    ctx.shadowOffsetX = resolveNumber(layer.properties.shadow.dx, 0);
+    ctx.shadowOffsetY = resolveNumber(layer.properties.shadow.dy, 0);
+    ctx.shadowBlur = resolveNumber(layer.properties.shadow.radius, 0);
+    ctx.fillStyle = "rgba(0,0,0,1)";
+    ctx.beginPath();
+    if (cornerRadius > 0) {
+      roundedRect(ctx, x, y, w, h, cornerRadius);
+    } else {
+      ctx.rect(x, y, w, h);
+    }
+    ctx.fill();
+    ctx.restore();
+  }
 
   ctx.save();
-  const cornerRadius = resolveNumber(layer.properties.cornerRadius, 0);
   ctx.beginPath();
   if (cornerRadius > 0) {
     roundedRect(ctx, x, y, w, h, cornerRadius);
@@ -801,7 +838,7 @@ function resolveImageSrc(src: string): string | null {
   }
   if (isTauri) return null; // Still loading convertFileSrc
   // Non-Tauri context (WebKitGTK wallpaper): serve via Vite asset proxy
-  return `/__klwp_assets${resolvedPath}`;
+  return `/__lava_assets${resolvedPath}`;
 }
 
 function renderFontIcon(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {

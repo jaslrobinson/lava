@@ -10,6 +10,7 @@ let wallpaperMode = $state(false);
 let activeOverlay = $state<string | null>(null);
 let interactiveMode = $state(false);
 let copiedLayer = $state<Layer | null>(null);
+let currentProjectPath = $state<string>("");
 
 // Undo history
 const MAX_UNDO = 30;
@@ -57,6 +58,8 @@ export function setActiveOverlay(overlay: string | null) { activeOverlay = overl
 export function getInteractiveMode() { return interactiveMode; }
 export function setInteractiveMode(active: boolean) { interactiveMode = active; }
 export function getCopiedLayer() { return copiedLayer; }
+export function getCurrentProjectPath() { return currentProjectPath; }
+export function setCurrentProjectPath(path: string) { currentProjectPath = path; }
 
 export function copySelectedLayer() {
   const layer = getSelectedLayer();

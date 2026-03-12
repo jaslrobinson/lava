@@ -124,8 +124,8 @@ fn run_capture_loop(app: AppHandle, bands: SharedBands) {
 
         // Write to temp file for wallpaper WebKitGTK view
         if let Ok(json) = serde_json::to_string(&smoothed) {
-            let path = std::env::temp_dir().join("klwp-audio-bands.json");
-            let tmp = std::env::temp_dir().join("klwp-audio-bands.json.tmp");
+            let path = std::env::temp_dir().join("lava-audio-bands.json");
+            let tmp = std::env::temp_dir().join("lava-audio-bands.json.tmp");
             if std::fs::write(&tmp, &json).is_ok() {
                 let _ = std::fs::rename(&tmp, &path);
             }

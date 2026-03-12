@@ -3,12 +3,12 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import fs from "node:fs";
 import path from "node:path";
 
-/** Serve local asset files at /__klwp_assets/<absolute-path> for the wallpaper WebView */
-function klwpAssetsPlugin(): Plugin {
+/** Serve local asset files at /__lava_assets/<absolute-path> for the wallpaper WebView */
+function lavaAssetsPlugin(): Plugin {
   return {
-    name: "klwp-assets",
+    name: "lava-assets",
     configureServer(server) {
-      server.middlewares.use("/__klwp_assets", (req, res, next) => {
+      server.middlewares.use("/__lava_assets", (req, res, next) => {
         const filePath = decodeURIComponent(req.url || "");
         if (!filePath || !path.isAbsolute(filePath)) {
           res.statusCode = 400;
@@ -38,15 +38,15 @@ function klwpAssetsPlugin(): Plugin {
 }
 
 /** Serve provider data from temp file so wallpaper WebKitGTK view can poll it */
-function klwpProviderPlugin(): Plugin {
+function lavaProviderPlugin(): Plugin {
   return {
-    name: "klwp-providers",
+    name: "lava-providers",
     configureServer(server) {
-      server.middlewares.use("/__klwp_providers", (_req, res) => {
+      server.middlewares.use("/__lava_providers", (_req, res) => {
         // Must match Rust's std::env::temp_dir() which uses TMPDIR or /tmp
         const filePath = path.join(
           process.env.TMPDIR || "/tmp",
-          "klwp-provider-data.json",
+          "lava-provider-data.json",
         );
         fs.readFile(filePath, "utf-8", (err, data) => {
           res.setHeader("Content-Type", "application/json");
@@ -64,14 +64,14 @@ function klwpProviderPlugin(): Plugin {
 }
 
 /** Serve audio band data for the wallpaper WebKitGTK view */
-function klwpAudioPlugin(): Plugin {
+function lavaAudioPlugin(): Plugin {
   return {
-    name: "klwp-audio",
+    name: "lava-audio",
     configureServer(server) {
-      server.middlewares.use("/__klwp_audio", (_req, res) => {
+      server.middlewares.use("/__lava_audio", (_req, res) => {
         const filePath = path.join(
           process.env.TMPDIR || "/tmp",
-          "klwp-audio-bands.json",
+          "lava-audio-bands.json",
         );
         fs.readFile(filePath, "utf-8", (err, data) => {
           res.setHeader("Content-Type", "application/json");
@@ -89,7 +89,7 @@ function klwpAudioPlugin(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [svelte(), klwpAssetsPlugin(), klwpProviderPlugin(), klwpAudioPlugin()],
+  plugins: [svelte(), lavaAssetsPlugin(), lavaProviderPlugin(), lavaAudioPlugin()],
   clearScreen: false,
   server: {
     port: 1420,

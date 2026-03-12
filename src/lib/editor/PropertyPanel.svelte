@@ -272,6 +272,19 @@
               updateLayerProperty(layer.id, "clickAction", "url:" + newArg);
             }} />
           {/if}
+          <label>Scroll Action</label>
+          <select
+            value={getSelectedLayer()?.properties.scrollAction ?? "none"}
+            onchange={(e) => {
+              const val = (e.target as HTMLSelectElement).value;
+              const layer = getSelectedLayer()!;
+              updateLayerProperty(layer.id, "scrollAction", val === "none" ? undefined : val);
+            }}
+          >
+            <option value="none">None</option>
+            <option value="volume:adjust">Volume</option>
+            <option value="brightness:adjust">Brightness</option>
+          </select>
         </div>
       </section>
 
@@ -350,13 +363,24 @@
               <option value="arc">Arc</option>
             </select>
             <label>Fill</label>
-            <ColorField value={String(props.fill ?? "#e94560")} defaultColor="#e94560" onChange={(v) => onColorProp("fill", v)} />
+            <div class="input-row">
+              <ColorField value={String(props.fill ?? "#e94560")} defaultColor="#e94560" onChange={(v) => onColorProp("fill", v)} />
+              <button class="browse-btn" title="No fill (transparent)" onclick={() => { const l = getSelectedLayer(); if (l) updateLayerProperty(l.id, "fill", "none"); }} style="font-size:10px; width:auto; padding:2px 6px;">No Fill</button>
+            </div>
+            {#if props.fill === "none" || props.fill === "transparent"}
+              <span class="prop-hint">Fill is transparent — stroke only</span>
+            {/if}
             <label>Stroke</label>
             <ColorField value={String(props.stroke ?? "#000000")} defaultColor="#000000" onChange={(v) => onColorProp("stroke", v)} />
             <label>Stroke Width</label>
             <input type="number" value={props.strokeWidth ?? 0} oninput={(e) => onInput("strokeWidth", e)} />
             <label>Corner Radius</label>
             <input type="number" value={props.cornerRadius ?? 0} oninput={(e) => onInput("cornerRadius", e)} />
+            <label style="margin-top: 6px; font-weight: 600;">Skew / Perspective</label>
+            <label>Skew X (°)</label>
+            <input type="number" value={props.skewX ?? 0} step="1" oninput={(e) => onInput("skewX", e)} />
+            <label>Skew Y (°)</label>
+            <input type="number" value={props.skewY ?? 0} step="1" oninput={(e) => onInput("skewY", e)} />
             <label style="margin-top: 6px; font-weight: 600;">Shadow</label>
             <label>Color</label>
             <input type="color" value={props.shadow?.color ?? "#00000080"} oninput={(e) => onShadowInput("color", e)} />
@@ -396,6 +420,15 @@
             <input type="number" min="0" value={props.cornerRadius ?? 0} oninput={(e) => onInput("cornerRadius", e)} />
             <label>Tint</label>
             <ColorField value={String(props.tint ?? "")} defaultColor="#ffffff" onChange={(v) => onColorProp("tint", v)} />
+            <label style="margin-top: 6px; font-weight: 600;">Shadow</label>
+            <label>Color</label>
+            <input type="color" value={props.shadow?.color ?? "#00000080"} oninput={(e) => onShadowInput("color", e)} />
+            <label>DX</label>
+            <input type="number" value={props.shadow?.dx ?? 2} oninput={(e) => onShadowInput("dx", e)} />
+            <label>DY</label>
+            <input type="number" value={props.shadow?.dy ?? 2} oninput={(e) => onShadowInput("dy", e)} />
+            <label>Radius</label>
+            <input type="number" min="0" value={props.shadow?.radius ?? 4} oninput={(e) => onShadowInput("radius", e)} />
           </div>
         </section>
       {/if}

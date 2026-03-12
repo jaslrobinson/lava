@@ -238,13 +238,13 @@
       };
 
       const path = await save({
-        filters: [{ name: "KLWP Component", extensions: ["komp"] }],
-        defaultPath: `${layer.name}.komp`,
+        filters: [{ name: "LAVA Rock", extensions: ["rock", "komp"] }],
+        defaultPath: `${layer.name}.rock`,
       });
       if (!path) return;
 
       await invoke("export_komp", { path, project: kompProject });
-      alert(`Exported "${layer.name}.komp" with ${bundledGlobals.length} bundled globals.`);
+      alert(`Exported "${layer.name}.rock" with ${bundledGlobals.length} bundled globals.`);
     } catch (e) {
       console.error("Export komp failed:", e);
       alert(`Export failed: ${e}`);
@@ -402,7 +402,7 @@
   <div class="ctx-menu" style="left:{contextMenuX}px;top:{contextMenuY}px;">
     <div class="ctx-header">{contextMenuLayer.name}</div>
     <span class="ctx-item" onclick={() => exportAsKomp(contextMenuLayer!)}>
-      Export as .komp
+      Export as .rock
     </span>
   </div>
 {/if}

@@ -25,8 +25,8 @@
 
   /** Open a URL — uses webkit message handler in wallpaper mode, Tauri IPC otherwise */
   async function openUrl(url: string) {
-    if (isWallpaperView && (window as any).webkit?.messageHandlers?.klwp) {
-      (window as any).webkit.messageHandlers.klwp.postMessage(
+    if (isWallpaperView && (window as any).webkit?.messageHandlers?.lava) {
+      (window as any).webkit.messageHandlers.lava.postMessage(
         JSON.stringify({ type: "open_url", url })
       );
     } else {
@@ -79,6 +79,72 @@
   let hoveredHandle = $state(-1);
   let hoveredLayerId = $state<string | null>(null);
   let spaceHeld = $state(false);
+
+  // OSD overlay state
+  let osdText = $state("");
+  let osdValue = $state(0); // 0-100 for progress bar
+  let osdShowTime = $state(0);
+  const OSD_DURATION = 1800; // ms visible
+  const OSD_FADE = 400; // ms fade out
+
+  function showOsd(label: string, value: number) {
+    osdText = label;
+    osdValue = Math.max(0, Math.min(100, value));
+    osdShowTime = performance.now();
+  }
+
+  function drawOsd(ctx: CanvasRenderingContext2D, timestamp: number) {
+    if (!osdShowTime) return;
+    const elapsed = timestamp - osdShowTime;
+    if (elapsed > OSD_DURATION + OSD_FADE) { osdShowTime = 0; return; }
+
+    let alpha = 1;
+    if (elapsed > OSD_DURATION) {
+      alpha = 1 - (elapsed - OSD_DURATION) / OSD_FADE;
+    }
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    const w = 220, h = 44, r = 12;
+    const x = (canvas.width - w) / 2;
+    const y = canvas.height - 80;
+
+    // Background pill
+    ctx.globalAlpha = alpha * 0.85;
+    ctx.fillStyle = "#1a1a2e";
+    ctx.beginPath();
+    ctx.roundRect(x, y, w, h, r);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Icon + text
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "16px sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.fillText(osdText, x + 14, y + h / 2);
+
+    // Progress bar track
+    const barX = x + 14, barY = y + h - 10, barW = w - 28, barH = 4;
+    ctx.fillStyle = "rgba(255,255,255,0.15)";
+    ctx.beginPath();
+    ctx.roundRect(barX, barY, barW, barH, 2);
+    ctx.fill();
+
+    // Progress bar fill
+    ctx.fillStyle = "#5599ff";
+    const fillW = barW * (osdValue / 100);
+    if (fillW > 0) {
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, fillW, barH, 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
 
   const HANDLE_HIT_RADIUS = 10;
   const HANDLE_PAD = 2;
@@ -174,6 +240,9 @@
       renderProject(ctx, project, selectedId, timestamp, hoveredLayerId);
     }
 
+    // Draw OSD overlay (volume/brightness feedback)
+    drawOsd(ctx, timestamp);
+
     rafId = requestAnimationFrame(renderLoop);
   }
 
@@ -253,6 +322,17 @@
   }
 
   function onWheel(e: WheelEvent) {
+    // Check for scroll actions on hovered layer (works in any mode)
+    const id = hitTest(e.clientX, e.clientY);
+    if (id) {
+      const project = getProject();
+      const action = findScrollActionForHit(project.layers, id);
+      if (action) {
+        e.preventDefault();
+        handleScrollAction(action, e.deltaY);
+        return;
+      }
+    }
     e.preventDefault();
     const factor = e.deltaY > 0 ? 0.9 : 1.1;
     const newZoom = Math.max(0.1, Math.min(10, zoom * factor));
@@ -309,7 +389,15 @@
     const id = hitTest(e.clientX, e.clientY);
     setSelectedLayerId(id);
     if (id) {
-      triggerTap(id, performance.now());
+      // Trigger tap on hit layer and all ancestors (so parent tap animations fire too)
+      const now = performance.now();
+      const project = getProject();
+      const path = findPathToLayer(project.layers, id);
+      if (path) {
+        for (const layer of path) triggerTap(layer.id, now);
+      } else {
+        triggerTap(id, now);
+      }
       if (getInteractiveMode()) {
         const project = getProject();
         const action = findClickActionForHit(project.layers, id);
@@ -451,11 +539,27 @@
     return null;
   }
 
+  /** Find the nearest scrollAction walking from hit layer up to root */
+  function findScrollActionForHit(layers: Layer[], hitId: string): string | null {
+    const path = findPathToLayer(layers, hitId);
+    if (!path) return null;
+    for (let i = path.length - 1; i >= 0; i--) {
+      if (path[i].properties.scrollAction) return path[i].properties.scrollAction!;
+    }
+    return null;
+  }
+
   function onFullscreenClick(e: MouseEvent) {
     const id = hitTest(e.clientX, e.clientY);
     if (id) {
-      triggerTap(id, performance.now());
+      const now = performance.now();
       const project = getProject();
+      const path = findPathToLayer(project.layers, id);
+      if (path) {
+        for (const layer of path) triggerTap(layer.id, now);
+      } else {
+        triggerTap(id, now);
+      }
       const action = findClickActionForHit(project.layers, id);
       if (action) {
         handleClickAction(action, project);
@@ -534,7 +638,7 @@
           console.warn("Launch app failed:", e);
         }
       } else {
-        (window as any).webkit?.messageHandlers?.klwp?.postMessage(
+        (window as any).webkit?.messageHandlers?.lava?.postMessage(
           JSON.stringify({ type: "launch_app", command: cmd })
         );
       }
@@ -549,7 +653,7 @@
           console.warn("Show editor failed:", e);
         }
       } else {
-        (window as any).webkit?.messageHandlers?.klwp?.postMessage(
+        (window as any).webkit?.messageHandlers?.lava?.postMessage(
           JSON.stringify({ type: "show_editor" })
         );
       }
@@ -563,6 +667,57 @@
         const isVisible = target.visible !== false && target.properties.visible !== false && target.properties.visible !== "NEVER";
         updateLayerProperty(target.id, "visible", isVisible ? false : true);
       }
+    }
+  }
+
+  let estimatedVolume = 50;
+  let estimatedBrightness = 50;
+  let lastScrollActionTime = 0;
+  const SCROLL_THROTTLE = 80; // ms between scroll action fires
+
+  function handleScrollAction(action: string, deltaY: number) {
+    const now = performance.now();
+    if (now - lastScrollActionTime < SCROLL_THROTTLE) return;
+    lastScrollActionTime = now;
+    const step = deltaY > 0 ? -2 : 2;
+
+    if (action === "volume:adjust") {
+      estimatedVolume = Math.max(0, Math.min(100, estimatedVolume + step));
+      showOsd(`\u{1F50A} ${estimatedVolume}%`, estimatedVolume);
+      // Fire and forget — don't block the UI
+      if (isWallpaperView && (window as any).webkit?.messageHandlers?.lava) {
+        (window as any).webkit.messageHandlers.lava.postMessage(
+          JSON.stringify({ type: "adjust_volume", delta: String(step) })
+        );
+      } else {
+        import("@tauri-apps/api/core").then(({ invoke }) =>
+          invoke("adjust_volume", { delta: step })
+        ).catch(() => {});
+      }
+    } else if (action === "brightness:adjust") {
+      estimatedBrightness = Math.max(0, Math.min(100, estimatedBrightness + step));
+      showOsd(`\u{2600} ${estimatedBrightness}%`, estimatedBrightness);
+      const cmd = `brightnessctl set ${step > 0 ? `+${step}%` : `${-step}%-`}`;
+      if (isWallpaperView && (window as any).webkit?.messageHandlers?.lava) {
+        (window as any).webkit.messageHandlers.lava.postMessage(
+          JSON.stringify({ type: "launch_command", command: cmd })
+        );
+      } else {
+        import("@tauri-apps/api/core").then(({ invoke }) =>
+          invoke("launch_app", { command: cmd })
+        ).catch(() => {});
+      }
+    }
+  }
+
+  function onFullscreenWheel(e: WheelEvent) {
+    const id = hitTest(e.clientX, e.clientY);
+    if (!id) return;
+    const project = getProject();
+    const action = findScrollActionForHit(project.layers, id);
+    if (action) {
+      e.preventDefault();
+      handleScrollAction(action, e.deltaY);
     }
   }
 
@@ -589,7 +744,7 @@
     onmouseleave={fullscreen ? undefined : onMouseUp}
     onclick={fullscreen ? onFullscreenClick : undefined}
     ondblclick={fullscreen ? undefined : onDblClick}
-    onwheel={fullscreen ? undefined : onWheel}
+    onwheel={fullscreen ? onFullscreenWheel : onWheel}
   />
   {#if !fullscreen && zoom !== 1}
     <button class="zoom-indicator" onclick={resetView} title="Click to reset view">

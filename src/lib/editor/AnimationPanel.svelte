@@ -27,6 +27,7 @@
     { value: "blur", label: "Blur" },
     { value: "color", label: "Color" },
     { value: "jiggle", label: "Jiggle" },
+    { value: "flash", label: "Flash" },
   ];
 
   const triggerTypes: { value: AnimationTrigger; label: string }[] = [
@@ -99,6 +100,7 @@
       case "blur": return "Blur Radius (px)";
       case "color": return "Strength";
       case "jiggle": return "Max Rotation (degrees)";
+      case "flash": return "Flash Intensity (0-255)";
     }
   }
 

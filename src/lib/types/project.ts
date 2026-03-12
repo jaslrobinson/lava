@@ -6,7 +6,7 @@ export type AnchorPoint = "center" | "top-left" | "top-center" | "top-right" | "
 
 export type AnimationTrigger = "time" | "scroll" | "reactive" | "tap" | "show" | "hover";
 
-export type AnimationType = "fade" | "rotate" | "scale" | "translate" | "color" | "blur" | "jiggle";
+export type AnimationType = "fade" | "rotate" | "scale" | "translate" | "color" | "blur" | "jiggle" | "flash";
 
 export type EasingType = "linear" | "ease-in" | "ease-out" | "ease-in-out" | "bounce" | "elastic";
 
@@ -67,6 +67,8 @@ export interface LayerProperties {
   stroke?: string;
   strokeWidth?: number;
   cornerRadius?: number;
+  skewX?: number | string;  // degrees horizontal skew
+  skewY?: number | string;  // degrees vertical skew
 
   // Image
   src?: string;
@@ -90,6 +92,9 @@ export interface LayerProperties {
 
   // Click action (for fullscreen/wallpaper mode)
   clickAction?: string; // e.g. "overlay:news", "url:https://..."
+
+  // Scroll action (mouse wheel/touchpad gesture)
+  scrollAction?: string; // e.g. "volume:adjust", "brightness:adjust"
 
   // Icon source (SVG/PNG path for imported icons)
   iconSrc?: string;

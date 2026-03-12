@@ -48,8 +48,27 @@
       <label class="toggle-row">
         <span>Auto-start wallpaper on launch</span>
         <input type="checkbox" checked={getSettings().autoStartWallpaper}
-          onchange={(e) => updateSetting("autoStartWallpaper", (e.target as HTMLInputElement).checked)} />
+          onchange={async (e) => {
+            const checked = (e.target as HTMLInputElement).checked;
+            updateSetting("autoStartWallpaper", checked);
+            try {
+              const { invoke } = await import("@tauri-apps/api/core");
+              await invoke("set_autostart", { enabled: checked });
+            } catch {}
+          }} />
       </label>
+      <label class="toggle-row">
+        <span>Fade wallpaper when apps focused</span>
+        <input type="checkbox" checked={getSettings().wallpaperFadeEnabled}
+          onchange={(e) => updateSetting("wallpaperFadeEnabled", (e.target as HTMLInputElement).checked)} />
+      </label>
+      {#if getSettings().wallpaperFadeEnabled}
+        <label class="field-row">
+          <span>Fade opacity ({Math.round((getSettings().wallpaperFadeOpacity ?? 0.3) * 100)}%)</span>
+          <input type="range" min="0" max="1" step="0.05" value={getSettings().wallpaperFadeOpacity ?? 0.3}
+            oninput={(e) => updateSetting("wallpaperFadeOpacity", Number((e.target as HTMLInputElement).value))} />
+        </label>
+      {/if}
       <label class="field-row">
         <span>Formula refresh rate (ms)</span>
         <input type="number" min="100" step="100" value={getSettings().formulaRefreshMs}

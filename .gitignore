@@ -26,3 +26,8 @@ src-tauri/icons/icon.ico
 
 # WASM
 pkg/
+
+# Temp/test files
+nohup.out
+test_*
+*.log

@@ -1,7 +1,7 @@
 /**
  * Audio band data module for the music visualizer.
  * - In Tauri mode: listens to "audio-bands" events from the backend.
- * - In wallpaper mode: polls /__klwp_audio every 33ms.
+ * - In wallpaper mode: polls /__lava_audio every 33ms.
  */
 
 export const NUM_BANDS = 24;
@@ -49,10 +49,10 @@ export function initAudioVisualizer() {
       });
     });
   } else {
-    // Wallpaper/non-Tauri mode: poll /__klwp_audio endpoint
+    // Wallpaper/non-Tauri mode: poll /__lava_audio endpoint
     setInterval(async () => {
       try {
-        const res = await fetch("/__klwp_audio");
+        const res = await fetch("/__lava_audio");
         const data: number[] = await res.json();
         updateBands(data);
       } catch {

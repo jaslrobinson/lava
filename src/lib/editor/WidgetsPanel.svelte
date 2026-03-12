@@ -339,7 +339,7 @@
               // ── RIGHT: Tray area ──
               mkStack("Tray", { x: 1480, y: 8, width: 200, height: 20, orientation: "horizontal", spacing: 10 }, [
                 mkText("WiFi", { text: "\u{1F4F6}", fontSize: 14, color: "$if(nc(connected)=1,#88ff88,#ff4444)$", width: 20, height: 20, textAlign: "center" }),
-                mkText("Vol", { text: "\u{1F50A}", fontSize: 14, color: "#aaaaaa", width: 20, height: 20, textAlign: "center" }),
+                mkText("Vol", { text: "\u{1F50A}", fontSize: 14, color: "#aaaaaa", width: 20, height: 20, textAlign: "center", scrollAction: "volume:adjust" }),
                 mkText("BAT", { text: "$bi(level)$%", fontSize: 11, color: "$if(bi(plugged)=1,#88ff88,#cccccc)$", width: 36, height: 20, textAlign: "center" }),
                 mkText("Weather", { text: "\u2601 $wi(temp)$\u00B0", fontSize: 12, color: "#cccccc", width: 60, height: 20 }),
               ]),
@@ -362,7 +362,10 @@
       widgets: [
         {
           name: "AI Artist Portrait",
-          description: "Gemini-generated artist image. Set API key: save text to ~/.config/klwp/gemini_api_key",
+          description: "Gemini-generated artist image. Set API key: ~/.config/lava/gemini_api_key. Edit ai_prompt global to customize.",
+          globals: [
+            { name: "ai_prompt", type: "text", value: 'Create a vivid, artistic portrait of the music artist "<artist>". High quality, studio lighting, detailed, professional photo style.' },
+          ],
           build: () => mkOverlap("AI Artist Portrait", { x: 100, y: 300, width: 320, height: 360 }, [
             // AI-generated image — $ai(artistImage)$ is a file:// path updated by the ai provider
             mkImage("AI Image", { src: "$ai(artistImage)$", width: 320, height: 300, scaleMode: "fill" }),
@@ -377,6 +380,7 @@
           name: "AI Artist + Lyrics",
           description: "AI portrait with synced lyrics overlay. Requires Gemini key + internet.",
           globals: [
+            { name: "ai_prompt", type: "text", value: 'Create a vivid, artistic portrait of the music artist "<artist>". High quality, studio lighting, detailed, professional photo style.' },
             { name: "ly_url", type: "text", value: "https://lrclib.net/api/get?artist_name=$tc(url,mi(artist))$&track_name=$tc(url,mi(title))$" },
             { name: "ly_raw", type: "text", value: '$wg(gv(ly_url),json,syncedLyrics)$' },
             { name: "ly_S0", type: "text", value: '$lrc(gv(ly_raw),mi(pos))$' },

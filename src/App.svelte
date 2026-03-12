@@ -15,7 +15,7 @@
       let checkTimer: ReturnType<typeof setTimeout> | null = null;
       let retries = 0;
       const checkProject = () => {
-        const proj = (window as any).__KLWP_PROJECT;
+        const proj = (window as any).__LAVA_PROJECT;
         if (proj) {
           setProject(proj);
         } else if (retries++ < 300) {
@@ -64,6 +64,23 @@
       listen("tray-stop-wallpaper", () => exitWallpaperMode()).then(u => cleanups.push(u));
       listen("tray-start-wallpaper", () => {}).then(u => cleanups.push(u));
     });
+
+    // Auto-start wallpaper from last session
+    (async () => {
+      const { loadSettings: ensureLoaded, getSettings: getS } = await import("./lib/stores/settings.svelte");
+      await ensureLoaded();
+      const s = getS();
+      if (s.autoStartWallpaper && s.lastProjectPath) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          const proj = await invoke("load_project", { path: s.lastProjectPath });
+          setProject(proj as any);
+          await invoke("start_wallpaper_mode", { project: proj });
+        } catch (e) {
+          console.error("Auto-start wallpaper failed:", e);
+        }
+      }
+    })();
 
     return () => {
       window.removeEventListener("keydown", onKeyDown);

@@ -26,7 +26,7 @@ export async function loadSettings() {
       const { invoke } = await import("@tauri-apps/api/core");
       raw = await invoke<string>("load_settings");
     } else {
-      raw = localStorage.getItem("kllw-settings");
+      raw = localStorage.getItem("lava-settings");
     }
     if (raw && raw !== "{}") {
       const parsed = JSON.parse(raw);
@@ -45,7 +45,7 @@ export async function saveSettings() {
       const { invoke } = await import("@tauri-apps/api/core");
       await invoke("save_settings", { data: json });
     } else {
-      localStorage.setItem("kllw-settings", json);
+      localStorage.setItem("lava-settings", json);
     }
   } catch {
     // Silently fail — config dir may not be writable

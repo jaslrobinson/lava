@@ -41,7 +41,7 @@ pub fn create_providers() -> (WeatherProvider, ForecastProvider) {
 
 fn read_weather_config() -> Option<WeatherConfig> {
     let config_dir = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    let path = config_dir.join("kllw").join("settings.json");
+    let path = config_dir.join("lava").join("settings.json");
     let content = std::fs::read_to_string(&path).ok()?;
     let json: serde_json::Value = serde_json::from_str(&content).ok()?;
 

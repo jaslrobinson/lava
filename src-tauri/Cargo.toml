@@ -1,5 +1,5 @@
 [package]
-name = "kustomlinux"
+name = "lava"
 version = "0.1.0"
 edition = "2021"
 
@@ -19,10 +19,11 @@ ureq = { version = "2", features = ["json"] }
 base64 = "0.22"
 rustfft = "6.2"
 rusqlite = { version = "0.31", features = ["bundled"] }
+tiny_http = "0.12"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
 [lib]
-name = "kustomlinux_lib"
+name = "lava_lib"
 crate-type = ["lib", "cdylib", "staticlib"]

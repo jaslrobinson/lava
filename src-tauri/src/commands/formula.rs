@@ -13,7 +13,15 @@ pub async fn evaluate_formula(
 ) -> Result<String, String> {
     let mut ctx = EvalContext::new();
 
-    // Set globals
+    // Set globals and write them into shared data so providers can read them
+    {
+        let mut data = provider_data.write().await;
+        let gv_map = data.entry("gv".to_string()).or_insert_with(HashMap::new);
+        gv_map.clear();
+        for (k, v) in &globals {
+            gv_map.insert(k.clone(), v.clone());
+        }
+    }
     for (k, v) in globals {
         ctx.globals
             .insert(k, kustom_formula::value::Value::Text(v));

@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { addLayer, getProject, getProjectSnapshot, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo, insertWidget, ensureGlobal } from "../stores/project.svelte";
+  import { addLayer, getProject, getProjectSnapshot, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo, insertWidget, ensureGlobal, getCurrentProjectPath, setCurrentProjectPath } from "../stores/project.svelte";
+  import { updateSetting } from "../stores/settings.svelte";
   import type { LayerType, Project, GlobalVarType, Layer } from "../types/project";
   import { createDefaultProject } from "../types/project";
   import { setDebugOverlay, getDebugOverlay } from "../canvas/renderer";
@@ -25,6 +26,7 @@
       }
     }
     setProject(createDefaultProject());
+    setCurrentProjectPath("");
   }
 
   async function handleSave() {
@@ -32,14 +34,16 @@
       const { save } = await import("@tauri-apps/plugin-dialog");
       const { invoke } = await import("@tauri-apps/api/core");
       const path = await save({
-        filters: [{ name: "KLLW Project", extensions: ["klwp", "json"] }],
-        defaultPath: `${getProject().name}.klwp`,
+        filters: [{ name: "LAVA Theme", extensions: ["lava", "klwp", "json"] }],
+        defaultPath: `${getProject().name}.lava`,
       });
       if (path) {
         try {
           await invoke("save_project", { path, project: getProjectSnapshot() });
           const { addTheme } = await import("../stores/settings.svelte");
           addTheme(getProject().name, path);
+          setCurrentProjectPath(path);
+          updateSetting("lastProjectPath", path);
         } catch (e) {
           console.error("Save failed:", e);
           throw e;
@@ -56,12 +60,14 @@
       const { open } = await import("@tauri-apps/plugin-dialog");
       const { invoke } = await import("@tauri-apps/api/core");
       const path = await open({
-        filters: [{ name: "KLLW Project", extensions: ["klwp", "json"] }],
+        filters: [{ name: "LAVA Theme", extensions: ["lava", "klwp", "json"] }],
         multiple: false,
       });
       if (path) {
         const project = await invoke<Project>("load_project", { path });
         setProject(project);
+        setCurrentProjectPath(path as string);
+        updateSetting("lastProjectPath", path as string);
       }
     } catch (e) {
       console.error("Load failed:", e);
@@ -75,11 +81,11 @@
       const { open } = await import("@tauri-apps/plugin-dialog");
       const { invoke } = await import("@tauri-apps/api/core");
       const path = await open({
-        filters: [{ name: "KLWP Komponent", extensions: ["komp"] }],
+        filters: [{ name: "LAVA Rock / KLWP Komponent", extensions: ["rock", "komp"] }],
         multiple: false,
       });
       if (path) {
-        importStatus = "Importing komponent...";
+        importStatus = "Importing...";
         const result = await invoke<{
           root: Layer;
           globals: { name: string; type: GlobalVarType; value: string | number | boolean }[];
@@ -128,6 +134,9 @@
         const server = await invoke<string>("start_wallpaper_mode", { project: getProjectSnapshot() });
         wallpaperActive = true;
         wallpaperStatus = `Live (${server})`;
+        // Save last project path for auto-start
+        const projPath = getCurrentProjectPath();
+        if (projPath) updateSetting("lastProjectPath", projPath);
       }
       setTimeout(() => { if (!wallpaperActive) wallpaperStatus = ""; }, 3000);
     } catch (e) {
@@ -231,8 +240,8 @@
       <span class="import-status">{wallpaperStatus}</span>
     {/if}
     <span class="separator"></span>
-    <button class="toolbar-btn" title="Import .komp" onclick={handleImportKomp}>
-      <span class="btn-label">.komp</span>
+    <button class="toolbar-btn" title="Import .rock / .komp" onclick={handleImportKomp}>
+      <span class="btn-label">Import</span>
     </button>
     {#if importStatus}
       <span class="import-status">{importStatus}</span>

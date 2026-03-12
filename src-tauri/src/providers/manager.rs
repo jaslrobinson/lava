@@ -9,10 +9,12 @@ use tokio::sync::RwLock;
 use super::{DataProvider, SharedProviderData};
 
 /// Handle to stop the provider polling loop.
+#[allow(dead_code)]
 pub struct ProviderHandle {
     shutdown: Arc<AtomicBool>,
 }
 
+#[allow(dead_code)]
 impl ProviderHandle {
     /// Signal the provider loop to stop.
     pub fn stop(&self) {
@@ -91,9 +93,9 @@ impl ProviderManager {
                         let _ = app.emit("provider-data-update", &*data_read);
                     }
                     if let Ok(json) = serde_json::to_string(&*data_read) {
-                        let path = std::env::temp_dir().join("klwp-provider-data.json");
+                        let path = std::env::temp_dir().join("lava-provider-data.json");
                         // Write atomically: write to temp then rename to avoid partial reads
-                        let tmp_path = std::env::temp_dir().join("klwp-provider-data.json.tmp");
+                        let tmp_path = std::env::temp_dir().join("lava-provider-data.json.tmp");
                         if std::fs::write(&tmp_path, &json).is_ok() {
                             let _ = std::fs::rename(&tmp_path, &path);
                         }
@@ -113,10 +115,10 @@ impl ProviderManager {
 
 /// Clean up temp files used by provider data sharing.
 pub fn cleanup_temp_files() {
-    let path = std::env::temp_dir().join("klwp-provider-data.json");
+    let path = std::env::temp_dir().join("lava-provider-data.json");
     let _ = std::fs::remove_file(&path);
-    let tmp_path = std::env::temp_dir().join("klwp-provider-data.json.tmp");
+    let tmp_path = std::env::temp_dir().join("lava-provider-data.json.tmp");
     let _ = std::fs::remove_file(&tmp_path);
-    let proj_path = std::env::temp_dir().join("klwp-wallpaper-project.json");
+    let proj_path = std::env::temp_dir().join("lava-wallpaper-project.json");
     let _ = std::fs::remove_file(&proj_path);
 }

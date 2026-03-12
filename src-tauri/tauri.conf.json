@@ -1,17 +1,17 @@
 {
-  "productName": "KLLW",
+  "productName": "LAVA",
   "version": "0.1.0",
-  "identifier": "com.kllw.app",
+  "identifier": "com.lava.app",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
-    "beforeDevCommand": "cargo build -p klwp-wallpaper && pnpm dev",
-    "beforeBuildCommand": "cargo build -p klwp-wallpaper --release && pnpm build"
+    "beforeDevCommand": "cargo build -p lava-wallpaper && pnpm dev",
+    "beforeBuildCommand": "cargo build -p lava-wallpaper --release && pnpm build"
   },
   "app": {
     "windows": [
       {
-        "title": "Kustom Linux Live Wallpaper",
+        "title": "LAVA - Live Animated Visuals for Arch",
         "width": 1400,
         "height": 900,
         "resizable": true,
@@ -20,7 +20,7 @@
     ],
     "trayIcon": {
       "iconPath": "icons/icon.png",
-      "tooltip": "KLLW - Kustom Linux Live Wallpaper"
+      "tooltip": "LAVA - Live Animated Visuals for Arch"
     },
     "security": {
       "csp": "default-src 'self'; connect-src 'self' https: http:; img-src 'self' asset: https://asset.localhost http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'",

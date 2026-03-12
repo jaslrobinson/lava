@@ -203,6 +203,14 @@ function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDelta
       deltas.dRotation += amount * t * oscillation;
       break;
     }
+
+    case "flash": {
+      // Flash: peaks bright at the start, decays to normal by progress=1
+      // amount = peak opacity (0-255), default behavior: starts at amount, returns to base
+      const flashIntensity = 1 - t; // 1 at start, 0 at end
+      deltas.opacityMultiplier *= 1 + (amount / 255) * flashIntensity;
+      break;
+    }
   }
 }
 

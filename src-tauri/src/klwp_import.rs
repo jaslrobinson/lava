@@ -13,7 +13,7 @@ static ITEM_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 fn next_id() -> String {
     let id = ITEM_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("klwp_{}", id)
+    format!("lava_{}", id)
 }
 
 fn reset_counter() {
@@ -848,6 +848,8 @@ impl Default for LayerProperties {
             stroke: None,
             stroke_width: None,
             corner_radius: None,
+            skew_x: None,
+            skew_y: None,
             src: None,
             scale_mode: None,
             tint: None,
@@ -861,6 +863,7 @@ impl Default for LayerProperties {
             orientation: None,
             spacing: None,
             click_action: None,
+            scroll_action: None,
             icon_src: None,
             viz_style: None,
             bar_count: None,

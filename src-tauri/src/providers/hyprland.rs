@@ -13,6 +13,7 @@ struct WsState {
     active: i64,
     /// workspace_id -> window count (only tracked workspaces)
     workspaces: HashMap<i64, i64>,
+    active_window_class: String,
 }
 
 impl WsState {
@@ -20,6 +21,7 @@ impl WsState {
         Self {
             active: 1,
             workspaces: HashMap::new(),
+            active_window_class: String::new(),
         }
     }
 
@@ -73,6 +75,12 @@ impl WsState {
                     }
                 }
             }
+        } else if line.starts_with("activewindow>>") {
+            // activewindow>>CLASS,TITLE
+            let payload = &line["activewindow>>".len()..];
+            let class = payload.split(',').next().unwrap_or("").trim().to_string();
+            self.active_window_class = class;
+            return true;
         } else if line.starts_with("closewindow>>") {
             // Window closed — we don't know which workspace, decrement active
             // (hyprctl clients will correct on next poll)
@@ -152,13 +160,52 @@ fn flush_ws_data(app: &AppHandle, shared: &SharedProviderData, ws_data: &Provide
         let _ = app.emit("provider-data-update", &*data);
         // Write temp file for wallpaper process (atomic rename)
         if let Ok(json) = serde_json::to_string(&*data) {
-            let tmp = std::env::temp_dir().join("klwp-provider-data.json.tmp");
-            let dst = std::env::temp_dir().join("klwp-provider-data.json");
+            let tmp = std::env::temp_dir().join("lava-provider-data.json.tmp");
+            let dst = std::env::temp_dir().join("lava-provider-data.json");
             if std::fs::write(&tmp, &json).is_ok() {
                 let _ = std::fs::rename(&tmp, &dst);
             }
         }
     });
+}
+
+/// Write target opacity to /tmp/lava-wallpaper-opacity based on active window.
+fn write_opacity_signal(active_class: &str) {
+    // Read fade settings from config
+    let (enabled, opacity) = read_fade_settings();
+
+    let target = if !enabled || active_class.is_empty() || active_class == "lava-wallpaper" {
+        1.0
+    } else {
+        opacity
+    };
+
+    let tmp = std::env::temp_dir().join("lava-wallpaper-opacity.tmp");
+    let dst = std::env::temp_dir().join("lava-wallpaper-opacity");
+    if std::fs::write(&tmp, format!("{:.2}", target)).is_ok() {
+        let _ = std::fs::rename(&tmp, &dst);
+    }
+}
+
+/// Read fade settings from ~/.config/lava/settings.json (cached-friendly)
+fn read_fade_settings() -> (bool, f64) {
+    let config_path = dirs::config_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("lava")
+        .join("settings.json");
+
+    if let Ok(content) = std::fs::read_to_string(&config_path) {
+        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+            let enabled = json.get("wallpaperFadeEnabled")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(true);
+            let opacity = json.get("wallpaperFadeOpacity")
+                .and_then(|v| v.as_f64())
+                .unwrap_or(0.3);
+            return (enabled, opacity);
+        }
+    }
+    (true, 0.3)
 }
 
 /// Event loop: listens on socket2, updates SharedProviderData directly, emits Tauri events.
@@ -172,6 +219,7 @@ fn run_event_loop(app: AppHandle, shared: SharedProviderData) -> Result<(), Stri
     let mut state = WsState::new();
     state.init_from_hyprctl();
     flush_ws_data(&app, &shared, &state.to_provider_data());
+    write_opacity_signal(&state.active_window_class);
 
     eprintln!("[hyprland] Connecting to event socket: {}", socket_path);
     let stream = UnixStream::connect(&socket_path)
@@ -186,6 +234,8 @@ fn run_event_loop(app: AppHandle, shared: SharedProviderData) -> Result<(), Stri
 
         if state.apply_event(&line) {
             flush_ws_data(&app, &shared, &state.to_provider_data());
+            // Write opacity signal when active window changes
+            write_opacity_signal(&state.active_window_class);
         }
     }
 

@@ -55,6 +55,23 @@ pub fn music_control(action: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Adjust system volume via wpctl (WirePlumber).
+/// delta: percentage to adjust, e.g. 5 for +5%, -5 for -5%
+#[tauri::command]
+pub fn adjust_volume(delta: i32) -> Result<(), String> {
+    // Use relative percentage — no blocking read needed
+    let arg = if delta >= 0 {
+        format!("{}%+", delta)
+    } else {
+        format!("{}%-", -delta)
+    };
+    std::process::Command::new("wpctl")
+        .args(["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", &arg])
+        .spawn()
+        .map_err(|e| format!("wpctl set-volume failed: {}", e))?;
+    Ok(())
+}
+
 /// Launch an application by command string.
 #[tauri::command]
 pub fn launch_app(command: String) -> Result<(), String> {

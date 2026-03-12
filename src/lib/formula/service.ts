@@ -62,7 +62,7 @@ async function fetchProviderData() {
   if (isTauri || providerFetching) return;
   providerFetching = true;
   try {
-    const resp = await fetch("/__klwp_providers");
+    const resp = await fetch("/__lava_providers");
     if (resp.ok) {
       const data = await resp.json();
       if (data && Object.keys(data).length > 0) {

@@ -58,6 +58,7 @@ pub enum AnimationType {
     Color,
     Blur,
     Jiggle,
+    Flash,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -240,6 +241,10 @@ pub struct LayerProperties {
     pub stroke_width: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub corner_radius: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skew_x: Option<NumberOrString>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skew_y: Option<NumberOrString>,
 
     // Image properties
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -276,6 +281,10 @@ pub struct LayerProperties {
     // Click action (for fullscreen/wallpaper mode)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub click_action: Option<String>,
+
+    // Scroll action (mouse wheel/touchpad gesture)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scroll_action: Option<String>,
 
     // Icon source (SVG/PNG path for imported icons)
     #[serde(skip_serializing_if = "Option::is_none")]
