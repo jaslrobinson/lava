@@ -93,6 +93,10 @@ fn handle_message(msg: &str) {
                 let _ = std::process::Command::new("sh").arg("-c").arg(cmd).spawn();
             }
         }
+        Some("show_editor") => {
+            eprintln!("[klwp-wallpaper] Writing show-editor signal");
+            let _ = std::fs::write("/tmp/klwp-show-editor", "1");
+        }
         _ => {
             // Legacy: no type field — try url field directly
             if let Some(url) = extract_json_field(msg, "url") {

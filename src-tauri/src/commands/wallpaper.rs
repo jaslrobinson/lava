@@ -7,6 +7,26 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 pub static WALLPAPER_ACTIVE: AtomicBool = AtomicBool::new(false);
 static WALLPAPER_PID: Mutex<Option<Child>> = Mutex::new(None);
 
+const SHOW_EDITOR_SIGNAL: &str = "/tmp/klwp-show-editor";
+
+/// Start a background thread that watches for the show-editor signal file.
+/// When the wallpaper process creates it, we show + focus the main window.
+pub fn start_signal_watcher(app: tauri::AppHandle) {
+    std::thread::spawn(move || {
+        loop {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            if std::path::Path::new(SHOW_EDITOR_SIGNAL).exists() {
+                let _ = std::fs::remove_file(SHOW_EDITOR_SIGNAL);
+                if let Some(window) = app.get_webview_window("main") {
+                    window.show().ok();
+                    window.set_focus().ok();
+                    eprintln!("[wallpaper] Signal received — showing editor window");
+                }
+            }
+        }
+    });
+}
+
 /// Check if wallpaper is currently running.
 pub fn is_wallpaper_active() -> bool {
     WALLPAPER_ACTIVE.load(Ordering::Relaxed)
@@ -97,12 +117,15 @@ pub fn start_wallpaper_mode(window: tauri::WebviewWindow, project: serde_json::V
     // Register global shortcut (Super+Escape) to exit wallpaper mode
     let shortcut = Shortcut::new(Some(Modifiers::SUPER), Code::Escape);
     let app = window.app_handle().clone();
-    let _ = app.global_shortcut().unregister(shortcut);
-    app.global_shortcut().on_shortcut(shortcut, move |handle, _shortcut, event| {
+    let gs = app.global_shortcut();
+    let _ = gs.unregister(shortcut);
+    if let Err(e) = gs.on_shortcut(shortcut, move |handle, _shortcut, event| {
         if event.state == ShortcutState::Pressed {
             handle.emit("exit-wallpaper", ()).ok();
         }
-    }).map_err(|e| format!("Failed to register shortcut: {}", e))?;
+    }) {
+        eprintln!("[wallpaper] Shortcut registration failed (may already be registered): {}", e);
+    }
 
     WALLPAPER_ACTIVE.store(true, Ordering::Relaxed);
     Ok(format!("{} ({})", display_server, compositor))

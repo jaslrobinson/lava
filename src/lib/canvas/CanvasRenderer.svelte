@@ -538,6 +538,21 @@
           JSON.stringify({ type: "launch_app", command: cmd })
         );
       }
+    } else if (action === "editor:show") {
+      // editor:show — bring the editor window back into focus
+      const isTauriCtx = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
+      if (isTauriCtx) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("show_editor");
+        } catch (e) {
+          console.warn("Show editor failed:", e);
+        }
+      } else {
+        (window as any).webkit?.messageHandlers?.klwp?.postMessage(
+          JSON.stringify({ type: "show_editor" })
+        );
+      }
     } else if (action.startsWith("overlay:")) {
       // overlay:layerName — toggle visibility of a named layer
       const targetName = action.slice(8).toLowerCase();

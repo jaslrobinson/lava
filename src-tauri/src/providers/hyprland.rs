@@ -1,7 +1,109 @@
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader};
+use std::os::unix::net::UnixStream;
 use std::process::Command;
 use std::time::Duration;
 
-use super::{DataProvider, ProviderData};
+use tauri::{AppHandle, Emitter};
+
+use super::{DataProvider, ProviderData, SharedProviderData};
+
+/// In-memory workspace state, updated directly from socket events.
+struct WsState {
+    active: i64,
+    /// workspace_id -> window count (only tracked workspaces)
+    workspaces: HashMap<i64, i64>,
+}
+
+impl WsState {
+    fn new() -> Self {
+        Self {
+            active: 1,
+            workspaces: HashMap::new(),
+        }
+    }
+
+    /// Bootstrap from hyprctl (called once at startup)
+    fn init_from_hyprctl(&mut self) {
+        if let Ok(output) = Command::new("hyprctl").args(["activeworkspace", "-j"]).output() {
+            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
+                self.active = json["id"].as_i64().unwrap_or(1);
+            }
+        }
+        if let Ok(output) = Command::new("hyprctl").args(["workspaces", "-j"]).output() {
+            if let Ok(wss) = serde_json::from_slice::<Vec<serde_json::Value>>(&output.stdout) {
+                for ws in &wss {
+                    let id = ws["id"].as_i64().unwrap_or(0);
+                    if id >= 1 {
+                        self.workspaces.insert(id, ws["windows"].as_i64().unwrap_or(0));
+                    }
+                }
+            }
+        }
+    }
+
+    /// Apply a socket2 event line, return true if state changed
+    fn apply_event(&mut self, line: &str) -> bool {
+        if let Some(id_str) = line.strip_prefix("workspace>>") {
+            if let Ok(id) = id_str.trim().parse::<i64>() {
+                self.active = id;
+                self.workspaces.entry(id).or_insert(0);
+                return true;
+            }
+        } else if let Some(id_str) = line.strip_prefix("createworkspace>>") {
+            if let Ok(id) = id_str.trim().parse::<i64>() {
+                if id >= 1 {
+                    self.workspaces.entry(id).or_insert(0);
+                    return true;
+                }
+            }
+        } else if let Some(id_str) = line.strip_prefix("destroyworkspace>>") {
+            if let Ok(id) = id_str.trim().parse::<i64>() {
+                self.workspaces.remove(&id);
+                return true;
+            }
+        } else if line.starts_with("openwindow>>") {
+            // openwindow>>ADDR,WORKSPACE,CLASS,TITLE
+            let parts: Vec<&str> = line["openwindow>>".len()..].splitn(4, ',').collect();
+            if parts.len() >= 2 {
+                if let Ok(ws_id) = parts[1].trim().parse::<i64>() {
+                    if ws_id >= 1 {
+                        *self.workspaces.entry(ws_id).or_insert(0) += 1;
+                        return true;
+                    }
+                }
+            }
+        } else if line.starts_with("closewindow>>") {
+            // Window closed — we don't know which workspace, decrement active
+            // (hyprctl clients will correct on next poll)
+            return true;
+        } else if line.starts_with("movewindow>>") {
+            // movewindow>>ADDR,WORKSPACE
+            return true;
+        }
+        false
+    }
+
+    /// Build ProviderData from current state
+    fn to_provider_data(&self) -> ProviderData {
+        let mut data = ProviderData::new();
+        data.insert("workspace".into(), self.active.to_string());
+        data.insert("workspace_name".into(), self.active.to_string());
+
+        for i in 1..=10i64 {
+            let exists = self.workspaces.contains_key(&i);
+            let windows = self.workspaces.get(&i).copied().unwrap_or(0);
+            data.insert(format!("ws_{}_exists", i), if exists { "1" } else { "0" }.into());
+            data.insert(format!("ws_{}_windows", i), windows.to_string());
+            data.insert(
+                format!("ws_{}_active", i),
+                if i == self.active { "1" } else { "0" }.into(),
+            );
+        }
+
+        data
+    }
+}
 
 pub struct HyprlandProvider;
 
@@ -10,15 +112,23 @@ impl HyprlandProvider {
         Self
     }
 
+    /// Start the event listener. Must be called after providers are registered
+    /// so we have access to SharedProviderData and AppHandle.
+    pub fn start_event_listener(app: AppHandle, shared: SharedProviderData) {
+        std::thread::spawn(move || {
+            if let Err(e) = run_event_loop(app, shared) {
+                eprintln!("[hyprland] Event listener failed: {}", e);
+            }
+        });
+    }
+
     fn read_gpu_usage() -> Option<String> {
-        // AMD: sysfs gpu_busy_percent
         for card in ["card0", "card1"] {
             let path = format!("/sys/class/drm/{}/device/gpu_busy_percent", card);
             if let Ok(val) = std::fs::read_to_string(&path) {
                 return Some(val.trim().to_string());
             }
         }
-        // NVIDIA fallback
         if let Ok(output) = Command::new("nvidia-smi")
             .args(["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"])
             .output()
@@ -31,6 +141,57 @@ impl HyprlandProvider {
     }
 }
 
+/// Write workspace data into shared provider data, emit update event, and write temp file.
+fn flush_ws_data(app: &AppHandle, shared: &SharedProviderData, ws_data: &ProviderData) {
+    tauri::async_runtime::block_on(async {
+        let mut data = shared.write().await;
+        let hy = data.entry("hy".into()).or_default();
+        for (k, v) in ws_data {
+            hy.insert(k.clone(), v.clone());
+        }
+        let _ = app.emit("provider-data-update", &*data);
+        // Write temp file for wallpaper process (atomic rename)
+        if let Ok(json) = serde_json::to_string(&*data) {
+            let tmp = std::env::temp_dir().join("klwp-provider-data.json.tmp");
+            let dst = std::env::temp_dir().join("klwp-provider-data.json");
+            if std::fs::write(&tmp, &json).is_ok() {
+                let _ = std::fs::rename(&tmp, &dst);
+            }
+        }
+    });
+}
+
+/// Event loop: listens on socket2, updates SharedProviderData directly, emits Tauri events.
+fn run_event_loop(app: AppHandle, shared: SharedProviderData) -> Result<(), String> {
+    let sig = std::env::var("HYPRLAND_INSTANCE_SIGNATURE")
+        .map_err(|_| "HYPRLAND_INSTANCE_SIGNATURE not set".to_string())?;
+    let runtime_dir = std::env::var("XDG_RUNTIME_DIR")
+        .map_err(|_| "XDG_RUNTIME_DIR not set".to_string())?;
+    let socket_path = format!("{}/hypr/{}/.socket2.sock", runtime_dir, sig);
+
+    let mut state = WsState::new();
+    state.init_from_hyprctl();
+    flush_ws_data(&app, &shared, &state.to_provider_data());
+
+    eprintln!("[hyprland] Connecting to event socket: {}", socket_path);
+    let stream = UnixStream::connect(&socket_path)
+        .map_err(|e| format!("Failed to connect to socket2: {}", e))?;
+
+    let reader = BufReader::new(stream);
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => break,
+        };
+
+        if state.apply_event(&line) {
+            flush_ws_data(&app, &shared, &state.to_provider_data());
+        }
+    }
+
+    Err("Event socket closed".into())
+}
+
 impl DataProvider for HyprlandProvider {
     fn prefix(&self) -> &str {
         "hy"
@@ -39,71 +200,8 @@ impl DataProvider for HyprlandProvider {
     fn poll(&mut self) -> ProviderData {
         let mut data = ProviderData::new();
 
-        // Active workspace
-        if let Ok(output) = Command::new("hyprctl")
-            .args(["activeworkspace", "-j"])
-            .output()
-        {
-            if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
-                let id = json["id"].as_i64().unwrap_or(1);
-                data.insert("workspace".into(), id.to_string());
-                data.insert(
-                    "workspace_name".into(),
-                    json["name"].as_str().unwrap_or("").to_string(),
-                );
-                data.insert(
-                    "workspace_windows".into(),
-                    json["windows"].as_i64().unwrap_or(0).to_string(),
-                );
-            }
-        }
-
-        let active_ws = data
-            .get("workspace")
-            .and_then(|s| s.parse::<i64>().ok())
-            .unwrap_or(1);
-
-        // All workspaces
-        if let Ok(output) = Command::new("hyprctl")
-            .args(["workspaces", "-j"])
-            .output()
-        {
-            if let Ok(workspaces) =
-                serde_json::from_slice::<Vec<serde_json::Value>>(&output.stdout)
-            {
-                for ws in &workspaces {
-                    let id = ws["id"].as_i64().unwrap_or(0);
-                    if id < 1 {
-                        continue;
-                    }
-                    let windows = ws["windows"].as_i64().unwrap_or(0);
-                    data.insert(format!("ws_{}_windows", id), windows.to_string());
-                    data.insert(format!("ws_{}_exists", id), "1".to_string());
-                }
-            }
-        }
-
-        // Fill in workspace 1-10 active/exists flags
-        for i in 1..=10 {
-            if !data.contains_key(&format!("ws_{}_exists", i)) {
-                data.insert(format!("ws_{}_exists", i), "0".to_string());
-                data.insert(format!("ws_{}_windows", i), "0".to_string());
-            }
-            data.insert(
-                format!("ws_{}_active", i),
-                if i == active_ws {
-                    "1".to_string()
-                } else {
-                    "0".to_string()
-                },
-            );
-        }
-
-        // Clients (running windows)
-        if let Ok(output) = Command::new("hyprctl")
-            .args(["clients", "-j"])
-            .output()
-        {
+        // Clients (running windows) — only thing that still needs polling
+        if let Ok(output) = Command::new("hyprctl").args(["clients", "-j"]).output() {
             if let Ok(clients) =
                 serde_json::from_slice::<Vec<serde_json::Value>>(&output.stdout)
             {
@@ -123,7 +221,6 @@ impl DataProvider for HyprlandProvider {
                 data.insert("apps".into(), classes.join(", "));
                 data.insert("app_list_count".into(), classes.len().to_string());
 
-                // Focused window
                 if let Some(focused) = clients.iter().find(|c| c["focusHistoryID"].as_i64() == Some(0)) {
                     data.insert(
                         "focused_app".into(),
@@ -148,6 +245,6 @@ impl DataProvider for HyprlandProvider {
     }
 
     fn interval(&self) -> Duration {
-        Duration::from_millis(500)
+        Duration::from_secs(1)
     }
 }

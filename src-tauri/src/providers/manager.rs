@@ -57,7 +57,7 @@ impl ProviderManager {
         let shutdown_flag = shutdown.clone();
 
         tauri::async_runtime::spawn(async move {
-            let mut tick = tokio::time::interval(Duration::from_secs(1));
+            let mut tick = tokio::time::interval(Duration::from_millis(250));
 
             loop {
                 tick.tick().await;
@@ -73,9 +73,12 @@ impl ProviderManager {
                         let prefix = entry.provider.prefix().to_string();
                         let mut data_write = data.write().await;
                         let current = data_write.entry(prefix).or_default();
-                        if *current != new_data {
-                            *current = new_data;
-                            changed = true;
+                        // Merge new data into existing (preserves keys from event listeners)
+                        for (k, v) in &new_data {
+                            if current.get(k) != Some(v) {
+                                current.insert(k.clone(), v.clone());
+                                changed = true;
+                            }
                         }
                         entry.last_poll = now;
                     }

@@ -26,10 +26,37 @@ const wgResultCache = new Map<string, { val: string; ts: number }>(); // cacheKe
 const wgFetching = new Set<string>(); // URLs currently being fetched
 const WG_CACHE_TTL = 300_000; // 5 minutes
 
-// --- Provider data for non-Tauri (wallpaper) view ---
+// --- Provider data cache (populated by Tauri events or file polling) ---
 // Structure: { "mi": { "title": "Song", "artist": "Artist" }, "bi": { "level": "85" }, ... }
 let providerData: Record<string, Record<string, string>> = {};
 let providerFetching = false;
+let providerListenerStarted = false;
+
+/** Start listening for provider data updates from Tauri backend.
+ *  On each event: update providerData, then immediately re-eval provider formulas. */
+function startProviderListener(getGlobals: () => Record<string, string>) {
+  if (providerListenerStarted) return;
+  providerListenerStarted = true;
+  import("@tauri-apps/api/event").then(({ listen }) => {
+    listen<Record<string, Record<string, string>>>("provider-data-update", (event) => {
+      // 1. Update provider data cache
+      providerData = event.payload;
+      // 2. Immediately re-eval all provider formulas synchronously
+      const resolved = resolveGlobals(getGlobals());
+      for (const [key] of cache) {
+        if (key.match(/\b(hy|mi|bi|rm|ts|nc|si|wi|wf|ai)\(/)) {
+          cache.set(key, evaluateClientSide(key, resolved));
+        }
+      }
+    });
+  });
+  // Also fetch initial provider data from Rust
+  import("@tauri-apps/api/core").then(({ invoke }) => {
+    invoke<Record<string, Record<string, string>>>("get_provider_data").then((data) => {
+      if (data && Object.keys(data).length > 0) providerData = data;
+    }).catch(() => {});
+  });
+}
 
 async function fetchProviderData() {
   if (isTauri || providerFetching) return;
@@ -38,7 +65,6 @@ async function fetchProviderData() {
     const resp = await fetch("/__klwp_providers");
     if (resp.ok) {
       const data = await resp.json();
-      // Only update if we got actual provider data (don't overwrite valid data with {})
       if (data && Object.keys(data).length > 0) {
         providerData = data;
       }
@@ -956,20 +982,28 @@ async function flushPending(globals: Record<string, string>) {
     cache.set(formula, evaluateClientSide(formula, globals));
   }
 
-  if (!isTauri) {
-    // Non-Tauri: evaluate everything client-side
-    for (const formula of otherFormulas) {
-      cache.set(formula, evaluateClientSide(formula, globals));
+  // Evaluate formulas client-side when provider data is available
+  // Only send to Rust backend if client-side eval returns empty (unsupported function)
+  const rustFormulas: string[] = [];
+  for (const formula of otherFormulas) {
+    const result = evaluateClientSide(formula, globals);
+    if (result !== "" || !isTauri) {
+      cache.set(formula, result);
+    } else {
+      rustFormulas.push(formula);
     }
+  }
+
+  if (!isTauri || rustFormulas.length === 0) {
     evaluating = false;
     return;
   }
 
-  // Tauri: send non-wg formulas to Rust backend
-  if (otherFormulas.length > 0) {
+  // Tauri: send remaining formulas to Rust backend
+  if (rustFormulas.length > 0) {
     try {
       const results = await Promise.all(
-        otherFormulas.map(async (formula) => {
+        rustFormulas.map(async (formula) => {
           try {
             const result = await tauriInvoke<string>("evaluate_formula", {
               formula,
@@ -1009,24 +1043,32 @@ let intervalId: ReturnType<typeof setInterval> | null = null;
 export function startFormulaLoop(getGlobals: () => Record<string, string>): Promise<void> {
   if (intervalId) return Promise.resolve();
 
-  // Fetch provider data for non-Tauri wallpaper view
-  if (!isTauri) fetchProviderData();
+  // Start provider data listener for both Tauri and wallpaper views
+  if (isTauri) {
+    startProviderListener(getGlobals);
+  } else {
+    fetchProviderData();
+  }
 
-  // Evaluate pending formulas and refresh time-sensitive ones every second
-  intervalId = setInterval(() => {
-    // Refresh provider data for wallpaper view
-    if (!isTauri) fetchProviderData();
-
-    // Queue time-dependent and web-get formulas for re-evaluation
+  const refreshAll = () => {
+    // Queue time-dependent and provider formulas for re-evaluation
     for (const [key] of cache) {
       if (key.match(/\b(df|dp|tf|tu|ai|mi|bi|rm|ts|wg|gv|mu|wi|wf|lrc|hy|nc|si)\(/)) {
         pending.add(key);
       }
     }
-    // Resolve globals (evaluates formula values in globals before use)
     const resolved = resolveGlobals(getGlobals());
     flushPending(resolved);
-  }, 1000);
+  };
+
+  // Evaluate pending formulas and refresh provider data
+  // Tauri: 1s (provider events handle instant updates)
+  // Wallpaper: 200ms (polling temp file)
+  const interval = isTauri ? 1000 : 200;
+  intervalId = setInterval(() => {
+    if (!isTauri) fetchProviderData();
+    refreshAll();
+  }, interval);
 
   // Initial flush — return promise so callers can wait for first evaluation
   const resolved = resolveGlobals(getGlobals());

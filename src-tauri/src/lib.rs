@@ -105,16 +105,25 @@ pub fn run() {
             // AI provider needs shared data to read the current artist from music provider
             manager.register(Box::new(providers::ai::AiProvider::new(data.clone())));
 
-            app.manage(data);
+            app.manage(data.clone());
 
             let provider_handle = manager.start(app.handle().clone());
             app.manage(provider_handle);
+
+            // Start Hyprland event listener — writes directly to shared data + emits events
+            providers::hyprland::HyprlandProvider::start_event_listener(
+                app.handle().clone(),
+                data,
+            );
 
             setup_tray(app)?;
 
             // Start audio visualizer capture (non-blocking, spawns background thread)
             let audio_bands = providers::audio::new_shared_bands();
             providers::audio::start_audio_capture(app.handle().clone(), audio_bands);
+
+            // Watch for show-editor signal from wallpaper process
+            commands::wallpaper::start_signal_watcher(app.handle().clone());
 
             Ok(())
         })
@@ -130,6 +139,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::formula::evaluate_formula,
+            commands::formula::get_provider_data,
             commands::project::save_project,
             commands::project::load_project,
             commands::project::import_komp,

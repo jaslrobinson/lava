@@ -319,15 +319,15 @@
 
               // ── LEFT: Workspace label ──
               mkStack("WS Label", { x: 12, y: 4, width: 160, height: 28, spacing: 0 }, [
-                mkText("Desktop", { text: "Desktop", fontSize: 10, color: "#666666", width: 160, height: 12 }),
+                mkText("Desktop", { text: "Desktop", fontSize: 10, color: "#666666", width: 160, height: 12, clickAction: "editor:show" }),
                 mkText("WS Name", { text: "Workspace $hy(workspace)$", fontSize: 13, color: "#cccccc", width: 160, height: 16 }),
               ]),
 
               // ── LEFT-CENTER: System stats ──
               mkStack("Stats", { x: 190, y: 8, width: 240, height: 20, orientation: "horizontal", spacing: 14 }, [
-                mkText("CPU", { text: "\u{1F5A5} $si(cpupercent)$", fontSize: 12, color: "#88ccff", width: 50, height: 20 }),
-                mkText("GPU", { text: "\u{1F3AE} $hy(gpu)$", fontSize: 12, color: "#ff88cc", width: 50, height: 20 }),
-                mkText("RAM", { text: "\u{1F4BE} $rm(ramp)$", fontSize: 12, color: "#88ff88", width: 50, height: 20 }),
+                mkText("CPU", { text: "\u{1F5A5} $rm(cpuuse)$%", fontSize: 12, color: "#88ccff", width: 55, height: 20 }),
+                mkText("GPU", { text: "\u{1F3AE} $hy(gpu)$%", fontSize: 12, color: "#ff88cc", width: 55, height: 20 }),
+                mkText("RAM", { text: "\u{1F4BE} $rm(ramp)$%", fontSize: 12, color: "#88ff88", width: 55, height: 20 }),
               ]),
 
               // ── CENTER: Workspace indicators ──

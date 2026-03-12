@@ -80,10 +80,11 @@ impl DataProvider for ResourceMonitorProvider {
 
             data.insert("memtot".into(), format!("{}", mem_total / 1024)); // MB
             data.insert("memfree".into(), format!("{}", mem_available / 1024));
-            data.insert(
-                "memuse".into(),
-                format!("{}", mem_total.saturating_sub(mem_available) / 1024),
-            );
+            let mem_used = mem_total.saturating_sub(mem_available);
+            data.insert("memuse".into(), format!("{}", mem_used / 1024));
+            if mem_total > 0 {
+                data.insert("ramp".into(), format!("{}", mem_used * 100 / mem_total));
+            }
             data.insert("swptot".into(), format!("{}", swap_total / 1024));
             data.insert("swpfree".into(), format!("{}", swap_free / 1024));
         }

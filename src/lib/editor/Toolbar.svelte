@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addLayer, getProject, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo, insertWidget, ensureGlobal } from "../stores/project.svelte";
+  import { addLayer, getProject, getProjectSnapshot, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo, insertWidget, ensureGlobal } from "../stores/project.svelte";
   import type { LayerType, Project, GlobalVarType, Layer } from "../types/project";
   import { createDefaultProject } from "../types/project";
   import { setDebugOverlay, getDebugOverlay } from "../canvas/renderer";
@@ -37,7 +37,7 @@
       });
       if (path) {
         try {
-          await invoke("save_project", { path, project: getProject() });
+          await invoke("save_project", { path, project: getProjectSnapshot() });
           const { addTheme } = await import("../stores/settings.svelte");
           addTheme(getProject().name, path);
         } catch (e) {
@@ -125,7 +125,7 @@
         wallpaperStatus = "Stopped";
       } else {
         wallpaperStatus = "Starting...";
-        const server = await invoke<string>("start_wallpaper_mode", { project: getProject() });
+        const server = await invoke<string>("start_wallpaper_mode", { project: getProjectSnapshot() });
         wallpaperActive = true;
         wallpaperStatus = `Live (${server})`;
       }

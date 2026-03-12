@@ -36,3 +36,11 @@ pub async fn evaluate_formula(
 
     Ok(evaluate(&formula, &ctx))
 }
+
+#[tauri::command]
+pub async fn get_provider_data(
+    provider_data: State<'_, SharedProviderData>,
+) -> Result<HashMap<String, HashMap<String, String>>, String> {
+    let data = provider_data.read().await;
+    Ok(data.clone())
+}

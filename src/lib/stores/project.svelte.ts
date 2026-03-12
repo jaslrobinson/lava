@@ -45,6 +45,7 @@ export function canUndo() { return undoStack.length > 0; }
 export function canRedo() { return redoStack.length > 0; }
 
 export function getProject() { return project; }
+export function getProjectSnapshot() { return $state.snapshot(project) as Project; }
 export function setProject(p: Project) { project = p; isDirty = false; clearImageCache(); clearFormulaCache(); resetAnimationState(); }
 export function getSelectedLayerId() { return selectedLayerId; }
 export function setSelectedLayerId(id: string | null) { selectedLayerId = id; }
