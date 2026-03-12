@@ -84,6 +84,7 @@ impl EvalContext {
             "cm" => color::eval_cm(args, self),
             "gv" => variables::eval_gv(args, self),
             "lv" => variables::eval_lv(args, self),
+            "lrc" => text::eval_lrc(args, self),
             "wg" => web::eval_wg(args, self),
             "sh" => shell::eval_sh(args, self),
             _ => {

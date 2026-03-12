@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::providers::manager::SharedProviderData;
+use crate::providers::SharedProviderData;
 use kustom_formula::{evaluate, EvalContext};
 use tauri::State;
 
@@ -20,7 +20,7 @@ pub async fn evaluate_formula(
     }
 
     // Set provider data
-    let data = provider_data.read().await;
+    let data: tokio::sync::RwLockReadGuard<'_, std::collections::HashMap<String, std::collections::HashMap<String, String>>> = provider_data.read().await;
     let mut providers = HashMap::new();
     for (prefix, fields) in data.iter() {
         let mut provider_map = HashMap::new();

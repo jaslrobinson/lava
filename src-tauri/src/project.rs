@@ -45,6 +45,7 @@ pub enum AnimationTrigger {
     Reactive,
     Tap,
     Show,
+    Hover,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -56,6 +57,7 @@ pub enum AnimationType {
     Translate,
     Color,
     Blur,
+    Jiggle,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,6 +154,8 @@ pub struct Animation {
     #[serde(rename = "loop")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub loop_mode: Option<AnimationLoop>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_target: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -276,6 +280,24 @@ pub struct LayerProperties {
     // Icon source (SVG/PNG path for imported icons)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub icon_src: Option<String>,
+
+    // Visualizer properties
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub viz_style: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bar_count: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bar_spacing: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sensitivity: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_top: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_mid: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color_bottom: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub peak_color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -320,6 +342,16 @@ pub struct Background {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct Shortcut {
+    pub id: String,
+    pub keys: String,
+    pub action: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Project {
     pub version: String,
     pub name: String,
@@ -327,7 +359,8 @@ pub struct Project {
     pub background: Background,
     pub globals: Vec<GlobalVariable>,
     pub layers: Vec<Layer>,
+    #[serde(default)]
+    pub shortcuts: Vec<Shortcut>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub asset_dir: Option<String>,
 }
-

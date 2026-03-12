@@ -3,7 +3,6 @@ mod klwp_import;
 mod plugins;
 mod project;
 mod providers;
-mod rainmeter_import;
 
 use providers::manager::ProviderManager;
 use tauri::Emitter;
@@ -95,12 +94,17 @@ pub fn run() {
             manager.register(Box::new(weather));
             manager.register(Box::new(forecast));
             manager.register(Box::new(providers::radar::RadarProvider));
+            manager.register(Box::new(providers::hyprland::HyprlandProvider::new()));
 
             for provider in plugins::load_plugins() {
                 manager.register(provider);
             }
 
             let data = manager.data();
+
+            // AI provider needs shared data to read the current artist from music provider
+            manager.register(Box::new(providers::ai::AiProvider::new(data.clone())));
+
             app.manage(data);
 
             let provider_handle = manager.start(app.handle().clone());
@@ -129,7 +133,7 @@ pub fn run() {
             commands::project::save_project,
             commands::project::load_project,
             commands::project::import_komp,
-            commands::project::import_rmskin,
+            commands::project::export_komp,
             commands::project::list_project_fonts,
             commands::project::copy_asset_to_project,
             commands::project::extract_apk_icon,

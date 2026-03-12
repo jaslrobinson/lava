@@ -1,5 +1,6 @@
 <script lang="ts">
   import { getSettings, updateSetting, resetSettings } from "../stores/settings.svelte";
+  import { getProject, renameProject } from "../stores/project.svelte";
 
   let showApiKey = $state(false);
 
@@ -20,6 +21,16 @@
     <span>Settings</span>
   </div>
   <div class="settings-scroll">
+
+    <!-- Project -->
+    <div class="section">
+      <div class="section-header">Project</div>
+      <label class="field-row">
+        <span>Name</span>
+        <input type="text" value={getProject().name}
+          oninput={(e) => renameProject((e.target as HTMLInputElement).value)} />
+      </label>
+    </div>
 
     <!-- General -->
     <div class="section">

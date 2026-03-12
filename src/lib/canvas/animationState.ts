@@ -90,3 +90,39 @@ export function resetAnimationState() {
   scrollX = 0;
   engineStartTime = null;
 }
+
+/** Check if a layer is currently hovered */
+export function isLayerHovered(layerId: string): boolean {
+  const state = layerStates.get(layerId);
+  return state ? state.hoverEnterTime !== null && state.hoverExitTime === null : false;
+}
+
+/** Get hover progress (0-1) for a layer based on animation speed */
+export function getHoverProgress(layerId: string, timestamp: number, speed: number = 200): number {
+  const state = layerStates.get(layerId);
+  if (!state || !state.hoverEnterTime) return 0;
+  
+  const enterElapsed = timestamp - state.hoverEnterTime;
+  if (state.hoverExitTime === null) {
+    // Currently hovered — animate toward 1
+    return Math.min(1, enterElapsed / speed);
+  } else {
+    // Hover exited — animate back toward 0
+    const exitElapsed = timestamp - state.hoverExitTime;
+    const enterProgress = Math.min(1, enterElapsed / speed);
+    return Math.max(0, enterProgress - exitElapsed / speed);
+  }
+}
+
+/** Get raw hover state for formula evaluation */
+export function getHoverState(layerId: string): { isHovered: boolean; enterTime: number | null; exitTime: number | null } {
+  const state = layerStates.get(layerId);
+  if (!state) {
+    return { isHovered: false, enterTime: null, exitTime: null };
+  }
+  return {
+    isHovered: state.hoverEnterTime !== null && state.hoverExitTime === null,
+    enterTime: state.hoverEnterTime,
+    exitTime: state.hoverExitTime
+  };
+}

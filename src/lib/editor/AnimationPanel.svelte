@@ -1,6 +1,23 @@
 <script lang="ts">
   import { getSelectedLayer, addAnimation, updateAnimation, removeAnimation } from "../stores/project.svelte";
   import type { Animation, AnimationType, AnimationTrigger, EasingType } from "../types/project";
+  import FxBuilder from "./FxBuilder.svelte";
+
+  let builderIndex = $state<number | null>(null);
+
+  function openBuilder(index: number) {
+    builderIndex = index;
+  }
+  function handleBuilderApply(anim: Animation) {
+    if (builderIndex === null) return;
+    const layer = getSelectedLayer();
+    if (!layer) return;
+    updateAnimation(layer.id, builderIndex, anim);
+    builderIndex = null;
+  }
+  function handleBuilderClose() {
+    builderIndex = null;
+  }
 
   const animTypes: { value: AnimationType; label: string }[] = [
     { value: "fade", label: "Fade" },
@@ -86,10 +103,15 @@
   }
 
   function getRuleLabel(trigger: AnimationTrigger, type: AnimationType): string | null {
+    console.log('getRuleLabel called with:', { trigger, type });
     if (type === "translate") return "Direction (x, y, or x,y)";
     if (type === "color") return "Target Color (#hex)";
     if (type === "jiggle") return "Cycle Period (ms, default 80)";
-    if (trigger === "reactive") return "Formula ($...$)";
+    if (trigger === "reactive") {
+      console.log('Returning "Formula ($...$)" for reactive trigger');
+      return "Formula ($...$)";
+    }
+    console.log('Returning null');
     return null;
   }
 </script>
@@ -112,6 +134,7 @@
       <div class="anim-card">
         <div class="anim-header">
           <span class="anim-label">{anim.type} / {anim.trigger}</span>
+          <button class="build-btn" title="Open FX Builder" onclick={() => openBuilder(i)}>✦ Build</button>
           <button class="remove-btn" title="Remove animation" onclick={() => handleRemove(i)}>x</button>
         </div>
 
@@ -135,7 +158,7 @@
 
           {#if getRuleLabel(anim.trigger, anim.type)}
             <label>{getRuleLabel(anim.trigger, anim.type)}</label>
-            {#if anim.type === "color"}
+            {#if anim.type === "color" && anim.trigger !== "reactive"}
               <div class="color-rule-row">
                 <input type="color" value={anim.rule || "#ffffff"} oninput={(e) => handleUpdate(i, "rule", (e.target as HTMLInputElement).value)} />
                 <input type="text" value={anim.rule} placeholder="#rrggbb" oninput={(e) => handleUpdate(i, "rule", (e.target as HTMLInputElement).value)} />
@@ -169,6 +192,14 @@
         </div>
       </div>
     {/each}
+
+    {#if builderIndex !== null && anims[builderIndex]}
+      <FxBuilder
+        animation={anims[builderIndex]}
+        onApply={handleBuilderApply}
+        onClose={handleBuilderClose}
+      />
+    {/if}
   </section>
 {/if}
 
@@ -234,6 +265,21 @@
     font-weight: 600;
     color: var(--text-primary);
     text-transform: capitalize;
+  }
+  .build-btn {
+    padding: 1px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    border-radius: 3px;
+    background: var(--accent-dim);
+    color: var(--accent);
+    border: 1px solid transparent;
+    cursor: pointer;
+    margin-right: 4px;
+  }
+  .build-btn:hover {
+    background: var(--accent);
+    color: #fff;
   }
   .remove-btn {
     width: 18px;

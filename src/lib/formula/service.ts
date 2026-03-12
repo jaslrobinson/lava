@@ -10,6 +10,8 @@ async function tauriInvoke<T>(cmd: string, args?: Record<string, unknown>): Prom
 }
 
 const MAX_CACHE_SIZE = 2000;
+// Guard against circular gv() references during recursive evaluation
+const gvResolving = new Set<string>();
 
 // Cache of formula string -> evaluated result
 const cache = new Map<string, string>();
@@ -556,6 +558,50 @@ function evaluateCe(argsStr: string): string {
   }
 }
 
+/** Parse LRC text and find the lyric line at or before `secs`, shifted by `offset` lines.
+ *  offset=0 → current line, offset=-1 → previous line, offset=1 → next line, etc. */
+function lrcLookup(lrcText: string, secs: number, offset: number = 0): string {
+  if (!lrcText || secs < 0) return "";
+
+  // Parse all [mm:ss.xx] timestamps and their lyric text
+  const lines: { time: number; text: string }[] = [];
+  const pattern = /\[(\d{2}):(\d{2})(?:\.\d+)?\]([^\[]*)/g;
+  let m;
+  while ((m = pattern.exec(lrcText)) !== null) {
+    const t = parseInt(m[1]) * 60 + parseInt(m[2]);
+    const text = m[3].trim();
+    if (text) lines.push({ time: t, text });
+  }
+
+  if (lines.length === 0) return "";
+  lines.sort((a, b) => a.time - b.time);
+
+  // Find last line whose timestamp <= secs
+  let currentIdx = -1;
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (lines[i].time <= secs) {
+      currentIdx = i;
+      break;
+    }
+  }
+
+  if (currentIdx < 0) return "";
+
+  const targetIdx = currentIdx + offset;
+  if (targetIdx < 0 || targetIdx >= lines.length) return "";
+  return lines[targetIdx].text;
+}
+
+/** Evaluate $lrc(lrcText, seconds[, lineOffset])$ — fallback handler */
+function evaluateLrc(argsStr: string): string {
+  // Use last top-level comma to split LRC text (may contain commas) from remaining args
+  const args = splitArgs(argsStr);
+  const lrcText = args[0] ?? "";
+  const secs = parseInt(args[1]) || 0;
+  const offset = parseInt(args[2] || "0") || 0;
+  return lrcLookup(lrcText, secs, offset);
+}
+
 /** Evaluate $cm(h, s, l)$ — create color from HSL */
 function evaluateCm(argsStr: string): string {
   const args = splitArgs(argsStr).map(Number);
@@ -609,10 +655,12 @@ function evaluateIf(argsStr: string, globals: Record<string, string>): string {
     isTruthy = cond !== "" && cond !== "0" && cond !== "false";
   }
 
-  // Also resolve inner formulas in the result values
-  const trueVal = args[1] ?? "";
-  const falseVal = args[2] ?? "";
-  return isTruthy ? trueVal : falseVal;
+  // Pick the result branch and recursively evaluate if it contains function calls
+  const result = isTruthy ? (args[1] ?? "") : (args[2] ?? "");
+  if (result.match(/[a-z]{2,}\(/)) {
+    return evaluateClientSide(`$${result}$`, globals);
+  }
+  return result;
 }
 
 /** Evaluate $fl(init, stop, incr, body, sep)$ — for loop */
@@ -658,34 +706,51 @@ function evalArithmetic(expr: string): string {
   }
 }
 
-/** Resolve nested formula calls within an arguments string (innermost first) */
-function resolveInnerFormulas(argsStr: string, globals: Record<string, string>): string {
-  // Match innermost function calls (no nested parens in args)
-  // Exclude lv() — it's resolved by fl() during loop iteration
+/** Resolve all function calls within a single argument string */
+function resolveArgFunctions(arg: string, globals: Record<string, string>): string {
   const pattern = /\b(?!lv\b)([a-z]{2,})\(([^()]*)\)/;
-  let result = argsStr;
+  let result = arg;
   let safety = 50;
-
   while (safety-- > 0) {
     const match = result.match(pattern);
     if (!match) break;
-
-    const [fullMatch] = match;
-    const evaluated = evaluateClientSide(`$${fullMatch}$`, globals);
-    result = result.slice(0, match.index!) + evaluated + result.slice(match.index! + fullMatch.length);
+    const evaluated = evaluateClientSide(`$${match[0]}$`, globals);
+    result = result.slice(0, match.index!) + evaluated + result.slice(match.index! + match[0].length);
   }
+  return result;
+}
 
-  // After resolving all function calls, evaluate inline arithmetic in each argument
-  // Split by commas (respecting quotes), evaluate arithmetic in each part, rejoin
-  const parts = splitArgs(result);
-  const evaluated = parts.map(p => evalArithmetic(p));
-  return evaluated.join(", ");
+/** Resolve nested formula calls within an arguments string (innermost first).
+ *  Splits arguments BEFORE resolving so that commas inside resolved values
+ *  (e.g. LRC text with commas) don't corrupt argument boundaries. */
+function resolveInnerFormulas(argsStr: string, globals: Record<string, string>): string {
+  const origArgs = splitArgs(argsStr);
+  const resolvedParts = origArgs.map(arg => {
+    const resolved = resolveArgFunctions(arg.trim(), globals);
+    return evalArithmetic(resolved);
+  });
+  return resolvedParts.join(", ");
 }
 
 /** Client-side formula evaluation for non-Tauri context (wallpaper view) */
 function evaluateClientSide(formula: string, globals: Record<string, string>): string {
   // Strip outer $...$ delimiters
   let inner = formula.replace(/^\$|\$$/g, "");
+
+  // Handle lrc() before generic path — LRC text may contain commas/brackets that
+  // corrupt argument parsing after text substitution. Split args from the raw formula
+  // (where function calls have balanced parens), then resolve each arg independently.
+  // lrc(text, seconds[, lineOffset]) — finds last lyric at or before `seconds`,
+  // then shifts by lineOffset (negative = previous lines).
+  const lrcPreMatch = inner.match(/^lrc\((.+)\)$/s);
+  if (lrcPreMatch) {
+    const rawArgs = splitArgs(lrcPreMatch[1]);
+    const lrcText = resolveArgFunctions(rawArgs[0]?.trim() ?? "", globals);
+    const secsStr = resolveArgFunctions(rawArgs[1]?.trim() ?? "0", globals);
+    const secs = parseInt(evalArithmetic(secsStr)) || 0;
+    const offset = rawArgs.length > 2 ? parseInt(evalArithmetic(resolveArgFunctions(rawArgs[2]?.trim() ?? "0", globals))) || 0 : 0;
+    return lrcLookup(lrcText, secs, offset);
+  }
 
   // Resolve nested function calls in arguments before evaluating the outer function
   const outerMatch = inner.match(/^([a-z]{2,4})\((.+)\)$/s);
@@ -706,7 +771,16 @@ function evaluateClientSide(formula: string, globals: Record<string, string>): s
   // $gv(name)$ - global variable lookup
   const gvMatch = inner.match(/^gv\((.+)\)$/);
   if (gvMatch) {
-    return globals[gvMatch[1]] ?? "";
+    const name = gvMatch[1];
+    const val = globals[name] ?? "";
+    // If the global value is itself a formula, evaluate it recursively
+    // (guard against circular references)
+    if (hasFormula(val) && !gvResolving.has(name)) {
+      gvResolving.add(name);
+      try { return evaluateClientSide(val, globals); }
+      finally { gvResolving.delete(name); }
+    }
+    return val;
   }
 
   // $wg(url, type, path, index)$ - web get
@@ -761,6 +835,12 @@ function evaluateClientSide(formula: string, globals: Record<string, string>): s
   const cmMatch = inner.match(/^cm\((.+)\)$/);
   if (cmMatch) {
     return evaluateCm(cmMatch[1]);
+  }
+
+  // $lrc(lrcText, seconds)$ - extract lyric line from LRC text at given timestamp
+  const lrcMatch = inner.match(/^lrc\((.+)\)$/s);
+  if (lrcMatch) {
+    return evaluateLrc(lrcMatch[1]);
   }
 
   // $lv(name)$ - local variable (no loop context client-side)
@@ -837,12 +917,17 @@ function formatDate(pattern: string, date: Date): string {
   return pattern.replace(tokenRegex, (m) => tokens[m]);
 }
 
-/** Resolve globals — evaluate any global values that contain formulas */
+/** Resolve globals — evaluate any global values that contain formulas.
+ *  Does multiple passes so globals that depend on other globals (e.g.
+ *  ly_S1 → ly_raw → ly_url) get resolved through the cache chain. */
 function resolveGlobals(rawGlobals: Record<string, string>): Record<string, string> {
   const resolved: Record<string, string> = {};
   for (const [name, value] of Object.entries(rawGlobals)) {
     if (hasFormula(value)) {
-      resolved[name] = resolveFormula(value);
+      const val = resolveFormula(value);
+      // If resolveFormula returned a cached result that is itself a formula,
+      // evaluate it client-side so downstream gv() gets the final value.
+      resolved[name] = hasFormula(val) ? evaluateClientSide(val, resolved) : val;
     } else {
       resolved[name] = value;
     }
@@ -934,7 +1019,7 @@ export function startFormulaLoop(getGlobals: () => Record<string, string>): Prom
 
     // Queue time-dependent and web-get formulas for re-evaluation
     for (const [key] of cache) {
-      if (key.match(/\b(df|dp|tf|tu|ai|mi|bi|rm|ts|wg|gv|mu|wi|wf)\(/)) {
+      if (key.match(/\b(df|dp|tf|tu|ai|mi|bi|rm|ts|wg|gv|mu|wi|wf|lrc|hy|nc|si)\(/)) {
         pending.add(key);
       }
     }

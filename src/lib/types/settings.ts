@@ -27,6 +27,7 @@ export interface AppSettings {
   startMinimized: boolean;
   autoStartWallpaper: boolean;
   lastProjectPath: string;
+  savedThemes: { name: string; path: string }[];
 }
 
 export const defaultSettings: AppSettings = {
@@ -53,4 +54,5 @@ export const defaultSettings: AppSettings = {
   startMinimized: false,
   autoStartWallpaper: false,
   lastProjectPath: "",
+  savedThemes: [],
 };

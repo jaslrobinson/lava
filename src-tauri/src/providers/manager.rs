@@ -6,10 +6,7 @@ use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::RwLock;
 
-use super::DataProvider;
-
-/// Shared provider data: prefix -> field -> value
-pub type SharedProviderData = Arc<RwLock<HashMap<String, HashMap<String, String>>>>;
+use super::{DataProvider, SharedProviderData};
 
 /// Handle to stop the provider polling loop.
 pub struct ProviderHandle {

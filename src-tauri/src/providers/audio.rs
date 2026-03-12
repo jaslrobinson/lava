@@ -162,10 +162,12 @@ fn compute_bands(fft_data: &[Complex<f32>], sample_rate: usize, num_bands: usize
         let count = (b1 - b0) as f32;
         let sum: f32 = fft_data[b0..b1].iter().map(|c| c.norm()).sum();
 
-        // Normalize: divide by bin count, FFT size, and apply perceptual gain
-        // Higher bands get a slight boost (pink noise compensation)
-        let perceptual_gain = 1.0 + (band_idx as f32 / num_bands as f32) * 0.8;
-        out[band_idx] = (sum / count / fft_data.len() as f32 * 12.0 * perceptual_gain).min(1.0);
+        // Normalize: divide by bin count, FFT size, and apply perceptual gain.
+        // Music energy drops ~6 dB/octave, so higher bands need exponentially
+        // more boost to appear equally active in a visualizer.
+        let t = band_idx as f32 / num_bands as f32;
+        let perceptual_gain = (1.0 + t * 3.0).powi(2); // 1x at low → 16x at high
+        out[band_idx] = (sum / count / fft_data.len() as f32 * 20.0 * perceptual_gain).min(1.0);
 
         prev_b1 = b1;
     }

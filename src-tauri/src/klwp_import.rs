@@ -862,6 +862,14 @@ impl Default for LayerProperties {
             spacing: None,
             click_action: None,
             icon_src: None,
+            viz_style: None,
+            bar_count: None,
+            bar_spacing: None,
+            sensitivity: None,
+            color_top: None,
+            color_mid: None,
+            color_bottom: None,
+            peak_color: None,
         }
     }
 }

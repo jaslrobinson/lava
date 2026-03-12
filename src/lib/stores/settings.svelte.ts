@@ -57,6 +57,23 @@ export function resetSettings() {
   saveSettings();
 }
 
+export function addTheme(name: string, path: string) {
+  const copy: any = $state.snapshot(settings);
+  const themes: { name: string; path: string }[] = copy.savedThemes ?? [];
+  if (!themes.find((t: any) => t.path === path)) {
+    copy.savedThemes = [...themes, { name, path }];
+    settings = copy;
+    saveSettings();
+  }
+}
+
+export function removeTheme(path: string) {
+  const copy: any = $state.snapshot(settings);
+  copy.savedThemes = (copy.savedThemes ?? []).filter((t: any) => t.path !== path);
+  settings = copy;
+  saveSettings();
+}
+
 /** Deep merge source into target, keeping target's structure as the template */
 function deepMerge(target: any, source: any): any {
   if (source === null || source === undefined) return target;

@@ -369,7 +369,16 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
   if (deltas.colorOverride) {
     ctx.globalCompositeOperation = "source-atop";
     ctx.fillStyle = deltas.colorOverride;
-    ctx.fillRect(x, y, w, h);
+    
+    // For shapes, create and fill the exact shape path
+    // For other layer types, use fillRect
+    if (layer.type === "shape") {
+      createShapePath(ctx, layer, x, y, w, h);
+      ctx.fill();
+    } else {
+      ctx.fillRect(x, y, w, h);
+    }
+    
     ctx.globalCompositeOperation = "source-over";
   }
 
@@ -580,6 +589,51 @@ function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
   ctx.lineTo(x, y + r);
   ctx.quadraticCurveTo(x, y, x + r, y);
   ctx.closePath();
+}
+
+/** Create a shape path without filling or stroking it */
+function createShapePath(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
+  const props = layer.properties;
+  const kind = props.shapeKind || "rectangle";
+  const cornerRadius = resolveNumber(props.cornerRadius, 0);
+
+  switch (kind) {
+    case "rectangle":
+      if (cornerRadius > 0) {
+        roundedRect(ctx, x, y, w, h, cornerRadius);
+      } else {
+        ctx.beginPath();
+        ctx.rect(x, y, w, h);
+      }
+      break;
+
+    case "circle": {
+      const radius = Math.min(w, h) / 2;
+      ctx.beginPath();
+      ctx.arc(x + w / 2, y + h / 2, radius, 0, Math.PI * 2);
+      break;
+    }
+
+    case "oval":
+      ctx.beginPath();
+      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+      break;
+
+    case "triangle":
+      ctx.beginPath();
+      ctx.moveTo(x + w / 2, y);
+      ctx.lineTo(x + w, y + h);
+      ctx.lineTo(x, y + h);
+      ctx.closePath();
+      break;
+
+    case "arc": {
+      const r = Math.min(w, h) / 2;
+      ctx.beginPath();
+      ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI);
+      break;
+    }
+  }
 }
 
 /** Get descriptive label for an image that can't be displayed */
@@ -821,15 +875,25 @@ function renderFontIcon(ctx: CanvasRenderingContext2D, layer: Layer, x: number, 
 
 function renderVisualizer(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
   const props = layer.properties;
+  const vizStyle = resolve(props.vizStyle, "bars");
+
+  if (vizStyle === "wave") {
+    renderVisualizerWave(ctx, layer, x, y, w, h);
+  } else {
+    renderVisualizerBars(ctx, layer, x, y, w, h);
+  }
+}
+
+function renderVisualizerBars(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
+  const props = layer.properties;
   const barCount = resolveNumber(props.barCount, 24);
   const barSpacing = resolveNumber(props.barSpacing, 3);
   const sensitivity = resolveNumber(props.sensitivity, 1.0);
 
-  // Nord-inspired default colors
-  const colorTop = resolve(props.colorTop, "#88C0D0");      // Nord8 frost bright
-  const colorMid = resolve(props.colorMid, "#5E81AC");      // Nord10 deep blue
-  const colorBottom = resolve(props.colorBottom, "#2E3440"); // Nord0 dark
-  const peakColor = resolve(props.peakColor, "#ECEFF4");    // Nord6 snow white
+  const colorTop = resolve(props.colorTop, "#88C0D0");
+  const colorMid = resolve(props.colorMid, "#5E81AC");
+  const colorBottom = resolve(props.colorBottom, "#2E3440");
+  const peakColor = resolve(props.peakColor, "#ECEFF4");
 
   const bandsData = getAudioBands();
   const peaksData = getAudioPeaks();
@@ -839,7 +903,6 @@ function renderVisualizer(ctx: CanvasRenderingContext2D, layer: Layer, x: number
   const cornerR = Math.min(barW / 2, 3);
 
   for (let i = 0; i < barCount; i++) {
-    // Map bar index to band index (may downsample if barCount > NUM_BANDS)
     const bandIdx = Math.min(
       Math.floor((i / barCount) * bandsData.length),
       bandsData.length - 1
@@ -851,15 +914,13 @@ function renderVisualizer(ctx: CanvasRenderingContext2D, layer: Layer, x: number
     const bx = x + i * (barW + barSpacing);
     const by = y + h - barH;
 
-    // Gradient: colorBottom at base → colorMid at middle → colorTop at spike tip
     const grad = ctx.createLinearGradient(bx, by + barH, bx, by);
-    grad.addColorStop(0, colorBottom + "60"); // 38% alpha at base
-    grad.addColorStop(0.4, colorMid + "cc");   // 80% alpha at mid
-    grad.addColorStop(1, colorTop);            // full at top
+    grad.addColorStop(0, colorBottom + "60");
+    grad.addColorStop(0.4, colorMid + "cc");
+    grad.addColorStop(1, colorTop);
 
     ctx.fillStyle = grad;
 
-    // Rounded top bar
     if (cornerR > 0 && barH > cornerR * 2) {
       ctx.beginPath();
       ctx.moveTo(bx, by + barH);
@@ -874,7 +935,6 @@ function renderVisualizer(ctx: CanvasRenderingContext2D, layer: Layer, x: number
       ctx.fillRect(bx, by, barW, barH);
     }
 
-    // Peak indicator dot
     if (peaksData[bandIdx] > 0.05) {
       const peakH = Math.min(1, peaksData[bandIdx] * sensitivity) * h;
       const peakY = y + h - peakH;
@@ -882,6 +942,91 @@ function renderVisualizer(ctx: CanvasRenderingContext2D, layer: Layer, x: number
       ctx.fillRect(bx, peakY - 2, barW, 2);
     }
   }
+}
+
+function renderVisualizerWave(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
+  const props = layer.properties;
+  const pointCount = resolveNumber(props.barCount, 24);
+  const sensitivity = resolveNumber(props.sensitivity, 1.0);
+
+  const colorTop = resolve(props.colorTop, "#88C0D0");
+  const colorMid = resolve(props.colorMid, "#5E81AC");
+  const colorBottom = resolve(props.colorBottom, "#2E3440");
+
+  const bandsData = getAudioBands();
+
+  // Build data points along the width
+  const points: { x: number; y: number }[] = [];
+  for (let i = 0; i < pointCount; i++) {
+    const bandIdx = Math.min(
+      Math.floor((i / pointCount) * bandsData.length),
+      bandsData.length - 1
+    );
+    const rawVal = bandsData[bandIdx] ?? 0;
+    const val = Math.min(1, rawVal * sensitivity);
+    const px = x + (i / (pointCount - 1)) * w;
+    const py = y + h - Math.max(2, val * h);
+    points.push({ x: px, y: py });
+  }
+
+  if (points.length < 2) return;
+
+  // Catmull-Rom to cubic bezier conversion for smooth curves.
+  // For each segment [P[i], P[i+1]], control points are:
+  //   CP1 = P[i]   + (P[i+1] - P[i-1]) / 6
+  //   CP2 = P[i+1] - (P[i+2] - P[i])   / 6
+  ctx.beginPath();
+  ctx.moveTo(x, y + h); // bottom-left corner
+  ctx.lineTo(points[0].x, points[0].y);
+
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+
+  ctx.lineTo(x + w, y + h); // bottom-right corner
+  ctx.closePath();
+
+  // Filled gradient: colorBottom at base → colorMid → colorTop at peaks
+  const fillGrad = ctx.createLinearGradient(x, y + h, x, y);
+  fillGrad.addColorStop(0, colorBottom + "40");
+  fillGrad.addColorStop(0.4, colorMid + "99");
+  fillGrad.addColorStop(1, colorTop + "dd");
+  ctx.fillStyle = fillGrad;
+  ctx.fill();
+
+  // Stroke the wave line on top for definition
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[Math.max(0, i - 1)];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[Math.min(points.length - 1, i + 2)];
+
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+    ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+  }
+
+  const strokeGrad = ctx.createLinearGradient(x, y + h, x, y);
+  strokeGrad.addColorStop(0, colorMid);
+  strokeGrad.addColorStop(1, colorTop);
+  ctx.strokeStyle = strokeGrad;
+  ctx.lineWidth = 2;
+  ctx.stroke();
 }
 
 function renderOverlap(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, container: ContainerSize, parentAbsX: number, parentAbsY: number, timestamp: number = 0) {

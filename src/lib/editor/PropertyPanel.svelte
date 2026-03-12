@@ -4,6 +4,7 @@
   import FormulaHelper from "./FormulaHelper.svelte";
   import AnimationPanel from "./AnimationPanel.svelte";
   import IconPicker from "./IconPicker.svelte";
+  import ColorField from "./ColorField.svelte";
   import { SYSTEM_FONTS } from "../data/fonts";
   import { getProjectFontNames, loadFont } from "../fonts/fontLoader";
 
@@ -156,6 +157,12 @@
     }
     updateLayerProperty(layer.id, "shadow", updated);
   }
+
+  function onColorProp(field: string, value: string) {
+    const layer = getSelectedLayer();
+    if (!layer) return;
+    updateLayerProperty(layer.id, field, value);
+  }
 </script>
 
 <div class="property-panel">
@@ -306,7 +313,7 @@
             {/if}
             <button class="browse-btn" style="margin-top: 2px; width: 100%; text-align: center;" title="Import font file (.ttf, .otf, .woff2)" onclick={handleImportFont}>Import Font</button>
             <label>Color</label>
-            <input type="color" value={props.color ?? "#ffffff"} oninput={(e) => onInput("color", e)} />
+            <ColorField value={String(props.color ?? "#ffffff")} defaultColor="#ffffff" onChange={(v) => onColorProp("color", v)} />
             <label>Align</label>
             <select value={props.textAlign ?? "left"} onchange={(e) => onSelectInput("textAlign", e)}>
               <option value="left">Left</option>
@@ -343,9 +350,9 @@
               <option value="arc">Arc</option>
             </select>
             <label>Fill</label>
-            <input type="color" value={props.fill ?? "#e94560"} oninput={(e) => onInput("fill", e)} />
+            <ColorField value={String(props.fill ?? "#e94560")} defaultColor="#e94560" onChange={(v) => onColorProp("fill", v)} />
             <label>Stroke</label>
-            <input type="color" value={props.stroke ?? "#000000"} oninput={(e) => onInput("stroke", e)} />
+            <ColorField value={String(props.stroke ?? "#000000")} defaultColor="#000000" onChange={(v) => onColorProp("stroke", v)} />
             <label>Stroke Width</label>
             <input type="number" value={props.strokeWidth ?? 0} oninput={(e) => onInput("strokeWidth", e)} />
             <label>Corner Radius</label>
@@ -388,7 +395,7 @@
             <label>Corner Radius</label>
             <input type="number" min="0" value={props.cornerRadius ?? 0} oninput={(e) => onInput("cornerRadius", e)} />
             <label>Tint</label>
-            <input type="color" value={props.tint ?? "#ffffff"} oninput={(e) => onInput("tint", e)} />
+            <ColorField value={String(props.tint ?? "")} defaultColor="#ffffff" onChange={(v) => onColorProp("tint", v)} />
           </div>
         </section>
       {/if}
@@ -411,9 +418,9 @@
             <input type="text" value={props.value ?? 50} placeholder="0–100 or $mi(percent)$" oninput={(e) => onInput("value", e)} />
             <span class="prop-hint">Tip: <code>$mi(percent)$</code> = music progress, <code>$bi(level)$</code> = battery</span>
             <label>Color</label>
-            <input type="color" value={props.color ?? "#e94560"} oninput={(e) => onInput("color", e)} />
+            <ColorField value={String(props.color ?? "#e94560")} defaultColor="#e94560" onChange={(v) => onColorProp("color", v)} />
             <label>Track Color</label>
-            <input type="color" value={props.trackColor ?? "#333333"} oninput={(e) => onInput("trackColor", e)} />
+            <ColorField value={String(props.trackColor ?? "#333333")} defaultColor="#333333" onChange={(v) => onColorProp("trackColor", v)} />
             <label>Stroke Width</label>
             <input type="number" value={props.strokeWidth ?? 6} oninput={(e) => onInput("strokeWidth", e)} />
           </div>
@@ -457,20 +464,25 @@
         <section class="prop-section">
           <div class="section-title">Visualizer</div>
           <div class="prop-stack">
-            <label>Bars</label>
+            <label>Style</label>
+            <select value={props.vizStyle ?? "bars"} onchange={(e) => updateLayerProperty(layer.id, "vizStyle", (e.target as HTMLSelectElement).value)}>
+              <option value="bars">Bars</option>
+              <option value="wave">Wave</option>
+            </select>
+            <label>{(props.vizStyle ?? "bars") === "wave" ? "Points" : "Bars"}</label>
             <input type="number" min="4" max="64" value={props.barCount ?? 24} oninput={(e) => onInput("barCount", e)} />
             <label>Spacing</label>
             <input type="number" min="0" max="20" value={props.barSpacing ?? 3} oninput={(e) => onInput("barSpacing", e)} />
             <label>Sensitivity</label>
             <input type="number" min="0.1" max="5" step="0.1" value={props.sensitivity ?? 1} oninput={(e) => onInput("sensitivity", e)} />
             <label>Top Color</label>
-            <input type="color" value={props.colorTop ?? "#88C0D0"} oninput={(e) => onInput("colorTop", e)} />
+            <ColorField value={String(props.colorTop ?? "#88C0D0")} defaultColor="#88C0D0" onChange={(v) => onColorProp("colorTop", v)} />
             <label>Mid Color</label>
-            <input type="color" value={props.colorMid ?? "#5E81AC"} oninput={(e) => onInput("colorMid", e)} />
+            <ColorField value={String(props.colorMid ?? "#5E81AC")} defaultColor="#5E81AC" onChange={(v) => onColorProp("colorMid", v)} />
             <label>Base Color</label>
-            <input type="color" value={props.colorBottom ?? "#2E3440"} oninput={(e) => onInput("colorBottom", e)} />
+            <ColorField value={String(props.colorBottom ?? "#2E3440")} defaultColor="#2E3440" onChange={(v) => onColorProp("colorBottom", v)} />
             <label>Peak Color</label>
-            <input type="color" value={props.peakColor ?? "#ECEFF4"} oninput={(e) => onInput("peakColor", e)} />
+            <ColorField value={String(props.peakColor ?? "#ECEFF4")} defaultColor="#ECEFF4" onChange={(v) => onColorProp("peakColor", v)} />
             <span class="prop-hint">Requires <code>parec</code> (PulseAudio/PipeWire). Reacts to playing audio.</span>
           </div>
         </section>
@@ -504,7 +516,7 @@
             <label>Icon Source (path)</label>
             <input type="text" value={props.iconSrc ?? ""} placeholder="SVG/PNG path" oninput={(e) => onInput("iconSrc", e)} />
             <label>Color</label>
-            <input type="color" value={props.color ?? "#ffffff"} oninput={(e) => onInput("color", e)} />
+            <ColorField value={String(props.color ?? "#ffffff")} defaultColor="#ffffff" onChange={(v) => onColorProp("color", v)} />
             <label>Font Size</label>
             <input type="number" value={props.fontSize ?? 48} oninput={(e) => onInput("fontSize", e)} />
           </div>

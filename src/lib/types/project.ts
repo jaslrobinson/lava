@@ -35,6 +35,8 @@ export interface Animation {
   easing?: EasingType;
   delay?: number;
   loop?: "none" | "restart" | "reverse";
+  /** Target color for color-type animations when trigger=reactive (rule holds the formula) */
+  colorTarget?: string;
 }
 
 export interface LayerProperties {
@@ -93,6 +95,7 @@ export interface LayerProperties {
   iconSrc?: string;
 
   // Visualizer
+  vizStyle?: "bars" | "wave";
   barCount?: number;
   barSpacing?: number;
   sensitivity?: number;
@@ -113,6 +116,13 @@ export interface Layer {
   visible?: boolean;
 }
 
+export interface Shortcut {
+  id: string;
+  keys: string;       // e.g. "Super+1", "Ctrl+Shift+M"
+  action: string;     // e.g. "music:play-pause", "app:firefox", "overlay:panel"
+  label?: string;     // optional display name
+}
+
 export interface Project {
   version: string;
   name: string;
@@ -120,6 +130,7 @@ export interface Project {
   background: { type: "color" | "image"; value: string };
   globals: GlobalVariable[];
   layers: Layer[];
+  shortcuts: Shortcut[];
   assetDir?: string;
 }
 
@@ -131,6 +142,7 @@ export function createDefaultProject(): Project {
     background: { type: "color", value: "#1a1a2e" },
     globals: [],
     layers: [],
+    shortcuts: [],
   };
 }
 

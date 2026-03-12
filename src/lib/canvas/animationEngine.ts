@@ -1,6 +1,6 @@
 import type { Animation, Layer } from "../types/project";
 import { applyEasing } from "./easing";
-import { getScrollX, getLayerAnimState, getEngineStartTime, markLayerSeen } from "./animationState";
+import { getScrollX, getLayerAnimState, getEngineStartTime, markLayerSeen, isLayerHovered, getHoverProgress } from "./animationState";
 import { resolveFormula, hasFormula } from "../formula/service";
 
 export interface AnimatedDeltas {
@@ -27,6 +27,34 @@ function emptyDeltas(): AnimatedDeltas {
     blur: 0,
     colorOverride: null,
   };
+}
+
+/** Evaluate hover-related formulas directly without caching */
+function evaluateHoverFormula(formula: string, timestamp: number): number {
+  // Check for $hover(layerId)$ - returns 1 if hovered, 0 otherwise
+  const hoverMatch = formula.match(/^\$hover\(['"]?([^'"]+)['"]?\)\$$/);
+  if (hoverMatch) {
+    const targetLayerId = hoverMatch[1];
+    return isLayerHovered(targetLayerId) ? 1 : 0;
+  }
+  
+  // Check for $hoverProgress(layerId)$ or $hoverProgress(layerId, speed)$
+  const hoverProgressMatch = formula.match(/^\$hoverProgress\(['"]?([^'"]+)['"]?(?:,\s*([0-9.]+))?\)\$$/);
+  if (hoverProgressMatch) {
+    const targetLayerId = hoverProgressMatch[1];
+    const speed = hoverProgressMatch[2] ? parseFloat(hoverProgressMatch[2]) : 200;
+    return getHoverProgress(targetLayerId, timestamp, speed);
+  }
+  
+  // Check for $isHovered(layerId)$ - same as $hover() but more readable in formulas
+  const isHoveredMatch = formula.match(/^\$isHovered\(['"]?([^'"]+)['"]?\)\$$/);
+  if (isHoveredMatch) {
+    const targetLayerId = isHoveredMatch[1];
+    return isLayerHovered(targetLayerId) ? 1 : 0;
+  }
+  
+  // Not a hover formula
+  return NaN;
 }
 
 /** Compute the raw progress (0-1) for an animation based on its trigger */
@@ -65,6 +93,14 @@ function computeProgress(anim: Animation, layerId: string, timestamp: number): n
     case "reactive": {
       // Rule is a formula that resolves to 0-1
       if (!anim.rule) return 0;
+      
+      // First check if it's a hover formula (needs real-time evaluation)
+      const hoverVal = evaluateHoverFormula(anim.rule, timestamp);
+      if (!isNaN(hoverVal)) {
+        return Math.max(0, Math.min(1, hoverVal));
+      }
+      
+      // Otherwise use the standard formula evaluation (cached)
       const str = hasFormula(anim.rule) ? resolveFormula(anim.rule) : anim.rule;
       const val = parseFloat(str);
       return isNaN(val) ? 0 : Math.max(0, Math.min(1, val));
@@ -149,12 +185,15 @@ function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDelta
       deltas.blur += amount * t;
       break;
 
-    case "color":
-      // rule is target color hex, amount is interpolation strength
-      if (anim.rule && t > 0) {
-        deltas.colorOverride = anim.rule;
+    case "color": {
+      // colorTarget takes priority (used when trigger=reactive, rule holds formula)
+      // otherwise rule is the target color hex
+      const targetColor = anim.colorTarget || anim.rule;
+      if (targetColor && t > 0) {
+        deltas.colorOverride = targetColor;
       }
       break;
+    }
 
     case "jiggle": {
       // t is the amplitude envelope (0 = still, 1 = full intensity)

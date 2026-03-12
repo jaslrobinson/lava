@@ -637,4 +637,100 @@ mod tests {
         ];
         assert_eq!(eval_tc(&args, &ctx).as_text(), "1");
     }
+
+    #[test]
+    fn test_lrc_basic() {
+        let ctx = EvalContext::new();
+        let lrc = "[00:01.23] Hello world\n[00:05.67] Second line\n[00:10.00] Third";
+        // At 5s, the last timestamp <= 5 is [00:05.67] (parsed as 5s)
+        let args = vec![
+            Expr::Literal(Value::Text(lrc.into())),
+            Expr::Literal(Value::Number(5.0)),
+        ];
+        assert_eq!(eval_lrc(&args, &ctx).as_text(), "Second line");
+    }
+
+    #[test]
+    fn test_lrc_between_timestamps() {
+        let ctx = EvalContext::new();
+        let lrc = "[00:01.00]First\n[00:05.00]Second\n[00:10.00]Third";
+        // At 7s, the last timestamp <= 7 is [00:05] → "Second"
+        let args = vec![
+            Expr::Literal(Value::Text(lrc.into())),
+            Expr::Literal(Value::Number(7.0)),
+        ];
+        assert_eq!(eval_lrc(&args, &ctx).as_text(), "Second");
+    }
+
+    #[test]
+    fn test_lrc_with_offset() {
+        let ctx = EvalContext::new();
+        let lrc = "[00:01.00]First\n[00:05.00]Second\n[00:10.00]Third";
+        // At 10s, current is "Third" (idx 2). Offset -1 → "Second"
+        let args = vec![
+            Expr::Literal(Value::Text(lrc.into())),
+            Expr::Literal(Value::Number(10.0)),
+            Expr::Literal(Value::Number(-1.0)),
+        ];
+        assert_eq!(eval_lrc(&args, &ctx).as_text(), "Second");
+    }
+}
+
+/// lrc(text, seconds[, lineOffset]) — find the lyric line at or before `seconds`,
+/// then shift by `lineOffset` lines (negative = previous lines).
+pub fn eval_lrc(args: &[Expr], ctx: &EvalContext) -> Value {
+    let lrc_text = get_text_arg(args, 0, ctx);
+    let secs = get_num_arg(args, 1, ctx) as i64;
+    let offset = if args.len() > 2 { get_num_arg(args, 2, ctx) as i64 } else { 0 };
+
+    if lrc_text.is_empty() || secs < 0 {
+        return Value::Text(String::new());
+    }
+
+    // Parse all [mm:ss.xx] timestamps and their lyric text
+    let mut lines: Vec<(i64, String)> = Vec::new();
+    let mut i = 0;
+    let bytes = lrc_text.as_bytes();
+    while i < bytes.len() {
+        if bytes[i] == b'[' && i + 6 <= bytes.len() {
+            if let Some(close) = lrc_text[i..].find(']') {
+                let tag = &lrc_text[i + 1..i + close];
+                let time_part = tag.split('.').next().unwrap_or("");
+                if let Some((mm_str, ss_str)) = time_part.split_once(':') {
+                    if let (Ok(mm), Ok(ss)) = (mm_str.parse::<i64>(), ss_str.parse::<i64>()) {
+                        let time = mm * 60 + ss;
+                        let text_start = i + close + 1;
+                        let text_end = lrc_text[text_start..].find('[')
+                            .map(|p| text_start + p)
+                            .unwrap_or(lrc_text.len());
+                        let text = lrc_text[text_start..text_end].trim();
+                        if !text.is_empty() {
+                            lines.push((time, text.to_string()));
+                        }
+                        i = text_end;
+                        continue;
+                    }
+                }
+            }
+        }
+        i += 1;
+    }
+
+    if lines.is_empty() {
+        return Value::Text(String::new());
+    }
+    lines.sort_by_key(|(t, _)| *t);
+
+    // Find last line whose timestamp <= secs
+    let current_idx = match lines.iter().rposition(|(t, _)| *t <= secs) {
+        Some(idx) => idx as i64,
+        None => return Value::Text(String::new()),
+    };
+
+    let target_idx = current_idx + offset;
+    if target_idx < 0 || target_idx as usize >= lines.len() {
+        return Value::Text(String::new());
+    }
+
+    Value::Text(lines[target_idx as usize].1.clone())
 }

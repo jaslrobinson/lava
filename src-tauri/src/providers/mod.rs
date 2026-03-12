@@ -1,6 +1,8 @@
+pub mod ai;
 pub mod audio;
 pub mod battery;
 pub mod datetime;
+pub mod hyprland;
 pub mod manager;
 pub mod music;
 pub mod network;
@@ -11,11 +13,16 @@ pub mod traffic;
 pub mod weather;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::RwLock;
 
 /// All providers store their data as string key-value pairs.
 /// The formula engine converts to appropriate types.
 pub type ProviderData = HashMap<String, String>;
+
+/// Shared provider data accessible across providers (prefix -> field -> value).
+pub type SharedProviderData = Arc<RwLock<HashMap<String, HashMap<String, String>>>>;
 
 pub trait DataProvider: Send + Sync {
     /// Unique prefix (e.g., "bi", "wi", "mi")

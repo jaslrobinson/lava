@@ -1,4 +1,4 @@
-import { type Project, type Layer, type Animation, createDefaultProject, createLayer, cloneLayerWithNewIds, type LayerType, type GlobalVarType } from "../types/project";
+import { type Project, type Layer, type Animation, type Shortcut, createDefaultProject, createLayer, cloneLayerWithNewIds, type LayerType, type GlobalVarType } from "../types/project";
 import { clearImageCache } from "../canvas/renderer";
 import { invalidateGlobalsFormulas, clearFormulaCache } from "../formula/service";
 import { resetAnimationState } from "../canvas/animationState";
@@ -169,6 +169,26 @@ export function removeLayer(id: string) {
   isDirty = true;
 }
 
+/** Rename a layer by ID */
+export function renameLayer(id: string, name: string) {
+  function renameInLayers(layers: Layer[]): Layer[] {
+    return layers.map(l => {
+      if (l.id === id) return { ...l, name };
+      if (l.children) return { ...l, children: renameInLayers(l.children) };
+      return l;
+    });
+  }
+  pushUndo();
+  project.layers = renameInLayers(project.layers);
+  isDirty = true;
+}
+
+/** Rename the project */
+export function renameProject(name: string) {
+  project.name = name;
+  isDirty = true;
+}
+
 let lastUndoPropTime = 0;
 export function updateLayerProperty(id: string, key: string, value: any) {
   // Batch property edits: only push undo if >500ms since last property change
@@ -193,9 +213,11 @@ function updateLayerAnimations(layers: Layer[], id: string, updater: (anims: Ani
 }
 
 export function addAnimation(layerId: string, anim: Animation) {
+  console.log('addAnimation called for layer', layerId, 'anim:', anim);
   pushUndo();
   project.layers = updateLayerAnimations(project.layers, layerId, (anims) => [...anims, anim]);
   isDirty = true;
+  console.log('Project after adding animation:', JSON.stringify(project, null, 2).substring(0, 500));
 }
 
 export function updateAnimation(layerId: string, index: number, anim: Animation) {
@@ -309,14 +331,29 @@ export function removeGlobal(name: string) {
 /** Insert a fully-constructed layer tree (widget preset) into the project */
 export function insertWidget(layer: Layer) {
   pushUndo();
-  project.layers = [...project.layers, layer];
+  const selected = getSelectedLayer();
+  if (selected && isContainerType(selected.type)) {
+    project.layers = addChildToParent(project.layers, selected.id, layer);
+  } else {
+    project.layers = [...project.layers, layer];
+  }
   selectedLayerId = layer.id;
   isDirty = true;
 }
 
 /** Ensure a global variable exists; if not, create it with the given defaults */
 export function ensureGlobal(name: string, type: GlobalVarType, defaultValue: string | number | boolean) {
-  if (project.globals.find(g => g.name === name)) return;
+  const existing = project.globals.find(g => g.name === name);
+  if (existing) {
+    // Update the value if the widget provides a newer formula
+    if (existing.value !== defaultValue) {
+      project.globals = project.globals.map(g =>
+        g.name === name ? { ...g, type, value: defaultValue } : g
+      );
+      isDirty = true;
+    }
+    return;
+  }
   project.globals = [...project.globals, { name, type, value: defaultValue }];
   isDirty = true;
 }
@@ -328,4 +365,23 @@ export function updateGlobal(name: string, field: string, value: any) {
   });
   isDirty = true;
   invalidateGlobalsFormulas();
+}
+
+export function addShortcut(keys: string, action: string, label?: string): string {
+  const id = `sc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  project.shortcuts = [...project.shortcuts, { id, keys, action, label }];
+  isDirty = true;
+  return id;
+}
+
+export function updateShortcut(id: string, field: string, value: any) {
+  project.shortcuts = project.shortcuts.map(s =>
+    s.id === id ? { ...s, [field]: value } : s
+  );
+  isDirty = true;
+}
+
+export function removeShortcut(id: string) {
+  project.shortcuts = project.shortcuts.filter(s => s.id !== id);
+  isDirty = true;
 }

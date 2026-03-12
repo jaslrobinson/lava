@@ -172,6 +172,50 @@
           ]),
         },
         {
+          name: "Lyrics Card",
+          description: "Album art + synced lyrics via lrclib.net (no API key needed)",
+          globals: [
+            { name: "ly_url", type: "text", value: "https://lrclib.net/api/get?artist_name=$tc(url,mi(artist))$&track_name=$tc(url,mi(title))$" },
+            { name: "ly_raw", type: "text", value: '$wg(gv(ly_url),json,syncedLyrics)$' },
+            { name: "ly_S0", type: "text", value: '$lrc(gv(ly_raw),mi(pos))$' },
+            { name: "ly_S1", type: "text", value: '$lrc(gv(ly_raw),mi(pos),-1)$' },
+            { name: "ly_S2", type: "text", value: '$lrc(gv(ly_raw),mi(pos),-2)$' },
+            { name: "ly_S3", type: "text", value: '$lrc(gv(ly_raw),mi(pos),-3)$' },
+            { name: "ly_S4", type: "text", value: '$lrc(gv(ly_raw),mi(pos),-4)$' },
+          ],
+          build: () => mkOverlap("Lyrics Card", { x: 100, y: 300, width: 560, height: 200 }, [
+            // Background (blurred)
+            mkShape("BG", { shapeKind: "rectangle", fill: "#CC111122", cornerRadius: 20, width: 560, height: 200, x: 0, y: 0 }),
+            // Album art
+            mkImage("Cover", { src: "$mi(cover)$", width: 150, height: 150, x: 25, y: 25, scaleMode: "fill" }),
+            // Title + Artist
+            mkText("Artist", { text: "$mi(artist)$", fontSize: 13, color: "#aaaaaa", x: 195, y: 20, width: 345, height: 18 }),
+            mkText("Title", { text: "$mi(title)$", fontSize: 17, color: "#ffffff", x: 195, y: 40, width: 345, height: 22 }),
+            // Lyric lines — shows the last 4 seconds of lyric timestamps
+            // S4 = oldest visible, S0 = newest; the most-recently-matched is the current line
+            mkText("Lyric -3", { text: "$gv(ly_S4)$", fontSize: 12, color: "#444466", x: 195, y: 75, width: 345, height: 18 }),
+            mkText("Lyric -2", { text: "$gv(ly_S3)$", fontSize: 13, color: "#6666aa", x: 195, y: 96, width: 345, height: 20 }),
+            mkText("Lyric -1", { text: "$gv(ly_S2)$", fontSize: 14, color: "#9999cc", x: 195, y: 120, width: 345, height: 20 }),
+            mkText("Lyric now", { text: "$gv(ly_S1)$", fontSize: 16, color: "#eeeeff", x: 195, y: 146, width: 345, height: 22 }),
+            // Progress bar
+            mkProgress("Bar", { style: "bar", min: 0, max: 100, value: "$mi(percent)$", color: "#7777ee", trackColor: "#ffffff10", strokeWidth: 2, width: 510, height: 3, x: 25, y: 190 }),
+          ]),
+        },
+        {
+          name: "Artist Photo Card",
+          description: "Large artist portrait from Deezer + song info (no API key)",
+          globals: [
+            { name: "ap_url", type: "text", value: "https://api.deezer.com/search/artist?q=$tc(url,mi(artist))$" },
+          ],
+          build: () => mkOverlap("Artist Photo", { x: 100, y: 300, width: 320, height: 340 }, [
+            mkImage("Artist", { src: "$wg(gv(ap_url),json,data.0.picture_xl)$", width: 320, height: 280, scaleMode: "fill" }),
+            mkShape("Gradient", { shapeKind: "rectangle", fill: "#000000cc", width: 320, height: 80, x: 0, y: 260 }),
+            mkText("Title", { text: "$mi(title)$", fontSize: 16, color: "#ffffff", x: 12, y: 270, width: 296, height: 22 }),
+            mkText("Artist", { text: "$mi(artist)$", fontSize: 12, color: "#aaaaaa", x: 12, y: 295, width: 296, height: 18 }),
+            mkProgress("Bar", { style: "bar", min: 0, max: 100, value: "$mi(percent)$", color: "#e94560", trackColor: "#ffffff20", strokeWidth: 3, width: 296, height: 4, x: 12, y: 320 }),
+          ]),
+        },
+        {
           name: "Visualizer Wide",
           description: "Full-width visualizer backdrop",
           build: () => mkOverlap("Visualizer Wide", { x: 0, y: 900, width: 1920, height: 160 }, [
@@ -241,6 +285,113 @@
           build: () => mkStack("Network Info", { x: 100, y: 500, width: 300, height: 50, spacing: 2 }, [
             mkText("SSID", { text: "$ni(ssid)$", fontSize: 16, color: "#ffffff", width: 300, height: 22 }),
             mkText("IP", { text: "$ni(ip)$", fontSize: 12, color: "#888888", width: 300, height: 16 }),
+          ]),
+        },
+        {
+          name: "Top Bar",
+          description: "Hyprland status bar: workspaces, stats, clock, wifi, weather",
+          build: () => {
+            // Workspace indicators 1-10 with click-to-switch and active highlighting
+            // Workspaces that don't exist AND aren't active are hidden automatically
+            // NOTE: No nested $...$ — inside a formula block, use bare function calls
+            const wsItems: Layer[] = [];
+            for (let i = 1; i <= 10; i++) {
+              wsItems.push(mkOverlap(`WS ${i}`, { width: 24, height: 24, visible: `$if(mu(max,hy(ws_${i}_exists),hy(ws_${i}_active))=1,ALWAYS,NEVER)$` }, [
+                // Active indicator dot (visible only when active)
+                mkShape("Dot", { shapeKind: "circle", fill: "#5599ff", width: 22, height: 22, x: 1, y: 1, opacity: 255, visible: `$if(hy(ws_${i}_active)=1,ALWAYS,NEVER)$` }),
+                mkText(`${i}`, {
+                  text: `${i}`,
+                  fontSize: 13,
+                  color: `$if(hy(ws_${i}_active)=1,#ffffff,if(hy(ws_${i}_windows)=0,#555555,#aaaaaa))$`,
+                  textAlign: "center",
+                  width: 24,
+                  height: 20,
+                  x: 0,
+                  y: 2,
+                  clickAction: `app:hyprctl dispatch workspace ${i}`,
+                }),
+              ]));
+            }
+
+            return mkOverlap("Top Bar", { x: 0, y: 0, width: 1920, height: 36, anchor: "top-left" }, [
+              // Bar background
+              mkShape("Bar BG", { shapeKind: "rectangle", fill: "#0d1117ee", width: 1920, height: 36, x: 0, y: 0 }),
+
+              // ── LEFT: Workspace label ──
+              mkStack("WS Label", { x: 12, y: 4, width: 160, height: 28, spacing: 0 }, [
+                mkText("Desktop", { text: "Desktop", fontSize: 10, color: "#666666", width: 160, height: 12 }),
+                mkText("WS Name", { text: "Workspace $hy(workspace)$", fontSize: 13, color: "#cccccc", width: 160, height: 16 }),
+              ]),
+
+              // ── LEFT-CENTER: System stats ──
+              mkStack("Stats", { x: 190, y: 8, width: 240, height: 20, orientation: "horizontal", spacing: 14 }, [
+                mkText("CPU", { text: "\u{1F5A5} $si(cpupercent)$", fontSize: 12, color: "#88ccff", width: 50, height: 20 }),
+                mkText("GPU", { text: "\u{1F3AE} $hy(gpu)$", fontSize: 12, color: "#ff88cc", width: 50, height: 20 }),
+                mkText("RAM", { text: "\u{1F4BE} $rm(ramp)$", fontSize: 12, color: "#88ff88", width: 50, height: 20 }),
+              ]),
+
+              // ── CENTER: Workspace indicators ──
+              mkStack("Workspaces", { x: 760, y: 6, width: 240, height: 24, orientation: "horizontal", spacing: 6 }, wsItems),
+
+              // ── CENTER-RIGHT: Clock ──
+              mkText("Clock", { text: "$df(h:mm a)$ \u00B7 $df(EEE, M/d)$", fontSize: 14, color: "#ffffff", textAlign: "center", x: 1040, y: 8, width: 260, height: 20 }),
+
+              // ── RIGHT: Tray area ──
+              mkStack("Tray", { x: 1480, y: 8, width: 200, height: 20, orientation: "horizontal", spacing: 10 }, [
+                mkText("WiFi", { text: "\u{1F4F6}", fontSize: 14, color: "$if(nc(connected)=1,#88ff88,#ff4444)$", width: 20, height: 20, textAlign: "center" }),
+                mkText("Vol", { text: "\u{1F50A}", fontSize: 14, color: "#aaaaaa", width: 20, height: 20, textAlign: "center" }),
+                mkText("BAT", { text: "$bi(level)$%", fontSize: 11, color: "$if(bi(plugged)=1,#88ff88,#cccccc)$", width: 36, height: 20, textAlign: "center" }),
+                mkText("Weather", { text: "\u2601 $wi(temp)$\u00B0", fontSize: 12, color: "#cccccc", width: 60, height: 20 }),
+              ]),
+
+              // ── FAR RIGHT: Status dots ──
+              mkStack("Status", { x: 1720, y: 8, width: 180, height: 20, orientation: "horizontal", spacing: 8 }, [
+                mkText("BT", { text: "\u{1F4F6}", fontSize: 12, color: "#5588ff", width: 16, height: 20, textAlign: "center" }),
+                mkText("Net", { text: "\u25CF", fontSize: 10, color: "$if(nc(connected)=1,#44cc44,#cc4444)$", width: 16, height: 20, textAlign: "center" }),
+                mkText("Apps", { text: "$hy(app_count)$ apps", fontSize: 10, color: "#888888", width: 50, height: 20 }),
+              ]),
+            ]);
+          },
+        },
+      ],
+    },
+
+    // ── AI / GEMINI ──
+    {
+      name: "AI",
+      widgets: [
+        {
+          name: "AI Artist Portrait",
+          description: "Gemini-generated artist image. Set API key: save text to ~/.config/klwp/gemini_api_key",
+          build: () => mkOverlap("AI Artist Portrait", { x: 100, y: 300, width: 320, height: 360 }, [
+            // AI-generated image — $ai(artistImage)$ is a file:// path updated by the ai provider
+            mkImage("AI Image", { src: "$ai(artistImage)$", width: 320, height: 300, scaleMode: "fill" }),
+            mkShape("Gradient", { shapeKind: "rectangle", fill: "#000000cc", width: 320, height: 80, x: 0, y: 280 }),
+            mkText("Status", { text: "$ai(status)$", fontSize: 9, color: "#555566", x: 12, y: 262, width: 160, height: 14 }),
+            mkText("Artist", { text: "$mi(artist)$", fontSize: 18, color: "#ffffff", x: 12, y: 290, width: 296, height: 24 }),
+            mkText("Title", { text: "$mi(title)$", fontSize: 13, color: "#aaaaaa", x: 12, y: 316, width: 296, height: 18 }),
+            mkProgress("Bar", { style: "bar", min: 0, max: 100, value: "$mi(percent)$", color: "#e94560", trackColor: "#ffffff20", strokeWidth: 3, width: 296, height: 4, x: 12, y: 348 }),
+          ]),
+        },
+        {
+          name: "AI Artist + Lyrics",
+          description: "AI portrait with synced lyrics overlay. Requires Gemini key + internet.",
+          globals: [
+            { name: "ly_url", type: "text", value: "https://lrclib.net/api/get?artist_name=$tc(url,mi(artist))$&track_name=$tc(url,mi(title))$" },
+            { name: "ly_raw", type: "text", value: '$wg(gv(ly_url),json,syncedLyrics)$' },
+            { name: "ly_S0", type: "text", value: '$lrc(gv(ly_raw),mi(pos))$' },
+            { name: "ly_S1", type: "text", value: '$lrc(gv(ly_raw),mi(pos),-1)$' },
+            { name: "ly_S2", type: "text", value: '$lrc(gv(ly_raw),mi(pos),-2)$' },
+          ],
+          build: () => mkOverlap("AI Artist + Lyrics", { x: 100, y: 200, width: 420, height: 420 }, [
+            mkImage("AI Image", { src: "$ai(artistImage)$", width: 420, height: 420, scaleMode: "fill" }),
+            // Dark overlay at bottom for lyrics
+            mkShape("Overlay", { shapeKind: "rectangle", fill: "#000000bb", width: 420, height: 160, x: 0, y: 260 }),
+            mkText("Artist", { text: "$mi(artist)$", fontSize: 14, color: "#aaaaaa", x: 16, y: 268, width: 388, height: 18 }),
+            mkText("Title", { text: "$mi(title)$", fontSize: 18, color: "#ffffff", x: 16, y: 288, width: 388, height: 24 }),
+            mkText("Lyric -1", { text: "$gv(ly_S2)$", fontSize: 12, color: "#777799", x: 16, y: 320, width: 388, height: 18 }),
+            mkText("Lyric now", { text: "$gv(ly_S1)$", fontSize: 15, color: "#eeeeff", x: 16, y: 342, width: 388, height: 22 }),
+            mkProgress("Bar", { style: "bar", min: 0, max: 100, value: "$mi(percent)$", color: "#e94560", trackColor: "#ffffff15", strokeWidth: 2, width: 388, height: 3, x: 16, y: 410 }),
           ]),
         },
       ],
@@ -354,6 +505,11 @@
     },
   ];
 
+  interface Props {
+    onAdd?: () => void;
+  }
+  let { onAdd }: Props = $props();
+
   let selectedCategory = $state(categories[0].name);
 
   function handleAddWidget(widget: WidgetDef) {
@@ -363,6 +519,7 @@
       }
     }
     insertWidget(widget.build());
+    onAdd?.();
   }
 </script>
 

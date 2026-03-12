@@ -4,39 +4,29 @@
   import ShortcutsPanel from "./ShortcutsPanel.svelte";
   import BackgroundPanel from "./BackgroundPanel.svelte";
   import SettingsPanel from "./SettingsPanel.svelte";
-  import WidgetsPanel from "./WidgetsPanel.svelte";
 
   let activeTab = $state("layers");
+
+  const tabs: { id: string; label: string }[] = [
+    { id: "layers", label: "Layers" },
+    { id: "globals", label: "Globals" },
+    { id: "shortcuts", label: "Shortcuts" },
+    { id: "background", label: "BG" },
+    { id: "settings", label: "\u2699" },
+  ];
 </script>
 
 <div class="left-panel">
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_static_element_interactions -->
-  <div style="display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; user-select: none;">
-    <span
-      style="flex: 1; padding: 6px 2px 4px; text-align: center; cursor: pointer; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; border-bottom: 2px solid {activeTab === 'layers' ? 'var(--accent)' : 'transparent'}; color: {activeTab === 'layers' ? 'var(--accent)' : 'var(--text-muted)'};"
-      onclick={() => { activeTab = "layers"; }}
-    >Layers</span>
-    <span
-      style="flex: 1; padding: 6px 2px 4px; text-align: center; cursor: pointer; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; border-bottom: 2px solid {activeTab === 'globals' ? 'var(--accent)' : 'transparent'}; color: {activeTab === 'globals' ? 'var(--accent)' : 'var(--text-muted)'};"
-      onclick={() => { activeTab = "globals"; }}
-    >Globals</span>
-    <span
-      style="flex: 1; padding: 6px 2px 4px; text-align: center; cursor: pointer; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; border-bottom: 2px solid {activeTab === 'shortcuts' ? 'var(--accent)' : 'transparent'}; color: {activeTab === 'shortcuts' ? 'var(--accent)' : 'var(--text-muted)'};"
-      onclick={() => { activeTab = "shortcuts"; }}
-    >Shortcuts</span>
-    <span
-      style="flex: 1; padding: 6px 2px 4px; text-align: center; cursor: pointer; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; border-bottom: 2px solid {activeTab === 'background' ? 'var(--accent)' : 'transparent'}; color: {activeTab === 'background' ? 'var(--accent)' : 'var(--text-muted)'};"
-      onclick={() => { activeTab = "background"; }}
-    >BG</span>
-    <span
-      style="flex: 1; padding: 6px 2px 4px; text-align: center; cursor: pointer; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; border-bottom: 2px solid {activeTab === 'widgets' ? 'var(--accent)' : 'transparent'}; color: {activeTab === 'widgets' ? 'var(--accent)' : 'var(--text-muted)'};"
-      onclick={() => { activeTab = "widgets"; }}
-    >Widgets</span>
-    <span
-      style="flex: 1; padding: 6px 2px 4px; text-align: center; cursor: pointer; font-size: 10px; letter-spacing: 0.3px; text-transform: uppercase; border-bottom: 2px solid {activeTab === 'settings' ? 'var(--accent)' : 'transparent'}; color: {activeTab === 'settings' ? 'var(--accent)' : 'var(--text-muted)'};"
-      onclick={() => { activeTab = "settings"; }}
-    >&#9881;</span>
+  <div class="tab-bar">
+    {#each tabs as tab}
+      <span
+        class="tab"
+        style="border-bottom-color: {activeTab === tab.id ? 'var(--accent)' : 'transparent'}; color: {activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)'};"
+        onclick={() => { activeTab = tab.id; }}
+      >{tab.label}</span>
+    {/each}
   </div>
 
   <div class="tab-content">
@@ -48,8 +38,6 @@
       <ShortcutsPanel />
     {:else if activeTab === "background"}
       <BackgroundPanel />
-    {:else if activeTab === "widgets"}
-      <WidgetsPanel />
     {:else if activeTab === "settings"}
       <SettingsPanel />
     {/if}
@@ -65,6 +53,26 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+  .tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .tab {
+    flex: 1;
+    padding: 8px 4px 6px;
+    text-align: center;
+    cursor: pointer;
+    font-size: 11px;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s;
+  }
+  .tab:hover {
+    color: var(--text-primary) !important;
   }
   .tab-content {
     flex: 1;

@@ -4,15 +4,22 @@
     getSelectedLayerId,
     setSelectedLayerId,
     removeLayer,
+    renameLayer,
     isContainerType,
     moveLayer,
+    flattenLayers,
   } from "../stores/project.svelte";
-  import type { Layer } from "../types/project";
+  import type { Layer, GlobalVariable } from "../types/project";
 
   let collapsedIds = $state(new Set<string>());
   let dragSourceId = $state<string | null>(null);
   let dropTargetId = $state<string | null>(null);
   let dropPosition = $state<"before" | "after" | "inside" | null>(null);
+  let contextMenuLayer = $state<Layer | null>(null);
+  let contextMenuX = $state(0);
+  let contextMenuY = $state(0);
+  let renamingId = $state<string | null>(null);
+  let renameValue = $state("");
 
   // Container drill-in navigation
   let focusedContainerId = $state<string | null>(null);
@@ -113,11 +120,28 @@
     focusedContainerId = id;
   }
 
-  function handleDblClick(e: MouseEvent, layer: Layer) {
+  function handleRowDblClick(e: MouseEvent, layer: Layer) {
     e.stopPropagation();
     if (isContainerType(layer.type)) {
       drillInto(layer.id);
     }
+  }
+
+  function handleNameDblClick(e: MouseEvent, layer: Layer) {
+    e.stopPropagation();
+    renamingId = layer.id;
+    renameValue = layer.name;
+  }
+
+  function commitRename() {
+    if (renamingId && renameValue.trim()) {
+      renameLayer(renamingId, renameValue.trim());
+    }
+    renamingId = null;
+  }
+
+  function cancelRename() {
+    renamingId = null;
   }
 
   function handleDragStart(e: DragEvent, id: string) {
@@ -161,6 +185,70 @@
     dragSourceId = null;
     dropTargetId = null;
     dropPosition = null;
+  }
+
+  function handleContextMenu(e: MouseEvent, layer: Layer) {
+    if (!isContainerType(layer.type)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    contextMenuLayer = layer;
+    contextMenuX = e.clientX;
+    contextMenuY = e.clientY;
+  }
+
+  function closeContextMenu() {
+    contextMenuLayer = null;
+  }
+
+  function extractGlobalRefs(layers: import("../types/project").Layer[]): Set<string> {
+    const refs = new Set<string>();
+    function scan(val: unknown) {
+      if (typeof val !== "string") return;
+      for (const m of val.matchAll(/gv\(([^)]+)\)/g)) refs.add(m[1].trim());
+    }
+    function scanLayer(l: import("../types/project").Layer) {
+      for (const v of Object.values(l.properties)) scan(v);
+      l.animations?.forEach(a => { scan(a.rule); scan(a.colorTarget ?? ""); });
+      l.children?.forEach(scanLayer);
+    }
+    layers.forEach(scanLayer);
+    return refs;
+  }
+
+  async function exportAsKomp(layer: Layer) {
+    closeContextMenu();
+    try {
+      const { save } = await import("@tauri-apps/plugin-dialog");
+      const { invoke } = await import("@tauri-apps/api/core");
+      const project = getProject();
+
+      // Find which globals this group references
+      const groupLayers = layer.children ?? [];
+      const refs = extractGlobalRefs(groupLayers);
+      const bundledGlobals: GlobalVariable[] = project.globals.filter(g => refs.has(g.name));
+
+      // Build a mini-project representing this component
+      const kompProject = {
+        version: "0.1.0",
+        name: layer.name,
+        resolution: project.resolution,
+        background: project.background,
+        globals: bundledGlobals,
+        layers: groupLayers,
+      };
+
+      const path = await save({
+        filters: [{ name: "KLWP Component", extensions: ["komp"] }],
+        defaultPath: `${layer.name}.komp`,
+      });
+      if (!path) return;
+
+      await invoke("export_komp", { path, project: kompProject });
+      alert(`Exported "${layer.name}.komp" with ${bundledGlobals.length} bundled globals.`);
+    } catch (e) {
+      console.error("Export komp failed:", e);
+      alert(`Export failed: ${e}`);
+    }
   }
 
   function toggleVisibility(id: string, currentVisible: boolean | undefined) {
@@ -222,11 +310,12 @@
     style="padding-left: {12 + depth * 16}px;{isContainer ? ` background: ${typeColors[layer.type]}12;` : ''}{isDropBefore ? ' border-top: 2px solid var(--accent);' : ''}{isDropAfter ? ' border-bottom: 2px solid var(--accent);' : ''}{isDropInside ? ' background: var(--accent-dim); outline: 1px dashed var(--accent);' : ''}"
     draggable="true"
     onclick={() => setSelectedLayerId(layer.id)}
-    ondblclick={(e) => handleDblClick(e, layer)}
+    ondblclick={(e) => handleRowDblClick(e, layer)}
     ondragstart={(e) => handleDragStart(e, layer.id)}
     ondragover={(e) => handleDragOver(e, layer.id, isContainer)}
     ondrop={handleDrop}
     ondragend={handleDragEnd}
+    oncontextmenu={(e) => handleContextMenu(e, layer)}
     role="button"
     tabindex="0"
     onkeydown={(e) => { if (e.key === 'Enter') setSelectedLayerId(layer.id); }}
@@ -260,7 +349,29 @@
       >{"\u{279C}"}</span>
     {/if}
     <span class="layer-type-icon" style="color: {typeColors[layer.type] || 'var(--text-muted)'};">{typeIcons[layer.type] || "?"}</span>
-    <span class="layer-name" style="{isContainer ? 'font-weight: 600;' : ''}">{layer.name}</span>
+    {#if renamingId === layer.id}
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        class="rename-input"
+        type="text"
+        bind:value={renameValue}
+        autofocus
+        onclick={(e) => e.stopPropagation()}
+        ondblclick={(e) => e.stopPropagation()}
+        onblur={commitRename}
+        onkeydown={(e) => {
+          e.stopPropagation();
+          if (e.key === "Enter") commitRename();
+          if (e.key === "Escape") cancelRename();
+        }}
+      />
+    {:else}
+      <span
+        class="layer-name"
+        style="{isContainer ? 'font-weight: 600;' : ''}"
+        ondblclick={(e) => handleNameDblClick(e, layer)}
+      >{layer.name}</span>
+    {/if}
     {#if isContainer && hasChildren}
       <span class="child-count">{layer.children!.length}</span>
     {/if}
@@ -285,6 +396,16 @@
     {/each}
   {/if}
 {/snippet}
+
+{#if contextMenuLayer !== null}
+  <div class="ctx-backdrop" onclick={closeContextMenu}></div>
+  <div class="ctx-menu" style="left:{contextMenuX}px;top:{contextMenuY}px;">
+    <div class="ctx-header">{contextMenuLayer.name}</div>
+    <span class="ctx-item" onclick={() => exportAsKomp(contextMenuLayer!)}>
+      Export as .komp
+    </span>
+  </div>
+{/if}
 
 <style>
   .layer-panel {
@@ -375,18 +496,22 @@
     opacity: 0.4;
   }
   .drill-btn {
-    font-size: 10px;
-    color: var(--text-muted);
-    width: 14px;
+    font-size: 12px;
+    color: var(--accent);
+    width: 18px;
     text-align: center;
     cursor: pointer;
     display: inline-block;
-    opacity: 0.5;
-    transition: opacity 0.1s, color 0.1s;
+    opacity: 0.7;
+    background: var(--accent-dim, rgba(100,140,255,0.1));
+    border-radius: 3px;
+    padding: 1px 0;
+    transition: opacity 0.1s, background 0.1s;
   }
   .drill-btn:hover {
     opacity: 1;
-    color: var(--accent);
+    background: var(--accent);
+    color: #fff;
   }
   .layer-type-icon {
     font-size: 14px;
@@ -400,6 +525,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .rename-input {
+    flex: 1;
+    font-size: 12px;
+    background: var(--bg-input);
+    border: 1px solid var(--accent);
+    border-radius: 3px;
+    color: var(--text-primary);
+    padding: 1px 4px;
+    outline: none;
+    min-width: 0;
   }
   .delete-btn {
     font-size: 16px;
@@ -422,5 +558,40 @@
     color: var(--text-muted);
     font-size: 12px;
     line-height: 1.6;
+  }
+  .ctx-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+  }
+  .ctx-menu {
+    position: fixed;
+    z-index: 901;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    min-width: 160px;
+    overflow: hidden;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  }
+  .ctx-header {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 6px 12px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  .ctx-item {
+    display: block;
+    padding: 7px 12px;
+    font-size: 12px;
+    color: var(--text-primary);
+    cursor: pointer;
+  }
+  .ctx-item:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
   }
 </style>
