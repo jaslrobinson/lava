@@ -1,10 +1,10 @@
-# Maintainer: andason
-pkgname=lava
+# Maintainer: jaslrobinson
+pkgname=lava-desktop
 pkgver=0.1.0
 pkgrel=1
 pkgdesc="LAVA - Live Animated Visuals for Arch. Desktop live wallpaper engine with formula support, animations, and widget system."
 arch=('x86_64')
-url="https://github.com/andason/lava"
+url="https://github.com/jaslrobinson/lava"
 license=('MIT')
 depends=(
     'gtk3'
@@ -25,15 +25,14 @@ makedepends=(
     'pkg-config'
 )
 provides=('lava')
-conflicts=('lava-git')
-source=("$pkgname-$pkgver.tar.gz")
+source=("$pkgname-$pkgver.tar.gz::https://github.com/jaslrobinson/lava/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('SKIP')
 
 build() {
-    cd "$srcdir/$pkgname-$pkgver"
+    cd "$srcdir/lava-$pkgver"
 
     # Install frontend dependencies
-    pnpm install --frozen-lockfile
+    pnpm install
 
     # Build the wallpaper helper binary
     cargo build -p lava-wallpaper --release
@@ -43,7 +42,7 @@ build() {
 }
 
 package() {
-    cd "$srcdir/$pkgname-$pkgver"
+    cd "$srcdir/lava-$pkgver"
 
     # Install main binary
     install -Dm755 "target/release/lava" "$pkgdir/usr/bin/lava"
