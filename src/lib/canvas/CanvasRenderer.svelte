@@ -15,6 +15,7 @@
   import { startFormulaLoop, stopFormulaLoop, evaluateSync, flushGlobalsNow, resolveFormula, hasFormula } from "../formula/service";
   import { setScrollPosition, triggerTap } from "./animationState";
   import { loadBundledIconFonts } from "../fonts/fontLoader";
+  import { markDirty, shouldRenderFullFps, hasActiveLoopingAnimations, setWakeCallback, setIdleTimeout, needsRepaint, clearRepaint, IDLE_INTERVAL_MS } from "./renderScheduler";
 
   interface Props {
     fullscreen?: boolean;
@@ -91,6 +92,7 @@
     osdText = label;
     osdValue = Math.max(0, Math.min(100, value));
     osdShowTime = performance.now();
+    markDirty();
   }
 
   function drawOsd(ctx: CanvasRenderingContext2D, timestamp: number) {
@@ -156,6 +158,13 @@
     loadBundledIconFonts();
     rafId = requestAnimationFrame(renderLoop);
 
+    // Set up wake callback for render scheduler (wallpaper mode)
+    if (isWallpaperView) {
+      setWakeCallback(() => {
+        rafId = requestAnimationFrame(renderLoop);
+      });
+    }
+
     startFormulaLoop(() => {
       const project = getProject();
       const globals: Record<string, string> = {};
@@ -219,18 +228,50 @@
       rafId = requestAnimationFrame(renderLoop);
       return;
     }
+
+    // Wallpaper mode: decide whether to render or skip this frame
+    if (isWallpaperView) {
+      const looping = hasActiveLoopingAnimations(getProject().layers);
+      const fullFps = shouldRenderFullFps(timestamp, looping);
+
+      if (fullFps) {
+        // Active mode (user interaction, animations): render + schedule at 60fps
+        clearRepaint();
+        doRender(timestamp);
+        rafId = requestAnimationFrame(renderLoop);
+      } else if (needsRepaint()) {
+        // Idle mode but content changed (clock tick, provider update): render once
+        clearRepaint();
+        doRender(timestamp);
+        const timeoutId = setTimeout(() => {
+          rafId = requestAnimationFrame(renderLoop);
+        }, IDLE_INTERVAL_MS);
+        setIdleTimeout(timeoutId);
+      } else {
+        // Idle mode, nothing changed: skip render entirely
+        const timeoutId = setTimeout(() => {
+          rafId = requestAnimationFrame(renderLoop);
+        }, IDLE_INTERVAL_MS);
+        setIdleTimeout(timeoutId);
+      }
+    } else {
+      // Editor mode: always render at 60fps
+      doRender(timestamp);
+      rafId = requestAnimationFrame(renderLoop);
+    }
+  }
+
+  function doRender(timestamp: number) {
     const project = getProject();
     const selectedId = fullscreen ? null : getSelectedLayerId();
 
     if (!fullscreen && (zoom !== 1 || panX !== 0 || panY !== 0)) {
-      // Clear full canvas with neutral background (visible when zoomed out)
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = "#0d0d1a";
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
 
-      // Apply zoom/pan as canvas context transform
       ctx.save();
       ctx.translate(panX, panY);
       ctx.scale(zoom, zoom);
@@ -240,10 +281,7 @@
       renderProject(ctx, project, selectedId, timestamp, hoveredLayerId);
     }
 
-    // Draw OSD overlay (volume/brightness feedback)
     drawOsd(ctx, timestamp);
-
-    rafId = requestAnimationFrame(renderLoop);
   }
 
   /** Convert screen coords to project coords, accounting for zoom/pan */
@@ -508,6 +546,7 @@
   }
 
   function onFullscreenMouseMove(e: MouseEvent) {
+    markDirty();
     setScrollPosition(e.clientX / window.innerWidth);
 
     // Track hovered layer for hover animations
@@ -550,6 +589,7 @@
   }
 
   function onFullscreenClick(e: MouseEvent) {
+    markDirty();
     const id = hitTest(e.clientX, e.clientY);
     if (id) {
       const now = performance.now();
@@ -711,6 +751,7 @@
   }
 
   function onFullscreenWheel(e: WheelEvent) {
+    markDirty();
     const id = hitTest(e.clientX, e.clientY);
     if (!id) return;
     const project = getProject();

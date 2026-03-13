@@ -1,3 +1,5 @@
+import { markDirty } from "./renderScheduler";
+
 export interface LayerAnimState {
   firstSeenTime: number | null;
   tapTime: number | null;
@@ -58,6 +60,7 @@ export function beginFrame() {
 }
 
 export function triggerTap(layerId: string, timestamp: number) {
+  markDirty();
   const state = getLayerAnimState(layerId);
   state.tapTime = timestamp;
 }
@@ -71,8 +74,10 @@ export function updateHoverState(hoveredIds: Set<string>, timestamp: number) {
     if (isHovered && !wasHovered) {
       state.hoverEnterTime = timestamp;
       state.hoverExitTime = null;
+      markDirty();
     } else if (!isHovered && wasHovered) {
       state.hoverExitTime = timestamp;
+      markDirty();
     }
   }
   // Ensure all hovered layers have a state entry

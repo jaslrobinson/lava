@@ -3,19 +3,126 @@ use gtk_layer_shell::LayerShell;
 use webkit2gtk::{gio, UserContentManager, UserContentManagerExt, WebView, WebViewExt};
 
 fn main() {
-    let url = std::env::args().nth(1).unwrap_or_else(|| {
-        eprintln!("Usage: lava-wallpaper <url> [project-file]");
-        std::process::exit(1);
-    });
-    let project_path = std::env::args().nth(2);
+    let args: Vec<String> = std::env::args().collect();
 
-    // Read project JSON if provided
+    if args.iter().any(|a| a == "--standalone") {
+        let dev_mode = args.iter().any(|a| a == "--dev");
+        run_standalone(dev_mode);
+    } else {
+        // Legacy mode: lava-wallpaper <url> [project-file]
+        let url = args.get(1).cloned().unwrap_or_else(|| {
+            eprintln!("Usage: lava-wallpaper <url> [project-file]");
+            eprintln!("       lava-wallpaper --standalone [--dev]");
+            std::process::exit(1);
+        });
+        let project_path = args.get(2).cloned();
+        run_legacy(url, project_path);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Legacy mode (editor-spawned)
+// ---------------------------------------------------------------------------
+
+fn run_legacy(url: String, project_path: Option<String>) {
     let project_json = project_path.and_then(|p| {
         std::fs::read_to_string(&p)
             .map_err(|e| eprintln!("[lava-wallpaper] Failed to read project file: {}", e))
             .ok()
     });
+    run_gtk_wallpaper(&url, project_json);
+}
 
+// ---------------------------------------------------------------------------
+// Standalone mode (self-sufficient, no editor needed)
+// ---------------------------------------------------------------------------
+
+fn run_standalone(dev_mode: bool) {
+    use lava_core::{settings, server, audio, pid, providers, plugins};
+    use lava_core::providers::manager::ProviderManager;
+
+    eprintln!("[lava-wallpaper] Starting in standalone mode");
+
+    // 1. Write PID file
+    pid::write_pid();
+
+    // 2. Acquire provider master lock
+    if !pid::try_acquire_provider_lock() {
+        eprintln!("[lava-wallpaper] Warning: another process holds the provider lock");
+    }
+
+    // 3. Load project
+    let project_path = settings::last_project_path().unwrap_or_else(|| {
+        eprintln!("[lava-wallpaper] No lastProjectPath in settings");
+        std::process::exit(1);
+    });
+    let project_json = std::fs::read_to_string(&project_path).unwrap_or_else(|e| {
+        eprintln!("[lava-wallpaper] Failed to read project {}: {}", project_path, e);
+        std::process::exit(1);
+    });
+
+    // 4. Start HTTP server (or use Vite dev server)
+    let wallpaper_url = if dev_mode {
+        eprintln!("[lava-wallpaper] Dev mode: using Vite at localhost:1420");
+        "http://localhost:1420?wallpaper=true".to_string()
+    } else {
+        let dist_dir = settings::find_dist_dir().unwrap_or_else(|| {
+            eprintln!("[lava-wallpaper] Could not find frontend dist directory");
+            std::process::exit(1);
+        });
+        let server_url = server::start_wallpaper_server(dist_dir).unwrap_or_else(|e| {
+            eprintln!("[lava-wallpaper] Failed to start HTTP server: {}", e);
+            std::process::exit(1);
+        });
+        format!("{}?wallpaper=true", server_url)
+    };
+
+    // 5. Start providers
+    let mut manager = ProviderManager::new();
+    manager.register(Box::new(providers::datetime::DateTimeProvider));
+    manager.register(Box::new(providers::battery::BatteryProvider::new()));
+    manager.register(Box::new(providers::sysinfo_provider::SysInfoProvider::new()));
+    manager.register(Box::new(providers::resource_monitor::ResourceMonitorProvider::new()));
+    manager.register(Box::new(providers::music::MusicProvider));
+    manager.register(Box::new(providers::network::NetworkProvider));
+    manager.register(Box::new(providers::traffic::TrafficProvider::new()));
+    let (weather, forecast) = providers::weather::create_providers();
+    manager.register(Box::new(weather));
+    manager.register(Box::new(forecast));
+    manager.register(Box::new(providers::radar::RadarProvider));
+    manager.register(Box::new(providers::hyprland::HyprlandProvider::new()));
+
+    for provider in plugins::load_plugins() {
+        manager.register(provider);
+    }
+
+    let data = manager.data();
+    manager.register(Box::new(providers::ai::AiProvider::new(data.clone())));
+
+    let _provider_handle = manager.start(
+        None::<fn(&std::collections::HashMap<String, std::collections::HashMap<String, String>>, bool)>,
+    );
+
+    // 6. Start Hyprland event listener
+    providers::hyprland::HyprlandProvider::start_event_listener(data, None);
+
+    // 7. Start audio capture
+    let audio_bands = audio::new_shared_bands();
+    audio::start_audio_capture(|_bands| { /* no-op callback */ }, audio_bands);
+
+    // 8. Create GTK window + WebKit with standalone URL + project
+    run_gtk_wallpaper(&wallpaper_url, Some(project_json));
+
+    // Cleanup on exit
+    pid::cleanup_pid();
+    pid::release_provider_lock();
+}
+
+// ---------------------------------------------------------------------------
+// Shared GTK/WebKit wallpaper window
+// ---------------------------------------------------------------------------
+
+fn run_gtk_wallpaper(url: &str, project_json: Option<String>) {
     gtk::init().expect("Failed to init GTK");
 
     let window = gtk::Window::new(gtk::WindowType::Toplevel);
@@ -62,7 +169,7 @@ fn main() {
         });
     }
 
-    webview.load_uri(&url);
+    webview.load_uri(url);
 
     window.add(&webview);
     window.show_all();
@@ -95,6 +202,10 @@ fn main() {
     gtk::main();
 }
 
+// ---------------------------------------------------------------------------
+// Message handling (JS -> Rust bridge)
+// ---------------------------------------------------------------------------
+
 /// Handle a message from the frontend JS.
 /// Messages are JSON strings like: {"type":"open_url","url":"https://..."}
 fn handle_message(msg: &str) {
@@ -116,6 +227,13 @@ fn handle_message(msg: &str) {
         Some("show_editor") => {
             eprintln!("[lava-wallpaper] Writing show-editor signal");
             let _ = std::fs::write("/tmp/lava-show-editor", "1");
+            // In standalone mode, also try to launch the editor if not running
+            if !is_editor_running() {
+                if let Some(editor) = find_editor_binary() {
+                    eprintln!("[lava-wallpaper] Launching editor: {:?}", editor);
+                    let _ = std::process::Command::new(editor).spawn();
+                }
+            }
         }
         Some("adjust_volume") => {
             if let Some(delta_str) = extract_json_field(msg, "delta") {
@@ -138,7 +256,7 @@ fn handle_message(msg: &str) {
             }
         }
         _ => {
-            // Legacy: no type field — try url field directly
+            // Legacy: no type field -- try url field directly
             if let Some(url) = extract_json_field(msg, "url") {
                 if url.starts_with("http://") || url.starts_with("https://") {
                     let _ = std::process::Command::new("xdg-open").arg(url).spawn();
@@ -147,6 +265,44 @@ fn handle_message(msg: &str) {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Editor discovery (for standalone show_editor)
+// ---------------------------------------------------------------------------
+
+/// Check if the editor process is still running via its PID file.
+fn is_editor_running() -> bool {
+    std::fs::read_to_string("/tmp/lava-editor.pid")
+        .ok()
+        .and_then(|s| s.trim().parse::<u32>().ok())
+        .map(|pid| std::path::Path::new(&format!("/proc/{}", pid)).exists())
+        .unwrap_or(false)
+}
+
+/// Try to find the `lava` editor binary.
+fn find_editor_binary() -> Option<std::path::PathBuf> {
+    // Check next to our own binary first
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join("lava");
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
+    }
+    // Check well-known system paths
+    for path in ["/usr/bin/lava", "/usr/local/bin/lava"] {
+        let p = std::path::PathBuf::from(path);
+        if p.exists() {
+            return Some(p);
+        }
+    }
+    None
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 /// Extract a string field value from a simple JSON object.
 fn extract_json_field<'a>(json: &'a str, field: &str) -> Option<&'a str> {

@@ -33,10 +33,11 @@ pub fn set_autostart(enabled: bool) -> Result<(), String> {
     let desktop_path = autostart_dir.join("lava.desktop");
 
     if enabled {
-        let exe = std::env::current_exe().map_err(|e| e.to_string())?;
+        // Find the wallpaper binary for autostart (lightweight, no editor needed)
+        let wallpaper_bin = find_wallpaper_binary_for_autostart();
         let content = format!(
-            "[Desktop Entry]\nType=Application\nName=LAVA\nComment=Live Animated Visuals for Arch\nExec={}\nIcon=lava\nX-GNOME-Autostart-enabled=true\nStartupNotify=false\n",
-            exe.display()
+            "[Desktop Entry]\nType=Application\nName=LAVA Wallpaper\nComment=Live Animated Visuals for Arch\nExec={} --standalone\nIcon=lava\nX-GNOME-Autostart-enabled=true\nStartupNotify=false\n",
+            wallpaper_bin
         );
         std::fs::write(&desktop_path, content).map_err(|e| e.to_string())?;
     } else {
@@ -46,4 +47,24 @@ pub fn set_autostart(enabled: bool) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn find_wallpaper_binary_for_autostart() -> String {
+    // Check next to the current executable
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let candidate = dir.join("lava-wallpaper");
+            if candidate.exists() {
+                return candidate.display().to_string();
+            }
+        }
+    }
+    // System paths
+    for path in ["/usr/bin/lava-wallpaper", "/usr/local/bin/lava-wallpaper"] {
+        if std::path::Path::new(path).exists() {
+            return path.to_string();
+        }
+    }
+    // Fallback
+    "lava-wallpaper".to_string()
 }

@@ -1,3 +1,6 @@
+import { markDirty, markRepaint } from "../canvas/renderScheduler";
+import { setMusicPlaying } from "../canvas/audioVisualizer";
+
 const formulaPattern = /\$[^$]+\$/g;
 
 // Detect if we're running inside Tauri (vs plain WebKitGTK wallpaper view)
@@ -31,6 +34,7 @@ const WG_CACHE_TTL = 300_000; // 5 minutes
 let providerData: Record<string, Record<string, string>> = {};
 let providerFetching = false;
 let providerListenerStarted = false;
+let lastProviderJson = ""; // for change detection in polling mode
 
 /** Start listening for provider data updates from Tauri backend.
  *  On each event: update providerData, then immediately re-eval provider formulas. */
@@ -43,11 +47,21 @@ function startProviderListener(getGlobals: () => Record<string, string>) {
       providerData = event.payload;
       // 2. Immediately re-eval all provider formulas synchronously
       const resolved = resolveGlobals(getGlobals());
+      let changed = false;
       for (const [key] of cache) {
         if (key.match(/\b(hy|mi|bi|rm|ts|nc|si|wi|wf|ai)\(/)) {
-          cache.set(key, evaluateClientSide(key, resolved));
+          const result = evaluateClientSide(key, resolved);
+          if (result !== cache.get(key)) {
+            cache.set(key, result);
+            changed = true;
+          }
         }
       }
+      // 3. Signal repaint if any formula values actually changed
+      if (changed) markRepaint();
+      // 4. Gate audio visualizer on music playback state
+      const musicState = providerData?.mi?.state;
+      setMusicPlaying(musicState === "PLAYING");
     });
   });
   // Also fetch initial provider data from Rust
@@ -64,9 +78,19 @@ async function fetchProviderData() {
   try {
     const resp = await fetch("/__lava_providers");
     if (resp.ok) {
-      const data = await resp.json();
-      if (data && Object.keys(data).length > 0) {
-        providerData = data;
+      const text = await resp.text();
+      if (text !== lastProviderJson) {
+        lastProviderJson = text;
+        const data = JSON.parse(text);
+        if (data && Object.keys(data).length > 0) {
+          providerData = data;
+          // No markDirty() here — idle 4fps render picks up new values fine.
+          // Provider data changes (clock ticks, battery %) don't need 60fps.
+
+          // Gate audio visualizer on music playback state
+          const musicState = data?.mi?.state;
+          setMusicPlaying(musicState === "PLAYING");
+        }
       }
     }
   } catch {
@@ -978,8 +1002,13 @@ async function flushPending(globals: Record<string, string>) {
   }
 
   // Evaluate wg() formulas client-side (both Tauri and non-Tauri)
+  let anyChanged = false;
   for (const formula of wgFormulas) {
-    cache.set(formula, evaluateClientSide(formula, globals));
+    const result = evaluateClientSide(formula, globals);
+    if (result !== cache.get(formula)) {
+      cache.set(formula, result);
+      anyChanged = true;
+    }
   }
 
   // Evaluate formulas client-side when provider data is available
@@ -988,11 +1017,16 @@ async function flushPending(globals: Record<string, string>) {
   for (const formula of otherFormulas) {
     const result = evaluateClientSide(formula, globals);
     if (result !== "" || !isTauri) {
-      cache.set(formula, result);
+      if (result !== cache.get(formula)) {
+        cache.set(formula, result);
+        anyChanged = true;
+      }
     } else {
       rustFormulas.push(formula);
     }
   }
+
+  if (anyChanged) markRepaint();
 
   if (!isTauri || rustFormulas.length === 0) {
     evaluating = false;
@@ -1017,7 +1051,10 @@ async function flushPending(globals: Record<string, string>) {
       );
 
       for (const { formula, result } of results) {
-        cache.set(formula, result);
+        if (result !== cache.get(formula)) {
+          cache.set(formula, result);
+          markRepaint();
+        }
       }
     } finally {
       evaluating = false;

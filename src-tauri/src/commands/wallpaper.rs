@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use lava_core::pid;
 
 pub static WALLPAPER_ACTIVE: AtomicBool = AtomicBool::new(false);
 static WALLPAPER_PID: Mutex<Option<Child>> = Mutex::new(None);
@@ -27,17 +28,23 @@ pub fn start_signal_watcher(app: tauri::AppHandle) {
     });
 }
 
-/// Check if wallpaper is currently running.
+/// Check if wallpaper is currently running (editor-spawned or standalone).
 pub fn is_wallpaper_active() -> bool {
-    WALLPAPER_ACTIVE.load(Ordering::Relaxed)
+    WALLPAPER_ACTIVE.load(Ordering::Relaxed) || pid::is_wallpaper_running()
 }
 
 /// Kill the wallpaper helper process if running (used by tray quit).
 pub fn kill_wallpaper_process() {
+    // Kill editor-spawned child process if we have one
     if let Some(mut child) = WALLPAPER_PID.lock().unwrap_or_else(|e| e.into_inner()).take() {
         eprintln!("[wallpaper] Killing helper process PID {} (tray quit)", child.id());
         let _ = child.kill();
         let _ = child.wait();
+    }
+    // Also kill standalone wallpaper if running
+    if pid::is_wallpaper_running() {
+        eprintln!("[wallpaper] Killing standalone wallpaper process");
+        pid::kill_wallpaper();
     }
     WALLPAPER_ACTIVE.store(false, Ordering::Relaxed);
 }
@@ -146,6 +153,12 @@ pub fn stop_wallpaper_mode(window: tauri::WebviewWindow) -> Result<(), String> {
         eprintln!("[wallpaper] Killing helper process PID {}", child.id());
         let _ = child.kill();
         let _ = child.wait();
+    }
+
+    // Also kill standalone wallpaper if running
+    if pid::is_wallpaper_running() {
+        eprintln!("[wallpaper] Killing standalone wallpaper process");
+        pid::kill_wallpaper();
     }
 
     // Unregister global shortcut

@@ -12,3 +12,5 @@ gtk = "0.18"
 gtk-layer-shell = "0.8"
 webkit2gtk = { version = "2.0", features = ["v2_22"] }
 javascriptcore-rs = "1.1"
+lava-core = { path = "../lava-core" }
+serde_json = "1"

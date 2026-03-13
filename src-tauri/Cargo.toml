@@ -20,6 +20,7 @@ base64 = "0.22"
 rustfft = "6.2"
 rusqlite = { version = "0.31", features = ["bundled"] }
 tiny_http = "0.12"
+lava-core = { path = "../crates/lava-core" }
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

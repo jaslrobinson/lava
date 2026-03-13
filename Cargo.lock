@@ -1872,6 +1872,7 @@ dependencies = [
  "chrono",
  "dirs 5.0.1",
  "kustom-formula",
+ "lava-core",
  "nix",
  "rusqlite",
  "rustfft",
@@ -1888,12 +1889,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "lava-core"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "dirs 5.0.1",
+ "nix",
+ "rusqlite",
+ "rustfft",
+ "serde",
+ "serde_json",
+ "tiny_http",
+ "ureq",
+]
+
+[[package]]
 name = "lava-wallpaper"
 version = "0.1.0"
 dependencies = [
  "gtk",
  "gtk-layer-shell",
  "javascriptcore-rs",
+ "lava-core",
+ "serde_json",
  "webkit2gtk",
 ]
 
