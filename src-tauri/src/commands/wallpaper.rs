@@ -29,8 +29,17 @@ pub fn start_signal_watcher(app: tauri::AppHandle) {
 }
 
 /// Check if wallpaper is currently running (editor-spawned or standalone).
+/// If a standalone wallpaper is detected, adopt it by setting WALLPAPER_ACTIVE.
 pub fn is_wallpaper_active() -> bool {
-    WALLPAPER_ACTIVE.load(Ordering::Relaxed) || pid::is_wallpaper_running()
+    if WALLPAPER_ACTIVE.load(Ordering::Relaxed) {
+        return true;
+    }
+    if pid::is_wallpaper_running() {
+        // Adopt the standalone wallpaper so stop_wallpaper_mode works
+        WALLPAPER_ACTIVE.store(true, Ordering::Relaxed);
+        return true;
+    }
+    false
 }
 
 /// Kill the wallpaper helper process if running (used by tray quit).
@@ -80,6 +89,13 @@ pub fn start_wallpaper_mode(window: tauri::WebviewWindow, project: serde_json::V
         return Err("Wallpaper mode is already active".into());
     }
 
+    // Kill any standalone wallpaper before starting an editor-managed one
+    if pid::is_wallpaper_running() {
+        eprintln!("[wallpaper] Killing standalone wallpaper before starting editor-managed one");
+        pid::kill_wallpaper();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+
     let display_server = if std::env::var("WAYLAND_DISPLAY").is_ok() {
         "wayland"
     } else if std::env::var("DISPLAY").is_ok() {
@@ -90,40 +106,27 @@ pub fn start_wallpaper_mode(window: tauri::WebviewWindow, project: serde_json::V
 
     let compositor = detect_compositor();
 
-    // Get the URL for the wallpaper view
-    let base_url = window.url().map_err(|e| e.to_string())?;
-    let base_str = base_url.as_str().trim_end_matches('/');
-    let wallpaper_url = if base_str.starts_with("http") {
-        // Dev mode: use the Vite dev server directly
-        format!("{}?wallpaper=true", base_str)
-    } else {
-        // Release mode: start a local HTTP server to serve the dist files
-        let dist_dir = find_dist_dir()
-            .ok_or_else(|| "Could not find frontend dist directory".to_string())?;
-        let server_url = super::wallpaper_server::start_wallpaper_server(dist_dir)?;
-        format!("{}?wallpaper=true", server_url)
-    };
-    eprintln!("[wallpaper] Window URL: {}, wallpaper URL: {}", base_str, wallpaper_url);
-
-    // Save project to temp file for the helper to load
-    let project_path = std::env::temp_dir().join("lava-wallpaper-project.json");
-    let project_json = serde_json::to_string(&project).map_err(|e| e.to_string())?;
-    std::fs::write(&project_path, &project_json).map_err(|e| e.to_string())?;
-
     let binary = find_wallpaper_binary()
         .ok_or_else(|| "lava-wallpaper binary not found. Build it with: cargo build -p lava-wallpaper".to_string())?;
 
-    eprintln!("[wallpaper] Spawning {:?} with URL: {}", binary, wallpaper_url);
+    // Launch wallpaper in standalone mode so it survives editor exit.
+    // The frontend auto-saves before calling this, so lastProjectPath is current.
+    // Always use production mode (own HTTP server) — never --dev, because Vite
+    // dies with the editor and takes the wallpaper page down.
+    // Use `setsid --fork` to fully detach from the editor's process group/session.
+    let args = vec!["--fork", binary.to_str().unwrap_or("lava-wallpaper"), "--standalone"];
 
-    let child = Command::new(&binary)
-        .arg(&wallpaper_url)
-        .arg(project_path.to_str().unwrap_or("/tmp/lava-wallpaper-project.json"))
+    eprintln!("[wallpaper] Spawning setsid --fork {:?} --standalone", binary);
+
+    let child = Command::new("setsid")
+        .args(&args)
         .spawn()
         .map_err(|e| format!("Failed to spawn wallpaper process: {}", e))?;
 
-    let pid = child.id();
-    eprintln!("[wallpaper] Helper process started with PID {}", pid);
-    *WALLPAPER_PID.lock().unwrap_or_else(|e| e.into_inner()) = Some(child);
+    // setsid --fork exits immediately; the real wallpaper PID is in /tmp/lava-wallpaper.pid
+    // Wait briefly for the wallpaper to write its PID file
+    eprintln!("[wallpaper] Standalone wallpaper launched via setsid");
+    drop(child);
 
     // Register global shortcut (Super+Escape) to exit wallpaper mode
     let shortcut = Shortcut::new(Some(Modifiers::SUPER), Code::Escape);
@@ -144,7 +147,7 @@ pub fn start_wallpaper_mode(window: tauri::WebviewWindow, project: serde_json::V
 
 #[tauri::command]
 pub fn stop_wallpaper_mode(window: tauri::WebviewWindow) -> Result<(), String> {
-    if !WALLPAPER_ACTIVE.load(Ordering::Relaxed) {
+    if !WALLPAPER_ACTIVE.load(Ordering::Relaxed) && !pid::is_wallpaper_running() {
         return Err("Wallpaper mode is not active".into());
     }
 

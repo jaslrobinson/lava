@@ -122,6 +122,17 @@
   let wallpaperStatus = $state("");
   let wallpaperActive = $state(false);
 
+  // On mount, check if a standalone wallpaper is already running
+  import("@tauri-apps/api/core").then(({ invoke }) => {
+    invoke<boolean>("is_wallpaper_running").then((running) => {
+      if (running) {
+        wallpaperActive = true;
+        wallpaperStatus = "Live (standalone)";
+        setTimeout(() => { wallpaperStatus = ""; }, 3000);
+      }
+    }).catch(() => {});
+  });
+
   async function handleWallpaperToggle() {
     const { invoke } = await import("@tauri-apps/api/core");
     try {
@@ -131,11 +142,20 @@
         wallpaperStatus = "Stopped";
       } else {
         wallpaperStatus = "Starting...";
+        // Auto-save before applying wallpaper (so standalone mode has the latest on disk)
+        const projPath = getCurrentProjectPath();
+        if (projPath) {
+          try {
+            await invoke("save_project", { path: projPath, project: getProjectSnapshot() });
+            wallpaperStatus = "Saved, starting...";
+          } catch (e) {
+            console.warn("[wallpaper] Auto-save failed, continuing:", e);
+          }
+        }
         const server = await invoke<string>("start_wallpaper_mode", { project: getProjectSnapshot() });
         wallpaperActive = true;
-        wallpaperStatus = `Live (${server})`;
+        wallpaperStatus = projPath ? "Auto-saved & applied" : `Live (${server})`;
         // Save last project path for auto-start
-        const projPath = getCurrentProjectPath();
         if (projPath) updateSetting("lastProjectPath", projPath);
       }
       setTimeout(() => { if (!wallpaperActive) wallpaperStatus = ""; }, 3000);

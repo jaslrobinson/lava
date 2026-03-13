@@ -1,6 +1,6 @@
 use gtk::prelude::*;
 use gtk_layer_shell::LayerShell;
-use webkit2gtk::{gio, UserContentManager, UserContentManagerExt, WebView, WebViewExt};
+use webkit2gtk::{gio, UserContentManager, UserContentManagerExt, WebContext, WebView, WebViewExt, WebViewExtManual, WebsiteDataManager};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -150,12 +150,28 @@ fn run_gtk_wallpaper(url: &str, project_json: Option<String>) {
         }
     });
 
-    let webview = WebView::with_user_content_manager(&ucm);
+    // Use a separate WebKit data directory to avoid conflicts with the editor
+    let data_manager = WebsiteDataManager::new_ephemeral();
+    let web_context = WebContext::with_website_data_manager(&data_manager);
+    let webview = WebView::new_with_context_and_user_content_manager(&web_context, &ucm);
+
+    // Handle web process crashes — reload instead of showing blank
+    {
+        let url_for_reload = url.to_string();
+        webview.connect_web_process_terminated(move |wv: &WebView, reason| {
+            eprintln!("[lava-wallpaper] Web process terminated (reason: {:?})! Reloading in 1s...", reason);
+            let url = url_for_reload.clone();
+            let wv = wv.clone();
+            gtk::glib::timeout_add_local_once(std::time::Duration::from_secs(1), move || {
+                wv.load_uri(&url);
+            });
+        });
+    }
 
     // Once the page finishes loading, inject the project data via JS
     if let Some(json) = project_json {
         eprintln!("[lava-wallpaper] Will inject project ({} bytes) after page load", json.len());
-        webview.connect_load_changed(move |wv, event| {
+        webview.connect_load_changed(move |wv: &WebView, event| {
             if event == webkit2gtk::LoadEvent::Finished {
                 let js = format!("window.__LAVA_PROJECT = {};", json);
                 eprintln!("[lava-wallpaper] Injecting project data now");
@@ -247,6 +263,31 @@ fn handle_message(msg: &str) {
                         .args(["set-volume", "-l", "1.0", "@DEFAULT_AUDIO_SINK@", &arg])
                         .spawn();
                 }
+            }
+        }
+        Some("music_control") => {
+            if let Some(action) = extract_json_field(msg, "action") {
+                let method = match action {
+                    "play-pause" => "PlayPause",
+                    "play" => "Play",
+                    "pause" => "Pause",
+                    "stop" => "Stop",
+                    "next" => "Next",
+                    "previous" => "Previous",
+                    _ => {
+                        eprintln!("[lava-wallpaper] Unknown music action: {}", action);
+                        return;
+                    }
+                };
+                eprintln!("[lava-wallpaper] Music control: {}", method);
+                let _ = std::process::Command::new("dbus-send")
+                    .args([
+                        "--print-reply",
+                        "--dest=org.mpris.MediaPlayer2.playerctld",
+                        "/org/mpris/MediaPlayer2",
+                        &format!("org.mpris.MediaPlayer2.Player.{}", method),
+                    ])
+                    .spawn();
             }
         }
         Some("launch_command") => {

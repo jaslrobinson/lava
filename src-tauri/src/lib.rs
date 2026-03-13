@@ -14,12 +14,14 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let show_editor = MenuItemBuilder::with_id("show_editor", "Show Editor").build(app)?;
     let toggle_wallpaper =
         MenuItemBuilder::with_id("toggle_wallpaper", "Start/Stop Wallpaper").build(app)?;
-    let quit = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+    let close_editor = MenuItemBuilder::with_id("close_editor", "Close Editor").build(app)?;
+    let quit = MenuItemBuilder::with_id("quit", "Quit All").build(app)?;
 
     let menu = MenuBuilder::new(app)
         .item(&show_editor)
         .item(&toggle_wallpaper)
         .separator()
+        .item(&close_editor)
         .item(&quit)
         .build()?;
 
@@ -47,7 +49,12 @@ fn setup_tray(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
+            "close_editor" => {
+                // Close editor only — wallpaper keeps running
+                app.exit(0);
+            }
             "quit" => {
+                // Quit everything — kill wallpaper + exit
                 commands::wallpaper::kill_wallpaper_process();
                 app.exit(0);
             }
@@ -122,19 +129,17 @@ pub fn run() {
             let audio_bands = providers::audio::new_shared_bands();
             providers::audio::start_audio_capture(app.handle().clone(), audio_bands);
 
+            // Write editor PID file so wallpaper can detect us
+            let _ = std::fs::write("/tmp/lava-editor.pid", std::process::id().to_string());
+
             // Watch for show-editor signal from wallpaper process
             commands::wallpaper::start_signal_watcher(app.handle().clone());
 
             Ok(())
         })
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if commands::wallpaper::is_wallpaper_active() {
-                    // Wallpaper is running — hide instead of closing
-                    api.prevent_close();
-                    window.hide().ok();
-                }
-                // If wallpaper is NOT active, allow normal close/quit
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Always allow close — standalone wallpaper keeps running independently
             }
         })
         .invoke_handler(tauri::generate_handler![

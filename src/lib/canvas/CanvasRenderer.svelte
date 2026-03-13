@@ -641,14 +641,17 @@
       let resolved = evaluateSync(urlExpr, buildGlobalsMap(project));
       // If sync eval didn't resolve (still contains $), try async via Tauri
       if (resolved.includes("$")) {
-        try {
-          const { invoke } = await import("@tauri-apps/api/core");
-          resolved = await invoke<string>("evaluate_formula", {
-            formula: urlExpr,
-            globals: buildGlobalsMap(project),
-          });
-        } catch (e) {
-          console.warn("Async formula eval failed:", e);
+        const isTauriCtx = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
+        if (isTauriCtx) {
+          try {
+            const { invoke } = await import("@tauri-apps/api/core");
+            resolved = await invoke<string>("evaluate_formula", {
+              formula: urlExpr,
+              globals: buildGlobalsMap(project),
+            });
+          } catch (e) {
+            console.warn("Async formula eval failed:", e);
+          }
         }
       }
       resolved = resolved.trim();
@@ -660,11 +663,18 @@
     } else if (action.startsWith("music:")) {
       // music:play-pause, music:next, music:previous, music:play, music:pause, music:stop
       const musicAction = action.slice(6);
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        await invoke("music_control", { action: musicAction });
-      } catch (e) {
-        console.warn("Music control failed:", e);
+      const isTauriCtx = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
+      if (isTauriCtx) {
+        try {
+          const { invoke } = await import("@tauri-apps/api/core");
+          await invoke("music_control", { action: musicAction });
+        } catch (e) {
+          console.warn("Music control failed:", e);
+        }
+      } else {
+        (window as any).webkit?.messageHandlers?.lava?.postMessage(
+          JSON.stringify({ type: "music_control", action: musicAction })
+        );
       }
     } else if (action.startsWith("app:")) {
       // app:command — launch application
