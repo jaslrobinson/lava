@@ -1,7 +1,11 @@
 [package]
 name = "lava"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+
+[features]
+default = []
+calendar-sqlite = ["rusqlite"]
 
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
@@ -12,13 +16,13 @@ kustom-formula = { path = "../crates/kustom-formula" }
 tokio = { version = "1", features = ["time", "sync"] }
 nix = { version = "0.29", features = ["fs"] }
 chrono = "0.4"
-zip = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 tauri-plugin-global-shortcut = "2"
 dirs = "5"
-ureq = { version = "2", features = ["json"] }
+ureq = { version = "2", default-features = false, features = ["json", "native-tls"] }
 base64 = "0.22"
 rustfft = "6.2"
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.31", features = ["bundled"], optional = true }
 tiny_http = "0.12"
 lava-core = { path = "../crates/lava-core" }
 

@@ -24,6 +24,7 @@
 //   $ca(event_count)$       -- total upcoming events (max 5)
 
 pub mod calendar_ics;
+#[cfg(feature = "calendar-sqlite")]
 pub mod calendar_sqlite;
 
 use serde::Deserialize;
@@ -93,6 +94,7 @@ pub fn load_plugins() -> Vec<Box<dyn DataProvider>> {
                     glob,
                 )));
             }
+            #[cfg(feature = "calendar-sqlite")]
             "calendar-thunderbird" => {
                 let db_path = manifest
                     .config

@@ -1,6 +1,6 @@
 # Maintainer: jaslrobinson
 pkgname=lava-desktop
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=1
 pkgdesc="LAVA - Live Animated Visuals for Arch. Desktop live wallpaper engine with formula support, animations, and widget system."
 arch=('x86_64')
@@ -11,6 +11,7 @@ depends=(
     'webkit2gtk-4.1'
     'gtk-layer-shell'
     'wireplumber'
+    'openssl'
 )
 optdepends=(
     'brightnessctl: brightness control via scroll gestures'
@@ -31,14 +32,17 @@ sha256sums=('SKIP')
 build() {
     cd "$srcdir/lava-$pkgver"
 
-    # Install frontend dependencies
+    # Force gcc linker with relaxed DSO linking — rust-lld fails with C/asm
+    # crates, and gcc needs --copy-dt-needed-entries for transitive deps
+    export RUSTFLAGS="${RUSTFLAGS:-} -C linker=gcc -C link-arg=-Wl,--copy-dt-needed-entries"
+
+    # Install frontend dependencies and build dist
     pnpm install
+    pnpm build
 
-    # Build the wallpaper helper binary
+    # Build both binaries directly (avoids tauri CLI RUSTFLAGS issues)
     cargo build -p lava-wallpaper --release
-
-    # Build the main Tauri app (frontend + Rust backend)
-    npx tauri build --no-bundle
+    cargo build -p lava --release
 }
 
 package() {
