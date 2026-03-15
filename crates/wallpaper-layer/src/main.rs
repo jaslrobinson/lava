@@ -1,4 +1,5 @@
 use gtk::prelude::*;
+use gtk::gdk;
 use gtk_layer_shell::LayerShell;
 use webkit2gtk::{gio, UserContentManager, UserContentManagerExt, WebContext, WebView, WebViewExt, WebViewExtManual, WebsiteDataManager};
 
@@ -185,14 +186,23 @@ fn run_gtk_wallpaper(url: &str, project_json: Option<String>) {
         });
     }
 
+    // Make the WebKit background fully transparent so the GTK window
+    // can be a "clear" layer surface when content is hidden via JS opacity
+    let transparent = gdk::RGBA::new(0.0, 0.0, 0.0, 0.0);
+    webview.set_background_color(&transparent);
+
     webview.load_uri(url);
 
     window.add(&webview);
     window.show_all();
 
-    // Poll /tmp/lava-wallpaper-opacity to fade wallpaper when apps are focused
+    // Poll /tmp/lava-wallpaper-opacity to fade wallpaper when apps are focused.
+    // We control visibility via JS document.body.style.opacity instead of
+    // GTK window.set_opacity() — this avoids compositor flickering on other
+    // layer-shell surfaces (e.g. Quickshell bars) while keeping the surface
+    // mapped so WebKitGTK doesn't suspend rendering.
     {
-        let win = window.clone();
+        let wv = webview.clone();
         let mut last_opacity: f64 = 1.0;
         gtk::glib::timeout_add_local(std::time::Duration::from_millis(250), move || {
             let target = std::fs::read_to_string("/tmp/lava-wallpaper-opacity")
@@ -202,7 +212,8 @@ fn run_gtk_wallpaper(url: &str, project_json: Option<String>) {
                 .clamp(0.0, 1.0);
 
             if (target - last_opacity).abs() > 0.01 {
-                win.set_opacity(target);
+                let js = format!("document.body.style.opacity='{:.2}'", target);
+                wv.run_javascript(&js, None::<&gio::Cancellable>, |_| {});
                 last_opacity = target;
             }
 
