@@ -51,6 +51,10 @@
     stack: "\u2261",
     overlap: "\u29C9",
     fonticon: "\u2606",
+    visualizer: "\u{1F3B5}",
+    map: "\u{1F5FA}",
+    launcher: "\u229E",
+    radar: "\u29BF",
   };
 
   const typeColors: Record<string, string> = {
@@ -61,6 +65,10 @@
     stack: "#a569bd",
     overlap: "#8e44ad",
     fonticon: "#f1c40f",
+    visualizer: "#1abc9c",
+    map: "#3498db",
+    launcher: "#e67e22",
+    radar: "#27ae60",
   };
 
   function stop(fn: (e: MouseEvent) => void) {

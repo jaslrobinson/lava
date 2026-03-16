@@ -1,6 +1,49 @@
 use serde::Serialize;
 use std::path::PathBuf;
 
+/// Resolve a .desktop Icon= value to an absolute file path.
+/// Searches hicolor theme dirs and pixmaps in priority order.
+pub fn resolve_icon_path(icon: &str) -> String {
+    if icon.is_empty() { return String::new(); }
+    // Already an absolute path
+    if icon.starts_with('/') {
+        if std::path::Path::new(icon).exists() { return icon.to_string(); }
+        return String::new();
+    }
+    let sizes = ["256x256", "128x128", "64x64", "48x48", "32x32", "scalable"];
+    let exts = ["png", "svg", "xpm"];
+    // Theme dirs to search
+    let mut theme_dirs: Vec<PathBuf> = vec![
+        PathBuf::from("/usr/share/icons/hicolor"),
+        PathBuf::from("/usr/share/icons/Papirus"),
+        PathBuf::from("/usr/share/icons/Adwaita"),
+        PathBuf::from("/usr/share/icons/breeze"),
+    ];
+    // Add user icon theme dirs
+    if let Some(home) = dirs::home_dir() {
+        theme_dirs.insert(0, home.join(".local/share/icons/hicolor"));
+    }
+    for theme in &theme_dirs {
+        for size in &sizes {
+            for ext in &exts {
+                let p = theme.join(size).join("apps").join(format!("{}.{}", icon, ext));
+                if p.exists() { return p.to_string_lossy().into_owned(); }
+            }
+        }
+    }
+    // Fallback: pixmaps
+    for ext in &exts {
+        let p = PathBuf::from(format!("/usr/share/pixmaps/{}.{}", icon, ext));
+        if p.exists() { return p.to_string_lossy().into_owned(); }
+    }
+    String::new()
+}
+
+#[tauri::command]
+pub fn resolve_icon(icon_name: String) -> String {
+    resolve_icon_path(&icon_name)
+}
+
 #[derive(Debug, Serialize, Clone)]
 pub struct AppEntry {
     pub name: String,
@@ -90,5 +133,49 @@ fn parse_desktop_file(path: &PathBuf) -> Option<AppEntry> {
         .collect::<Vec<_>>()
         .join(" ");
 
-    Some(AppEntry { name, exec: exec_clean, icon, categories })
+    let icon_resolved = resolve_icon_path(&icon);
+    Some(AppEntry { name, exec: exec_clean, icon: icon_resolved, categories })
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct WindowState {
+    pub running_classes: Vec<String>,
+    pub active_class: String,
+}
+
+#[tauri::command]
+pub fn get_window_state() -> WindowState {
+    let mut running_classes: Vec<String> = Vec::new();
+    let mut active_class = String::new();
+
+    // Get all open clients
+    if let Ok(output) = std::process::Command::new("hyprctl")
+        .args(["clients", "-j"])
+        .output()
+    {
+        if let Ok(json) = serde_json::from_slice::<Vec<serde_json::Value>>(&output.stdout) {
+            for client in &json {
+                if let Some(class) = client["class"].as_str() {
+                    if !class.is_empty() {
+                        running_classes.push(class.to_lowercase());
+                    }
+                }
+            }
+        }
+    }
+
+    // Get active window class
+    if let Ok(output) = std::process::Command::new("hyprctl")
+        .args(["activewindow", "-j"])
+        .output()
+    {
+        if let Ok(json) = serde_json::from_slice::<serde_json::Value>(&output.stdout) {
+            if let Some(class) = json["class"].as_str() {
+                active_class = class.to_lowercase();
+            }
+        }
+    }
+
+    running_classes.dedup();
+    WindowState { running_classes, active_class }
 }

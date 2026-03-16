@@ -1,3 +1,4 @@
+pub mod apps;
 pub mod project;
 pub mod providers;
 pub mod audio;

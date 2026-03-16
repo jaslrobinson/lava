@@ -1,4 +1,4 @@
-export type LayerType = "text" | "shape" | "image" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer";
+export type LayerType = "text" | "shape" | "image" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer" | "map" | "launcher" | "radar";
 
 export type ShapeKind = "rectangle" | "circle" | "oval" | "triangle" | "arc";
 
@@ -108,6 +108,26 @@ export interface LayerProperties {
   colorMid?: string;
   colorBottom?: string;
   peakColor?: string;
+
+  // Map
+  mapLat?: number;       // center latitude (default 40.7)
+  mapLng?: number;       // center longitude (default -74.0)
+  mapZoom?: number;      // zoom level 0-18 (default 5)
+  mapShowRadar?: boolean; // show RainViewer radar overlay
+  mapRadarAnimate?: boolean; // animate radar frames
+  mapStyle?: "dark" | "streets" | "satellite"; // base tile style
+
+  // Launcher
+  launcherStyle?: "win11" | "macos" | "deepin"; // visual style
+  pinnedApps?: string[]; // list of app exec commands e.g. ["firefox", "thunar"]
+  launcherIconSize?: number; // icon size in pixels (default 36)
+
+  // Radar
+  radarSweepColor?: string;  // sweep/scan line color (default "#00ff4480")
+  radarRingColor?: string;   // concentric ring color (default "#00ff4440")
+  radarDotColor?: string;    // blip dot color (default "#00ff44")
+  radarDotSize?: number;     // blip dot radius in pixels (default 4)
+  radarRingCount?: number;   // number of concentric rings (default 3)
 }
 
 export interface Layer {
@@ -242,6 +262,35 @@ export function createLayer(type: LayerType, name: string): Layer {
       base.properties.barCount = 24;
       base.properties.barSpacing = 3;
       base.properties.sensitivity = 1.2;
+      break;
+    case "map":
+      base.properties.mapLat = 40.7;
+      base.properties.mapLng = -74.0;
+      base.properties.mapZoom = 5;
+      base.properties.mapShowRadar = true;
+      base.properties.mapRadarAnimate = false;
+      base.properties.mapStyle = "dark";
+      base.properties.width = 600;
+      base.properties.height = 400;
+      break;
+    case "launcher":
+      base.properties.launcherStyle = "win11";
+      base.properties.pinnedApps = ["firefox", "thunar", "gnome-terminal"];
+      base.properties.launcherIconSize = 36;
+      base.properties.x = 0;
+      base.properties.y = 1032;
+      base.properties.width = 1920;
+      base.properties.height = 48;
+      base.properties.anchor = "top-left";
+      break;
+    case "radar":
+      base.properties.width = 200;
+      base.properties.height = 200;
+      base.properties.radarSweepColor = "#00ff4480";
+      base.properties.radarRingColor = "#00ff4440";
+      base.properties.radarDotColor = "#00ff44";
+      base.properties.radarDotSize = 4;
+      base.properties.radarRingCount = 3;
       break;
   }
 

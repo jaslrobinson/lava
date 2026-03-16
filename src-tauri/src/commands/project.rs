@@ -6,6 +6,189 @@ use std::io;
 use std::io::Write;
 use std::path::Path;
 
+// ---------------------------------------------------------------------------
+// AI Image Extractor (Replicate API)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn extract_image_layer(
+    image_path: String,
+    prompt: String,
+    asset_dir: String,
+    api_key: String,
+) -> Result<String, String> {
+    if api_key.trim().is_empty() {
+        return Err("No Replicate API key provided.".into());
+    }
+    let api_key = api_key.trim().to_string();
+    tokio::task::spawn_blocking(move || {
+        do_extract_image(&image_path, &prompt, &asset_dir, &api_key)
+    })
+    .await
+    .map_err(|e| format!("Task error: {}", e))?
+}
+
+const REPLICATE_MODEL: &str = "cjwbw/rembg";
+
+fn replicate_agent() -> ureq::Agent {
+    ureq::AgentBuilder::new()
+        .redirects(0)
+        .build()
+}
+
+/// Fetch the latest version hash for a Replicate model.
+fn get_model_version(api_key: &str, model: &str) -> Result<String, String> {
+    let url = format!("https://api.replicate.com/v1/models/{}", model);
+    eprintln!("[lava] Fetching model info: {}", url);
+    let info: serde_json::Value = replicate_agent()
+        .get(&url)
+        .set("Authorization", &format!("Token {}", api_key))
+        .call()
+        .map_err(|e| format!("Model lookup failed: {}", e))?
+        .into_json()
+        .map_err(|e| format!("Model lookup response invalid: {}", e))?;
+
+    eprintln!("[lava] Model info keys: {:?}", info.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+    let version_id = info["latest_version"]["id"]
+        .as_str()
+        .map(|s| s.to_string())
+        .ok_or_else(|| format!("No version ID in model info. Got: {}", info))?;
+    eprintln!("[lava] Using version: {}", &version_id[..version_id.len().min(16)]);
+    Ok(version_id)
+}
+
+fn do_extract_image(image_path: &str, _prompt: &str, asset_dir: &str, api_key: &str) -> Result<String, String> {
+
+    // Get the latest version hash for the model
+    let version_id = get_model_version(api_key, REPLICATE_MODEL)?;
+
+    // Read and base64-encode the source image as a data URI
+    let img_bytes = fs::read(image_path).map_err(|e| format!("Cannot read image: {}", e))?;
+    let ext = Path::new(image_path)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png")
+        .to_lowercase();
+    let mime = match ext.as_str() {
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        _ => "image/png",
+    };
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&img_bytes);
+    let image_url = format!("data:{};base64,{}", mime, b64);
+    eprintln!("[lava] Image encoded as data URI ({} bytes source)", img_bytes.len());
+
+    // POST versioned prediction to Replicate
+    let payload = serde_json::json!({
+        "version": version_id,
+        "input": {
+            "image": image_url,
+        }
+    });
+
+    eprintln!("[lava] Creating prediction at /v1/predictions");
+    let raw = replicate_agent()
+        .post("https://api.replicate.com/v1/predictions")
+        .set("Authorization", &format!("Token {}", api_key))
+        .set("Content-Type", "application/json")
+        .send_json(&payload);
+
+    let resp: serde_json::Value = match raw {
+        Ok(r) => r.into_json().map_err(|e| format!("Invalid API response: {}", e))?,
+        Err(ureq::Error::Status(code, r)) => {
+            let body = r.into_string().unwrap_or_default();
+            eprintln!("[lava] Prediction error {}: {}", code, body);
+            return Err(format!("Replicate error {}: {}", code, body));
+        }
+        Err(e) => return Err(format!("Replicate request failed: {}", e)),
+    };
+
+    eprintln!("[lava] Prediction response: {:?}", resp.get("id").or(resp.get("detail")));
+
+    let prediction_id = resp["id"]
+        .as_str()
+        .ok_or_else(|| {
+            format!("No prediction ID in response: {}", resp)
+        })?
+        .to_string();
+
+    // Poll until complete
+    let output_url = poll_replicate_prediction(&api_key, &prediction_id)?;
+
+    // Determine output directory
+    let out_dir = if asset_dir.is_empty() {
+        dirs::config_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp"))
+            .join("lava/extracted")
+    } else {
+        Path::new(asset_dir).join("extracted")
+    };
+    fs::create_dir_all(&out_dir).map_err(|e| format!("Cannot create output dir: {}", e))?;
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    let filename = format!("extracted_{}.png", timestamp);
+    let output_path = out_dir.join(&filename);
+
+    // Download output image
+    let mut reader = ureq::get(&output_url)
+        .call()
+        .map_err(|e| format!("Failed to download result image: {}", e))?
+        .into_reader();
+    let mut out_file =
+        fs::File::create(&output_path).map_err(|e| format!("Cannot create output file: {}", e))?;
+    io::copy(&mut reader, &mut out_file).map_err(|e| format!("Failed to save image: {}", e))?;
+
+    Ok(output_path.to_string_lossy().to_string())
+}
+
+fn poll_replicate_prediction(api_key: &str, id: &str) -> Result<String, String> {
+    let url = format!("https://api.replicate.com/v1/predictions/{}", id);
+
+    for attempt in 0..90 {
+        if attempt > 0 {
+            std::thread::sleep(std::time::Duration::from_secs(2));
+        }
+
+        let resp: serde_json::Value = ureq::get(&url)
+            .set("Authorization", &format!("Token {}", api_key))
+            .call()
+            .map_err(|e| format!("Poll error: {}", e))?
+            .into_json()
+            .map_err(|e| format!("Invalid poll response: {}", e))?;
+
+        let status = resp["status"].as_str().unwrap_or("unknown");
+        eprintln!("[lava] Poll attempt {} status: {}", attempt + 1, status);
+
+        match status {
+            "succeeded" => {
+                // Output may be a single URL string or array of URLs
+                if let Some(s) = resp["output"].as_str() {
+                    return Ok(s.to_string());
+                }
+                if let Some(arr) = resp["output"].as_array() {
+                    // Last item is often the cleanest segment; fallback to first
+                    let url_opt = arr.last().or_else(|| arr.first()).and_then(|v| v.as_str());
+                    if let Some(u) = url_opt {
+                        return Ok(u.to_string());
+                    }
+                }
+                return Err("Prediction succeeded but output contained no image URL".into());
+            }
+            "failed" | "canceled" => {
+                let err = resp["error"].as_str().unwrap_or("unknown error");
+                return Err(format!("Extraction failed: {}", err));
+            }
+            _ => {} // "starting" | "processing" — keep polling
+        }
+    }
+
+    Err("Extraction timed out after 3 minutes".into())
+}
+
 #[tauri::command]
 pub fn save_project(path: String, project: Project) -> Result<(), String> {
     println!("[RUST] save_project called for path: {}", path);
@@ -221,6 +404,15 @@ fn import_native_komp(
                 color_mid: None,
                 color_bottom: None,
                 peak_color: None,
+                map_lat: None,
+                map_lng: None,
+                map_zoom: None,
+                map_show_radar: None,
+                map_radar_animate: None,
+                map_style: None,
+                launcher_style: None,
+                pinned_apps: None,
+                launcher_icon_size: None,
             },
             animations: None,
             children: Some(project.layers),

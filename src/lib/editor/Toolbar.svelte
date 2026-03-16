@@ -6,6 +6,7 @@
   import { setDebugOverlay, getDebugOverlay } from "../canvas/renderer";
   import WidgetsPanel from "./WidgetsPanel.svelte";
   import ThemesPanel from "./ThemesPanel.svelte";
+  import ImageExtractorModal from "./ImageExtractorModal.svelte";
 
   function handleCopy() {
     if (getSelectedLayerId()) copySelectedLayer();
@@ -187,12 +188,17 @@
     { type: "visualizer", label: "Visualizer", icon: "\u2248" },
     { type: "stack", label: "Stack", icon: "\u2261" },
     { type: "overlap", label: "Overlap", icon: "\u29C9" },
+    { type: "map", label: "Map", icon: "\u25CE" },
+    { type: "launcher", label: "Launcher", icon: "\u229E" },
+    { type: "radar", label: "Radar", icon: "\u29BF" },
   ];
 
   // Close panel on outside click
   function handlePanelBackdrop() {
     addPanelOpen = false;
   }
+
+  let extractorOpen = $state(false);
 </script>
 
 <div class="toolbar">
@@ -250,6 +256,14 @@
     </button>
     <button
       class="toolbar-btn"
+      class:extract-active={extractorOpen}
+      title="AI Image Extractor — extract elements from photos"
+      onclick={() => { extractorOpen = !extractorOpen; addPanelOpen = false; }}
+    >
+      <span class="btn-icon">✂</span>
+    </button>
+    <button
+      class="toolbar-btn"
       class:wallpaper-active={wallpaperActive}
       title={wallpaperActive ? "Stop live wallpaper" : "Apply as live wallpaper"}
       onclick={handleWallpaperToggle}
@@ -278,6 +292,10 @@
     </button>
   </div>
 </div>
+
+{#if extractorOpen}
+  <ImageExtractorModal onClose={() => { extractorOpen = false; }} />
+{/if}
 
 <!-- Add panel dropdown -->
 {#if addPanelOpen}
@@ -427,6 +445,13 @@
   }
   .toolbar-btn.debug-active:hover {
     background: #c0392b;
+  }
+  .toolbar-btn.extract-active {
+    background: #6c3483;
+    color: #fff;
+  }
+  .toolbar-btn.extract-active:hover {
+    background: #8e44ad;
   }
   .toolbar-btn.wallpaper-active {
     background: #2d7d46;

@@ -153,6 +153,7 @@ pub fn run() {
             commands::project::copy_asset_to_project,
             commands::project::extract_apk_icon,
             commands::project::write_icon_file,
+            commands::project::extract_image_layer,
             commands::wallpaper::start_wallpaper_mode,
             commands::wallpaper::stop_wallpaper_mode,
             commands::window::hide_editor,
@@ -167,6 +168,8 @@ pub fn run() {
             commands::settings::save_settings,
             commands::settings::set_autostart,
             commands::apps::list_apps,
+            commands::apps::resolve_icon,
+            commands::apps::get_window_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

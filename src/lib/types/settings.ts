@@ -30,6 +30,7 @@ export interface AppSettings {
   wallpaperFadeOpacity: number;
   lastProjectPath: string;
   savedThemes: { name: string; path: string }[];
+  replicateApiKey: string;
 }
 
 export const defaultSettings: AppSettings = {
@@ -59,4 +60,5 @@ export const defaultSettings: AppSettings = {
   wallpaperFadeOpacity: 0.3,
   lastProjectPath: "",
   savedThemes: [],
+  replicateApiKey: "",
 };

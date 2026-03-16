@@ -86,14 +86,15 @@ function getCachedImage(src: string): HTMLImageElement | null {
   let resolved: string;
   if (resolvedPath.startsWith("http") || resolvedPath.startsWith("data:")) {
     resolved = resolvedPath;
-  } else if (convertFileSrc) {
-    resolved = convertFileSrc(resolvedPath);
-  } else if (isTauri) {
-    // Tauri context but convertFileSrc not loaded yet — wait rather than failing
-    return null;
-  } else {
-    // Non-Tauri context (WebKitGTK wallpaper): serve via Vite asset proxy
+  } else if (!isTauri || import.meta.env.DEV) {
+    // Wallpaper WebKitGTK OR Tauri dev mode: Vite dev server serves any local file
     resolved = `/__lava_assets${resolvedPath}`;
+  } else if (convertFileSrc) {
+    // Production Tauri: use asset:// protocol
+    resolved = convertFileSrc(resolvedPath);
+  } else {
+    // Tauri but convertFileSrc not loaded yet — wait rather than failing
+    return null;
   }
 
   // Check if previously failed — retry after cooldown
@@ -363,13 +364,22 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
     case "visualizer":
       renderVisualizer(ctx, layer, x, y, w, h);
       break;
+    case "map":
+      renderMapPlaceholder(ctx, layer, x, y, w, h);
+      break;
+    case "launcher":
+      renderLauncherLayer(ctx, layer, x, y, w, h);
+      break;
+    case "radar":
+      renderRadarLayer(ctx, layer, x, y, w, h);
+      break;
   }
 
   // Color animation overlay: tint the already-drawn layer content
   if (deltas.colorOverride) {
     ctx.globalCompositeOperation = "source-atop";
     ctx.fillStyle = deltas.colorOverride;
-    
+
     // For shapes, create and fill the exact shape path
     // For other layer types, use fillRect
     if (layer.type === "shape") {
@@ -378,7 +388,23 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
     } else {
       ctx.fillRect(x, y, w, h);
     }
-    
+
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  // Flash overlay: white wash drawn on top via source-atop (no ctx.filter needed)
+  if (deltas.flashOverlay > 0) {
+    const savedAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = deltas.flashOverlay;
+    ctx.globalCompositeOperation = "source-atop";
+    ctx.fillStyle = "#ffffff";
+    if (layer.type === "shape") {
+      createShapePath(ctx, layer, x, y, w, h);
+      ctx.fill();
+    } else {
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.globalAlpha = savedAlpha;
     ctx.globalCompositeOperation = "source-over";
   }
 
@@ -667,12 +693,12 @@ function getImageLabel(src: string): string {
   let resolved: string;
   if (resolvedPath.startsWith("http") || resolvedPath.startsWith("data:")) {
     resolved = resolvedPath;
+  } else if (!isTauri || import.meta.env.DEV) {
+    resolved = `/__lava_assets${resolvedPath}`;
   } else if (convertFileSrc) {
     resolved = convertFileSrc(resolvedPath);
-  } else if (isTauri) {
-    return "Loading...";
   } else {
-    resolved = `/__lava_assets${resolvedPath}`;
+    return "Loading...";
   }
   if (imageFailedMap.has(resolved)) return "Failed to load";
   return "Loading...";
@@ -833,12 +859,13 @@ function resolveImageSrc(src: string): string | null {
   if (resolvedPath.startsWith("http") || resolvedPath.startsWith("data:")) {
     return resolvedPath;
   }
+  if (!isTauri || import.meta.env.DEV) {
+    return `/__lava_assets${resolvedPath}`;
+  }
   if (convertFileSrc) {
     return convertFileSrc(resolvedPath);
   }
-  if (isTauri) return null; // Still loading convertFileSrc
-  // Non-Tauri context (WebKitGTK wallpaper): serve via Vite asset proxy
-  return `/__lava_assets${resolvedPath}`;
+  return null; // Tauri production but convertFileSrc not loaded yet
 }
 
 function renderFontIcon(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
@@ -1160,5 +1187,455 @@ function drawSelectionOutline(ctx: CanvasRenderingContext2D, bounds: LayerBounds
     ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
   }
 
+  ctx.restore();
+}
+
+function renderMapPlaceholder(ctx: CanvasRenderingContext2D, _layer: Layer, x: number, y: number, w: number, h: number) {
+  ctx.save();
+  ctx.fillStyle = "#1a2a3a";
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 8);
+  ctx.fill();
+  ctx.strokeStyle = "#3a5a7a";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Crosshatch pattern
+  ctx.strokeStyle = "#2a3a4a";
+  ctx.lineWidth = 1;
+  const step = 20;
+  for (let i = x; i < x + w; i += step) {
+    ctx.beginPath(); ctx.moveTo(i, y); ctx.lineTo(i, y + h); ctx.stroke();
+  }
+  for (let j = y; j < y + h; j += step) {
+    ctx.beginPath(); ctx.moveTo(x, j); ctx.lineTo(x + w, j); ctx.stroke();
+  }
+
+  // Label
+  ctx.fillStyle = "#7ab8d8";
+  ctx.font = `bold ${Math.min(w / 8, 24)}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("Map", x + w / 2, y + h / 2);
+  ctx.restore();
+}
+
+// ─── Radar ────────────────────────────────────────────────────────────────────
+
+function renderRadarLayer(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
+  const props = layer.properties;
+  const sweepColor = resolve(props.radarSweepColor, "#00ff4480");
+  const ringColor = resolve(props.radarRingColor, "#00ff4440");
+  const dotColor = resolve(props.radarDotColor, "#00ff44");
+  const dotSize = resolveNumber(props.radarDotSize, 4);
+  const ringCount = resolveNumber(props.radarRingCount, 3);
+
+  const cx = x + w / 2;
+  const cy = y + h / 2;
+  const radius = Math.min(w, h) / 2;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.clip();
+
+  // Background
+  ctx.fillStyle = "#0a1a0a";
+  ctx.fillRect(x, y, w, h);
+
+  // Concentric rings
+  ctx.strokeStyle = ringColor;
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= ringCount; i++) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, (radius * i) / ringCount, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Crosshair lines
+  ctx.beginPath();
+  ctx.moveTo(cx - radius, cy); ctx.lineTo(cx + radius, cy);
+  ctx.moveTo(cx, cy - radius); ctx.lineTo(cx, cy + radius);
+  ctx.stroke();
+
+  // Animated sweep using timestamp from animation engine (fall back to Date.now)
+  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
+  const angle = ((now / 3000) % 1) * Math.PI * 2 - Math.PI / 2;
+
+  // Sweep gradient
+  const grad = ctx.createConicalGradient
+    ? (ctx as any).createConicalGradient(cx, cy, angle)
+    : null;
+  if (grad) {
+    grad.addColorStop(0, sweepColor);
+    grad.addColorStop(0.25, "transparent");
+    grad.addColorStop(1, "transparent");
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // Fallback: draw a sweep line
+    ctx.strokeStyle = sweepColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+    ctx.stroke();
+  }
+
+  // Static blip dots (seeded by layer id for consistency)
+  const seed = layer.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  ctx.fillStyle = dotColor;
+  for (let i = 0; i < 6; i++) {
+    const dotAngle = ((seed * (i + 1) * 137.5) % 360) * (Math.PI / 180);
+    const dotR = ((seed * (i + 3) * 73) % 80 + 10) / 100 * radius;
+    const dx = cx + Math.cos(dotAngle) * dotR;
+    const dy = cy + Math.sin(dotAngle) * dotR;
+    ctx.beginPath();
+    ctx.arc(dx, dy, dotSize, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Outer border circle
+  ctx.strokeStyle = ringColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+// ─── Launcher module-level state ──────────────────────────────────────────────
+const _launcherApps: { name: string; exec: string; icon: string }[] = [];
+let _launcherAppsLoaded = false;
+let _launcherAppsRetryCount = 0;
+const _launcherIconCache = new Map<string, HTMLImageElement | null>();
+
+/** Hit regions keyed by layer id */
+export const launcherHitRegions = new Map<string, Array<{ exec: string; bx: number; by: number; bw: number; bh: number }>>();
+
+/** Hover position in project coords — set by CanvasRenderer on mousemove */
+let _hoverX = -1;
+let _hoverY = -1;
+export function setLauncherHoverCoords(x: number, y: number) { _hoverX = x; _hoverY = y; }
+
+/** Start Menu open state */
+let _startMenuOpen = false;
+function notifyStartMenuState(open: boolean) {
+  const wk = (window as any).webkit?.messageHandlers?.lava;
+  if (wk) wk.postMessage(JSON.stringify({ type: open ? "start_menu_open" : "start_menu_close" }));
+}
+export function toggleStartMenu() {
+  _startMenuOpen = !_startMenuOpen;
+  notifyStartMenuState(_startMenuOpen);
+}
+export function closeStartMenu() {
+  if (_startMenuOpen) { _startMenuOpen = false; notifyStartMenuState(false); }
+}
+export function isStartMenuOpen() { return _startMenuOpen; }
+
+/** Running window classes from hyprctl */
+let _runningClasses: string[] = [];
+let _activeClass = "";
+let _windowStatePollId: ReturnType<typeof setInterval> | null = null;
+
+async function loadLauncherApps() {
+  if (_launcherAppsLoaded) return;
+  _launcherAppsLoaded = true;
+  if (isTauri) {
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      const apps = await invoke<{ name: string; exec: string; icon: string }[]>("list_apps");
+      _launcherApps.splice(0, _launcherApps.length, ...apps);
+    } catch (e) {
+      console.warn("list_apps failed:", e);
+    }
+  } else {
+    // Wallpaper mode: use pre-injected apps list
+    const injected = (window as any).__LAVA_APPS;
+    if (Array.isArray(injected) && injected.length > 0) {
+      _launcherApps.splice(0, _launcherApps.length, ...injected);
+    } else if (_launcherAppsRetryCount < 20) {
+      // __LAVA_APPS not yet injected — reset so next render frame retries
+      _launcherAppsRetryCount++;
+      _launcherAppsLoaded = false;
+    }
+  }
+  // Start polling running windows every 2s (editor only — hyprctl not available in standalone)
+  if (isTauri && !_windowStatePollId) {
+    pollWindowState();
+    _windowStatePollId = setInterval(pollWindowState, 2000);
+  }
+}
+
+async function pollWindowState() {
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    const state = await invoke<{ running_classes: string[]; active_class: string }>("get_window_state");
+    _runningClasses = state.running_classes;
+    _activeClass = state.active_class;
+  } catch { /* hyprland not running */ }
+}
+
+function getLauncherIcon(iconPath: string): HTMLImageElement | null {
+  if (!iconPath) return null;
+  if (_launcherIconCache.has(iconPath)) return _launcherIconCache.get(iconPath) ?? null;
+  // iconPath is a resolved absolute path from list_apps
+  // Use existing lazy-loaded convertFileSrc to get asset:// URL for WebKitGTK
+  const src = convertFileSrc ? convertFileSrc(iconPath) : iconPath;
+  const img = new Image();
+  img.onload = () => { _launcherIconCache.set(iconPath, img); };
+  img.onerror = () => { _launcherIconCache.set(iconPath, null); };
+  img.src = src;
+  return null;
+}
+
+function isHovering(bx: number, by: number, bw: number, bh: number): boolean {
+  return _hoverX >= bx && _hoverX <= bx + bw && _hoverY >= by && _hoverY <= by + bh;
+}
+
+function isAppRunning(exec: string, runningClasses: string[]): boolean {
+  const base = exec.split(/[\s/]/).pop()?.toLowerCase() ?? "";
+  return runningClasses.some(c => c === base || c.includes(base) || base.includes(c));
+}
+
+function isAppActive(exec: string, activeClass: string): boolean {
+  if (!activeClass) return false;
+  const base = exec.split(/[\s/]/).pop()?.toLowerCase() ?? "";
+  return activeClass === base || activeClass.includes(base) || base.includes(activeClass);
+}
+
+function stringToColor(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  return `hsl(${Math.abs(hash) % 360}, 55%, 42%)`;
+}
+
+// ─── Main launcher dispatcher ──────────────────────────────────────────────────
+
+function renderLauncherLayer(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
+  const props = layer.properties;
+  const style = props.launcherStyle ?? "win11";
+  const iconSize = props.launcherIconSize ?? 36;
+  const pinned = props.pinnedApps ?? [];
+  const p = props as any;
+  const taskbarBg = String(p.taskbarBg ?? "#141414");
+  const taskbarBgOpacity = Math.round(Number(p.taskbarBgOpacity ?? 235));
+  const taskbarRadius = Number(p.taskbarRadius ?? 0);
+
+  if (!_launcherAppsLoaded) { loadLauncherApps(); }
+
+  const pinnedEntries = pinned.map(exec => {
+    const app = _launcherApps.find(a =>
+      a.exec === exec ||
+      a.exec.startsWith(exec + " ") ||
+      a.exec.split(/[\s/]/).pop() === exec
+    );
+    return { exec, name: app?.name ?? exec, icon: app?.icon ?? exec };
+  });
+
+  const regions: Array<{ exec: string; bx: number; by: number; bw: number; bh: number }> = [];
+
+  if (style === "win11") {
+    renderWin11AppIcons(ctx, x, y, w, h, iconSize, pinnedEntries, regions);
+  } else if (style === "macos") {
+    renderMacosDock(ctx, x, y, w, h, iconSize, pinnedEntries, regions, taskbarBg, taskbarBgOpacity, taskbarRadius);
+  } else {
+    renderDeepinDock(ctx, x, y, w, h, iconSize, pinnedEntries, regions, taskbarBg, taskbarBgOpacity, taskbarRadius);
+  }
+
+  launcherHitRegions.set(layer.id, regions);
+}
+
+// ─── Windows 11 App Icons (pinned apps row only — no background/tray/clock) ───
+
+function renderWin11AppIcons(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  iconSize: number,
+  apps: Array<{ exec: string; name: string; icon: string }>,
+  regions: Array<{ exec: string; bx: number; by: number; bw: number; bh: number }>
+) {
+  ctx.save();
+
+  const slotW = iconSize + 8;
+  const slotH = iconSize + 8;
+  const slotY = y + (h - slotH) / 2;
+  const iconY = y + (h - iconSize) / 2;
+
+  // Center the icon row within the layer bounds
+  const totalW = apps.length * (slotW + 4) - (apps.length > 0 ? 4 : 0);
+  let cx = x + (w - totalW) / 2;
+
+  for (const app of apps) {
+    const running = isAppRunning(app.exec, _runningClasses);
+    const active = isAppActive(app.exec, _activeClass);
+    const appHover = isHovering(cx, slotY, slotW, slotH);
+
+    // Hover / active highlight background
+    if (active) {
+      ctx.fillStyle = "rgba(255,255,255,0.13)";
+      ctx.beginPath(); ctx.roundRect(cx, slotY, slotW, slotH, 4); ctx.fill();
+    } else if (appHover) {
+      ctx.fillStyle = "rgba(255,255,255,0.09)";
+      ctx.beginPath(); ctx.roundRect(cx, slotY, slotW, slotH, 4); ctx.fill();
+    }
+
+    // App icon image (with fallback letter circle)
+    const imgX = cx + (slotW - iconSize) / 2;
+    const img = getLauncherIcon(app.icon);
+    if (img) {
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(imgX, iconY, iconSize, iconSize, 4); ctx.clip();
+      ctx.drawImage(img, imgX, iconY, iconSize, iconSize);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = stringToColor(app.name);
+      ctx.beginPath(); ctx.roundRect(imgX, iconY, iconSize, iconSize, 6); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = `bold ${Math.floor(iconSize * 0.48)}px sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(app.name.charAt(0).toUpperCase(), imgX + iconSize / 2, iconY + iconSize / 2);
+    }
+
+    // Running indicator: small dot for running, wider pill for active
+    if (running) {
+      const dotW = active ? 14 : 4;
+      const dotH = 3;
+      const dotX = cx + slotW / 2 - dotW / 2;
+      const dotY = y + h - 5;
+      ctx.fillStyle = active ? "#60cdff" : "rgba(255,255,255,0.65)";
+      ctx.beginPath(); ctx.roundRect(dotX, dotY, dotW, dotH, 1.5); ctx.fill();
+    }
+
+    regions.push({ exec: app.exec, bx: cx, by: y, bw: slotW, bh: h });
+    cx += slotW + 4;
+  }
+
+  ctx.restore();
+}
+
+// ─── macOS Dock ───────────────────────────────────────────────────────────────
+
+function renderMacosDock(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  iconSize: number,
+  apps: Array<{ exec: string; name: string; icon: string }>,
+  regions: Array<{ exec: string; bx: number; by: number; bw: number; bh: number }>,
+  bgColor = "#ffffff", bgOpacity = 46, _radius = 16
+) {
+  const gap = 8;
+  const pad = 12;
+  const totalW = apps.length * (iconSize + gap) - gap + pad * 2;
+  const dockX = x + (w - totalW) / 2;
+  const dockY = y + 4;
+  const dockH = h - 8;
+
+  ctx.save();
+  const r = parseInt(bgColor.slice(1, 3), 16) || 255;
+  const g = parseInt(bgColor.slice(3, 5), 16) || 255;
+  const b = parseInt(bgColor.slice(5, 7), 16) || 255;
+  ctx.fillStyle = `rgba(${r},${g},${b},${(bgOpacity / 255).toFixed(3)})`;
+  ctx.beginPath(); ctx.roundRect(dockX, dockY, totalW, dockH, 16); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.3)"; ctx.lineWidth = 1; ctx.stroke();
+
+  let ix = dockX + pad;
+  const iy = dockY + (dockH - iconSize) / 2;
+
+  for (const app of apps) {
+    const hover = isHovering(ix, dockY, iconSize, dockH);
+    const running = isAppRunning(app.exec, _runningClasses);
+    const active = isAppActive(app.exec, _activeClass);
+    const scale = hover ? 1.15 : 1;
+    const scaledSize = iconSize * scale;
+    const scaledX = ix + (iconSize - scaledSize) / 2;
+    const scaledY = iy + (iconSize - scaledSize);
+
+    const img = getLauncherIcon(app.icon);
+    if (img) {
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(scaledX, scaledY, scaledSize, scaledSize, scaledSize * 0.22); ctx.clip();
+      ctx.drawImage(img, scaledX, scaledY, scaledSize, scaledSize);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = stringToColor(app.name);
+      ctx.beginPath(); ctx.roundRect(scaledX, scaledY, scaledSize, scaledSize, scaledSize * 0.22); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = `bold ${Math.floor(scaledSize * 0.48)}px sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(app.name.charAt(0).toUpperCase(), scaledX + scaledSize / 2, scaledY + scaledSize / 2);
+    }
+    if (running) {
+      ctx.fillStyle = active ? "#ffffff" : "rgba(255,255,255,0.55)";
+      ctx.beginPath(); ctx.arc(ix + iconSize / 2, dockY + dockH - 4, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+    regions.push({ exec: app.exec, bx: ix, by: dockY, bw: iconSize, bh: dockH });
+    ix += iconSize + gap;
+  }
+  ctx.restore();
+}
+
+// ─── Deepin Dock ──────────────────────────────────────────────────────────────
+
+function renderDeepinDock(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number,
+  iconSize: number,
+  apps: Array<{ exec: string; name: string; icon: string }>,
+  regions: Array<{ exec: string; bx: number; by: number; bw: number; bh: number }>,
+  bgColor = "#121a28", bgOpacity = 230, _radius = 14
+) {
+  const gap = 6;
+  const pad = 10;
+  const totalW = apps.length * (iconSize + gap) - gap + pad * 2;
+  const dockX = x + (w - totalW) / 2;
+  const dockY = y + 2;
+  const dockH = h - 4;
+
+  ctx.save();
+  const r = parseInt(bgColor.slice(1, 3), 16) || 18;
+  const g = parseInt(bgColor.slice(3, 5), 16) || 26;
+  const b = parseInt(bgColor.slice(5, 7), 16) || 40;
+  ctx.fillStyle = `rgba(${r},${g},${b},${(bgOpacity / 255).toFixed(3)})`;
+  ctx.beginPath(); ctx.roundRect(dockX, dockY, totalW, dockH, 14); ctx.fill();
+  ctx.strokeStyle = "rgba(32,140,255,0.35)"; ctx.lineWidth = 1; ctx.stroke();
+
+  let ix = dockX + pad;
+  const iy = dockY + (dockH - iconSize) / 2;
+
+  for (const app of apps) {
+    const hover = isHovering(ix, dockY, iconSize, dockH);
+    const running = isAppRunning(app.exec, _runningClasses);
+    const active = isAppActive(app.exec, _activeClass);
+
+    if (active || hover) {
+      ctx.fillStyle = active ? "rgba(32,140,255,0.22)" : "rgba(255,255,255,0.07)";
+      ctx.beginPath(); ctx.roundRect(ix - 4, dockY + 3, iconSize + 8, dockH - 6, 8); ctx.fill();
+    }
+
+    const img = getLauncherIcon(app.icon);
+    if (img) {
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(ix, iy, iconSize, iconSize, 10); ctx.clip();
+      ctx.drawImage(img, ix, iy, iconSize, iconSize);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = stringToColor(app.name);
+      ctx.beginPath(); ctx.roundRect(ix, iy, iconSize, iconSize, 10); ctx.fill();
+      ctx.fillStyle = "#fff";
+      ctx.font = `bold ${Math.floor(iconSize * 0.48)}px sans-serif`;
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(app.name.charAt(0).toUpperCase(), ix + iconSize / 2, iy + iconSize / 2);
+    }
+    if (running) {
+      ctx.fillStyle = active ? "#208cff" : "rgba(255,255,255,0.5)";
+      ctx.beginPath(); ctx.arc(ix + iconSize / 2, dockY + dockH - 4, 2.5, 0, Math.PI * 2); ctx.fill();
+    }
+    regions.push({ exec: app.exec, bx: ix, by: dockY, bw: iconSize, bh: dockH });
+    ix += iconSize + gap;
+  }
   ctx.restore();
 }

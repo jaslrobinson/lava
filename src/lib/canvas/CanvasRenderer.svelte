@@ -16,6 +16,9 @@
   import { setScrollPosition, triggerTap } from "./animationState";
   import { loadBundledIconFonts } from "../fonts/fontLoader";
   import { markDirty, shouldRenderFullFps, hasActiveLoopingAnimations, setWakeCallback, setIdleTimeout, needsRepaint, clearRepaint, IDLE_INTERVAL_MS } from "./renderScheduler";
+  import MapOverlay from "./MapOverlay.svelte";
+  import { launcherHitRegions, setLauncherHoverCoords, toggleStartMenu, closeStartMenu } from "./renderer";
+  import StartMenuOverlay from "./StartMenuOverlay.svelte";
 
   interface Props {
     fullscreen?: boolean;
@@ -43,6 +46,8 @@
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D;
   let containerEl: HTMLDivElement;
+  let startMenuVisible = $state(false);
+  let startMenuAnchorBounds = $state<{x:number;y:number;w:number;h:number} | null>(null);
   let baseScale = $state(1);
   let canvasStyleWidth = $state(800);
   let canvasStyleHeight = $state(450);
@@ -58,6 +63,8 @@
   let dragMode = $state<DragMode>("none");
   let dragOffset = $state({ x: 0, y: 0 });
   let panStart = $state({ x: 0, y: 0, px: 0, py: 0 });
+  let canvasOffsetX = $state(0);
+  let canvasOffsetY = $state(0);
   let resizeHandleIdx = $state(-1);
   let resizeStartMouse = $state({ x: 0, y: 0 });
   let resizeStartProps = $state({ x: 0, y: 0, w: 0, h: 0 });
@@ -79,6 +86,21 @@
   }
   let hoveredHandle = $state(-1);
   let hoveredLayerId = $state<string | null>(null);
+
+  // Collect all visible map layers from the project (for HTML overlays)
+  let mapLayers = $derived.by(() => {
+    const project = getProject();
+    const result: import("../types/project").Layer[] = [];
+    function collect(layers: import("../types/project").Layer[]) {
+      for (const l of layers) {
+        if (l.type === "map" && l.visible !== false) result.push(l);
+        if (l.children) collect(l.children);
+      }
+    }
+    collect(project.layers);
+    return result;
+  });
+
   let spaceHeld = $state(false);
 
   // OSD overlay state
@@ -204,11 +226,14 @@
     const containerRect = containerEl.getBoundingClientRect();
     if (containerRect.width === 0 || containerRect.height === 0) return;
 
+    let newStyleWidth: number;
+    let newStyleHeight: number;
+
     if (fullscreen) {
       canvas.width = project.resolution.width;
       canvas.height = project.resolution.height;
-      canvasStyleWidth = containerRect.width;
-      canvasStyleHeight = containerRect.height;
+      newStyleWidth = containerRect.width;
+      newStyleHeight = containerRect.height;
       baseScale = containerRect.width / project.resolution.width;
     } else {
       const scaleX = (containerRect.width - 40) / project.resolution.width;
@@ -218,9 +243,19 @@
       canvas.width = project.resolution.width;
       canvas.height = project.resolution.height;
 
-      canvasStyleWidth = Math.round(project.resolution.width * baseScale);
-      canvasStyleHeight = Math.round(project.resolution.height * baseScale);
+      newStyleWidth = Math.round(project.resolution.width * baseScale);
+      newStyleHeight = Math.round(project.resolution.height * baseScale);
     }
+
+    canvasStyleWidth = newStyleWidth;
+    canvasStyleHeight = newStyleHeight;
+
+    // Compute canvas offset within container directly from known dimensions.
+    // The canvas is centered by flexbox, so this is exact and avoids the
+    // getBoundingClientRect() staleness bug (Svelte flushes DOM updates
+    // asynchronously, so the canvas still has its old CSS size at this point).
+    canvasOffsetX = (containerRect.width - newStyleWidth) / 2;
+    canvasOffsetY = (containerRect.height - newStyleHeight) / 2;
   }
 
   function renderLoop(timestamp: number) {
@@ -387,6 +422,12 @@
   }
 
   function onMouseDown(e: MouseEvent) {
+    // Close start menu when clicking the canvas (the HTML overlay handles its own backdrop clicks)
+    if (startMenuVisible) {
+      startMenuVisible = false;
+      closeStartMenu();
+      markDirty();
+    }
     // Middle button or Space+click: start panning
     if (e.button === 1 || (spaceHeld && e.button === 0)) {
       dragMode = "pan";
@@ -438,9 +479,9 @@
       }
       if (getInteractiveMode()) {
         const project = getProject();
-        const action = findClickActionForHit(project.layers, id);
+        const action = findClickActionForHit(project.layers, id, e.clientX, e.clientY);
         if (action) {
-          handleClickAction(action, project);
+          handleClickAction(action, project, id);
           return; // Don't start a drag after firing a click action
         }
       }
@@ -538,6 +579,9 @@
         hoveredLayerId = hit;
       }
     }
+    // Pass hover coords to launcher renderer for highlight drawing
+    const hproj = canvasToProject(e.clientX, e.clientY);
+    setLauncherHoverCoords(hproj.x, hproj.y);
   }
 
   function onMouseUp() {
@@ -554,6 +598,8 @@
     if (hit !== hoveredLayerId) {
       hoveredLayerId = hit;
     }
+    const hproj2 = canvasToProject(e.clientX, e.clientY);
+    setLauncherHoverCoords(hproj2.x, hproj2.y);
   }
 
   /** Walk the layer tree to find the path from root to a target layer */
@@ -569,9 +615,20 @@
   }
 
   /** Find the nearest clickAction walking from hit layer up to root */
-  function findClickActionForHit(layers: Layer[], hitId: string): string | null {
+  function findClickActionForHit(layers: Layer[], hitId: string, clientX?: number, clientY?: number): string | null {
     const path = findPathToLayer(layers, hitId);
     if (!path) return null;
+    // Check launcher sub-regions first
+    const hitLayer = path[path.length - 1];
+    if (hitLayer?.type === "launcher" && clientX !== undefined && clientY !== undefined) {
+      const proj = canvasToProject(clientX, clientY);
+      const regions = launcherHitRegions.get(hitLayer.id) ?? [];
+      for (const r of regions) {
+        if (proj.x >= r.bx && proj.x <= r.bx + r.bw && proj.y >= r.by && proj.y <= r.by + r.bh) {
+          return `app:${r.exec}`;
+        }
+      }
+    }
     for (let i = path.length - 1; i >= 0; i--) {
       if (path[i].properties.clickAction) return path[i].properties.clickAction!;
     }
@@ -590,6 +647,11 @@
 
   function onFullscreenClick(e: MouseEvent) {
     markDirty();
+    if (startMenuVisible) {
+      startMenuVisible = false;
+      closeStartMenu();
+      markDirty();
+    }
     const id = hitTest(e.clientX, e.clientY);
     if (id) {
       const now = performance.now();
@@ -600,9 +662,9 @@
       } else {
         triggerTap(id, now);
       }
-      const action = findClickActionForHit(project.layers, id);
+      const action = findClickActionForHit(project.layers, id, e.clientX, e.clientY);
       if (action) {
-        handleClickAction(action, project);
+        handleClickAction(action, project, id);
       }
     }
   }
@@ -618,7 +680,19 @@
     return globals;
   }
 
-  async function handleClickAction(action: string, project: ReturnType<typeof getProject>) {
+  async function handleClickAction(action: string, project: ReturnType<typeof getProject>, triggerId?: string) {
+    if (action === "app:overlay:start_menu") {
+      startMenuVisible = !startMenuVisible;
+      if (triggerId) {
+        const bounds = getLayerBounds().get(triggerId);
+        startMenuAnchorBounds = bounds ? { x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h } : null;
+      }
+      toggleStartMenu();
+      const wk = (window as any).webkit?.messageHandlers?.lava;
+      if (wk) wk.postMessage(JSON.stringify({ type: startMenuVisible ? "start_menu_open" : "start_menu_close" }));
+      markDirty();
+      return;
+    }
     if (action.startsWith("set:")) {
       // set:varName:value — set a global variable
       const parts = action.split(":");
@@ -760,6 +834,10 @@
     }
   }
 
+  function onCanvasWheel(_e: WheelEvent) {
+    // scrolling handled by StartMenuOverlay when visible
+  }
+
   function onFullscreenWheel(e: WheelEvent) {
     markDirty();
     const id = hitTest(e.clientX, e.clientY);
@@ -795,7 +873,43 @@
     onmouseleave={fullscreen ? undefined : onMouseUp}
     onclick={fullscreen ? onFullscreenClick : undefined}
     ondblclick={fullscreen ? undefined : onDblClick}
-    onwheel={fullscreen ? onFullscreenWheel : onWheel}
+    onwheel={fullscreen ? onFullscreenWheel : onCanvasWheel}
+  />
+  {#each mapLayers as mapLayer (mapLayer.id)}
+    <MapOverlay
+      layer={mapLayer}
+      {baseScale}
+      {zoom}
+      {panX}
+      {panY}
+      {canvasOffsetX}
+      {canvasOffsetY}
+      containerW={getProject().resolution.width}
+      containerH={getProject().resolution.height}
+      interactive={isWallpaperView || fullscreen}
+    />
+  {/each}
+  <StartMenuOverlay
+    anchorBounds={startMenuAnchorBounds}
+    {baseScale}
+    {zoom}
+    {panX}
+    {panY}
+    {canvasOffsetX}
+    {canvasOffsetY}
+    containerW={getProject().resolution.width}
+    containerH={getProject().resolution.height}
+    interactive={isWallpaperView || fullscreen}
+    visible={startMenuVisible}
+    smBg="#1c1c1c"
+    smAccent="#60cdff"
+    onclose={() => {
+      startMenuVisible = false;
+      closeStartMenu();
+      const wk = (window as any).webkit?.messageHandlers?.lava;
+      if (wk) wk.postMessage(JSON.stringify({ type: "start_menu_close" }));
+      markDirty();
+    }}
   />
   {#if !fullscreen && zoom !== 1}
     <button class="zoom-indicator" onclick={resetView} title="Click to reset view">

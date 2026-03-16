@@ -873,6 +873,15 @@ impl Default for LayerProperties {
             color_mid: None,
             color_bottom: None,
             peak_color: None,
+            map_lat: None,
+            map_lng: None,
+            map_zoom: None,
+            map_show_radar: None,
+            map_radar_animate: None,
+            map_style: None,
+            launcher_style: None,
+            pinned_apps: None,
+            launcher_icon_size: None,
         }
     }
 }

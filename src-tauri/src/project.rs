@@ -11,6 +11,8 @@ pub enum LayerType {
     Progress,
     Fonticon,
     Visualizer,
+    Map,
+    Launcher,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -307,6 +309,28 @@ pub struct LayerProperties {
     pub color_bottom: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub peak_color: Option<String>,
+
+    // Map properties
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub map_lat: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub map_lng: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub map_zoom: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub map_show_radar: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub map_radar_animate: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub map_style: Option<String>,
+
+    // Launcher properties
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub launcher_style: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pinned_apps: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub launcher_icon_size: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

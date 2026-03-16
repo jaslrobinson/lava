@@ -13,14 +13,16 @@
   let showCustomFont = $state(false);
   let appPickerOpen = $state(false);
   let appPickerSearch = $state("");
-  let appList = $state<{ name: string; exec: string; icon: string }[]>([]);
+  let appPickerForPinned = $state(false);
+  let appList = $state<{ name: string; exec: string; icon: string; categories: string }[]>([]);
 
-  async function openAppPicker() {
+  async function openAppPicker(forPinned = false) {
+    appPickerForPinned = forPinned;
     appPickerOpen = true;
     if (appList.length === 0) {
       try {
         const { invoke } = await import("@tauri-apps/api/core");
-        appList = await invoke<{ name: string; exec: string; icon: string }[]>("list_apps");
+        appList = await invoke<typeof appList>("list_apps");
       } catch (e) {
         console.warn("list_apps failed:", e);
       }
@@ -29,9 +31,39 @@
 
   function selectApp(exec: string) {
     const layer = getSelectedLayer();
-    if (layer) updateLayerProperty(layer.id, "clickAction", "app:" + exec);
-    appPickerOpen = false;
-    appPickerSearch = "";
+    if (!layer) { appPickerOpen = false; appPickerSearch = ""; return; }
+    if (appPickerForPinned) {
+      const current = (layer.properties.pinnedApps ?? []) as string[];
+      if (!current.includes(exec)) {
+        updateLayerProperty(layer.id, "pinnedApps", [...current, exec]);
+      }
+      appPickerSearch = ""; // keep picker open to add more
+    } else {
+      updateLayerProperty(layer.id, "clickAction", "app:" + exec);
+      appPickerOpen = false;
+      appPickerSearch = "";
+    }
+  }
+
+  function removePinnedApp(exec: string) {
+    const layer = getSelectedLayer();
+    if (!layer) return;
+    const current = (layer.properties.pinnedApps ?? []) as string[];
+    updateLayerProperty(layer.id, "pinnedApps", current.filter(e => e !== exec));
+  }
+
+  function getIconSrc(iconPath: string): string {
+    if (!iconPath) return "";
+    // list_apps now returns resolved absolute paths — convert to asset URL
+    try { return convertFileSrc(iconPath); } catch { return iconPath; }
+  }
+
+  function iconLetter(name: string): string { return name.charAt(0).toUpperCase(); }
+
+  function iconBg(name: string): string {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h);
+    return `hsl(${Math.abs(h) % 360},40%,36%)`;
   }
 
   // Derived state for click action UI
@@ -87,7 +119,7 @@
     const target = e.target as HTMLInputElement | HTMLSelectElement;
     const raw = target.value;
     // Try to parse as number for numeric fields
-    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity"];
+    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "radarDotSize", "radarRingCount", "taskbarBgOpacity", "taskbarRadius"];
     if (numericKeys.includes(key)) {
       const num = Number(raw);
       updateLayerProperty(layer.id, key, isNaN(num) ? raw : num);
@@ -555,6 +587,102 @@
           </div>
         </section>
       {/if}
+      {#if layer.type === "map"}
+        <section class="prop-section">
+          <div class="section-title">Map</div>
+          <div class="prop-stack">
+            <label>Latitude</label>
+            <input type="number" step="0.1" value={props.mapLat ?? 40.7} oninput={(e) => onInput("mapLat", e)} />
+            <label>Longitude</label>
+            <input type="number" step="0.1" value={props.mapLng ?? -74.0} oninput={(e) => onInput("mapLng", e)} />
+            <label>Zoom</label>
+            <input type="number" min="0" max="18" value={props.mapZoom ?? 5} oninput={(e) => onInput("mapZoom", e)} />
+            <label>Style</label>
+            <select value={props.mapStyle ?? "dark"} onchange={(e) => onSelectInput("mapStyle", e)}>
+              <option value="dark">Dark (CartoDB)</option>
+              <option value="streets">Streets (OSM)</option>
+              <option value="satellite">Satellite (ArcGIS)</option>
+            </select>
+            <label>Show Radar</label>
+            <input type="checkbox" checked={props.mapShowRadar ?? true} onchange={(e) => updateLayerProperty(layer.id, "mapShowRadar", (e.target as HTMLInputElement).checked)} />
+            <label>Animate Radar</label>
+            <input type="checkbox" checked={props.mapRadarAnimate ?? false} onchange={(e) => updateLayerProperty(layer.id, "mapRadarAnimate", (e.target as HTMLInputElement).checked)} />
+            <span class="prop-hint">Uses RainViewer (free, no API key). Requires internet.</span>
+          </div>
+        </section>
+      {/if}
+
+      {#if layer.type === "launcher"}
+        <section class="prop-section">
+          <div class="section-title">Launcher</div>
+          <div class="prop-stack">
+            <label>Style</label>
+            <select value={props.launcherStyle ?? "win11"} onchange={(e) => onSelectInput("launcherStyle", e)}>
+              <option value="win11">Windows 11</option>
+              <option value="macos">macOS</option>
+              <option value="deepin">Deepin</option>
+            </select>
+            <label>Icon Size</label>
+            <input type="number" min="16" max="96" value={props.launcherIconSize ?? 36} oninput={(e) => onInput("launcherIconSize", e)} />
+            <label style="margin-top: 6px; font-weight: 600;">Appearance</label>
+            <label>Bar Background</label>
+            <ColorField value={String(props.taskbarBg ?? "#141414")} defaultColor="#141414" onChange={(v) => onColorProp("taskbarBg", v)} />
+            <label>Bar Opacity</label>
+            <input type="range" min="0" max="255" value={props.taskbarBgOpacity ?? 235} oninput={(e) => onInput("taskbarBgOpacity", e)} style="width:100%" />
+            <label>Corner Radius</label>
+            <input type="number" min="0" max="32" value={props.taskbarRadius ?? 0} oninput={(e) => onInput("taskbarRadius", e)} />
+            {#if (props.launcherStyle ?? "win11") === "win11"}
+            <label style="margin-top: 6px; font-weight: 600;">Start Menu</label>
+            <label>Menu Background</label>
+            <ColorField value={String(props.smBg ?? "#1c1c1c")} defaultColor="#1c1c1c" onChange={(v) => onColorProp("smBg", v)} />
+            <label>Accent Color</label>
+            <ColorField value={String(props.smAccent ?? "#60cdff")} defaultColor="#60cdff" onChange={(v) => onColorProp("smAccent", v)} />
+            {/if}
+            <label style="margin-top: 6px; font-weight: 600;">Pinned Apps</label>
+            <div class="pinned-list">
+              {#each (props.pinnedApps ?? []) as exec (exec)}
+                {@const appInfo = appList.find(a => a.exec === exec || a.exec.startsWith(exec + " ") || a.exec.split(/[\s/]/).pop() === exec)}
+                <div class="pinned-item">
+                  <span class="pinned-icon-wrap">
+                    {#if appInfo}
+                      <img src={getIconSrc(appInfo.icon)} alt="" class="pinned-icon"
+                        onerror={(e) => { (e.target as HTMLImageElement).style.display='none'; ((e.target as HTMLImageElement).nextElementSibling as HTMLElement).style.display='flex'; }} />
+                      <span class="pinned-letter" style="background:{iconBg(appInfo.name)};display:none">{iconLetter(appInfo.name)}</span>
+                    {:else}
+                      <span class="pinned-letter" style="background:{iconBg(exec)}">{iconLetter(exec)}</span>
+                    {/if}
+                  </span>
+                  <span class="pinned-name">{appInfo?.name ?? exec}</span>
+                  <button class="pinned-remove" onclick={() => removePinnedApp(exec)} title="Remove">×</button>
+                </div>
+              {/each}
+              {#if (props.pinnedApps ?? []).length === 0}
+                <span class="prop-hint" style="padding:6px 0;">No apps pinned yet</span>
+              {/if}
+            </div>
+            <button class="browse-btn" style="width:100%;text-align:center;margin-top:4px;" onclick={() => openAppPicker(true)}>+ Add App</button>
+          </div>
+        </section>
+      {/if}
+
+      {#if layer.type === "radar"}
+        <section class="prop-section">
+          <div class="section-title">Radar</div>
+          <div class="prop-stack">
+            <label>Sweep Color</label>
+            <ColorField value={String(props.radarSweepColor ?? "#00ff4480")} defaultColor="#00ff4480" onChange={(v) => onColorProp("radarSweepColor", v)} />
+            <label>Ring Color</label>
+            <ColorField value={String(props.radarRingColor ?? "#00ff4440")} defaultColor="#00ff4440" onChange={(v) => onColorProp("radarRingColor", v)} />
+            <label>Dot Color</label>
+            <ColorField value={String(props.radarDotColor ?? "#00ff44")} defaultColor="#00ff44" onChange={(v) => onColorProp("radarDotColor", v)} />
+            <label>Dot Size</label>
+            <input type="number" min="1" max="20" value={props.radarDotSize ?? 4} oninput={(e) => onInput("radarDotSize", e)} />
+            <label>Ring Count</label>
+            <input type="number" min="1" max="10" value={props.radarRingCount ?? 3} oninput={(e) => onInput("radarRingCount", e)} />
+          </div>
+        </section>
+      {/if}
+
       <AnimationPanel />
     {:else}
       <div class="empty-state">Select a layer to edit its properties.</div>
@@ -579,7 +707,7 @@
   <div class="modal-backdrop" onclick={() => { appPickerOpen = false; appPickerSearch = ""; }}>
     <div class="app-picker-modal" onclick={(e) => e.stopPropagation()}>
       <div class="app-picker-header">
-        <span>Select App</span>
+        <span>{appPickerForPinned ? "Add Pinned App" : "Select App"}</span>
         <span style="cursor:pointer;font-size:18px;line-height:1;" onclick={() => { appPickerOpen = false; appPickerSearch = ""; }}>&times;</span>
       </div>
       <input
@@ -590,17 +718,32 @@
         oninput={(e) => appPickerSearch = (e.target as HTMLInputElement).value}
       />
       <div class="app-picker-list">
-        {#each appList.filter(a => a.name.toLowerCase().includes(appPickerSearch.toLowerCase())) as app}
+        {#each appList.filter(a => a.name.toLowerCase().includes(appPickerSearch.toLowerCase())) as app (app.exec)}
           <div class="app-picker-item" onclick={() => selectApp(app.exec)} role="button" tabindex="0"
             onkeydown={(e) => { if (e.key === 'Enter') selectApp(app.exec); }}>
-            <span class="app-picker-name">{app.name}</span>
-            <span class="app-picker-exec">{app.exec}</span>
+            <span class="app-picker-icon-wrap">
+              <img src={getIconSrc(app.icon)} alt="" class="app-picker-icon"
+                onerror={(e) => { (e.target as HTMLImageElement).style.display='none'; ((e.target as HTMLImageElement).nextElementSibling as HTMLElement).style.display='flex'; }} />
+              <span class="app-picker-icon-letter" style="background:{iconBg(app.name)};display:none">{iconLetter(app.name)}</span>
+            </span>
+            <span class="app-picker-info">
+              <span class="app-picker-name">{app.name}</span>
+              <span class="app-picker-exec">{app.exec.split(" ")[0]}</span>
+            </span>
+            {#if appPickerForPinned}
+              <span class="app-picker-add">+</span>
+            {/if}
           </div>
         {/each}
         {#if appList.length === 0}
           <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px;">Loading apps...</div>
         {/if}
       </div>
+      {#if appPickerForPinned}
+        <div style="padding:8px;border-top:1px solid var(--border);">
+          <button class="browse-btn" style="width:100%;text-align:center;" onclick={() => { appPickerOpen = false; appPickerSearch = ""; }}>Done</button>
+        </div>
+      {/if}
     </div>
   </div>
 {/if}
@@ -835,8 +978,64 @@
     overflow-y: auto;
     flex: 1;
   }
+  /* Pinned apps list */
+  .pinned-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px;
+  }
+  .pinned-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 3px 4px;
+    border-radius: 3px;
+    min-height: 28px;
+  }
+  .pinned-item:hover { background: var(--bg-primary); }
+  .pinned-icon-wrap {
+    width: 22px; height: 22px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pinned-icon { width: 22px; height: 22px; object-fit: contain; border-radius: 3px; }
+  .pinned-letter {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 3px;
+    color: #fff; font-size: 11px; font-weight: bold;
+  }
+  .pinned-name { flex: 1; font-size: 12px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pinned-remove {
+    background: none; border: none; cursor: pointer;
+    color: var(--text-muted); font-size: 15px; line-height: 1;
+    padding: 0 2px; opacity: 0.6;
+  }
+  .pinned-remove:hover { color: #e06060; opacity: 1; }
+  /* App picker icons */
+  .app-picker-icon-wrap {
+    width: 28px; height: 28px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .app-picker-icon { width: 28px; height: 28px; object-fit: contain; border-radius: 4px; }
+  .app-picker-icon-letter {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 4px; color: #fff; font-size: 13px; font-weight: bold;
+  }
+  .app-picker-info { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  .app-picker-add { color: var(--accent, #60cdff); font-size: 16px; font-weight: bold; padding-right: 4px; }
+
   .app-picker-item {
-    padding: 7px 14px;
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 10px;
     cursor: pointer;
     display: flex;
     flex-direction: column;
@@ -844,6 +1043,6 @@
     border-bottom: 1px solid var(--border);
   }
   .app-picker-item:hover { background: var(--bg-secondary); }
-  .app-picker-name { font-size: 13px; color: var(--text-primary); }
-  .app-picker-exec { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); }
+  .app-picker-name { font-size: 12px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app-picker-exec { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 </style>

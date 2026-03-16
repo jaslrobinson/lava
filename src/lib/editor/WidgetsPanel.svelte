@@ -29,6 +29,12 @@
   function mkVisualizer(name: string, props: Record<string, any>): Layer {
     return { id: id(), name, type: "visualizer", properties: { x: 0, y: 0, width: 400, height: 120, opacity: 255, anchor: "top-left", barCount: 24, barSpacing: 3, sensitivity: 1.2, colorTop: "#88C0D0", colorMid: "#5E81AC", colorBottom: "#2E3440", peakColor: "#ECEFF4", ...props }, visible: true, locked: false };
   }
+  function mkLauncher(name: string, props: Record<string, any>): Layer {
+    return { id: id(), name, type: "launcher", properties: { x: 0, y: 0, width: 1920, height: 48, opacity: 255, anchor: "bottom-left", launcherStyle: "win11", launcherIconSize: 36, pinnedApps: [], ...props }, visible: true, locked: false };
+  }
+  function mkFontIcon(name: string, props: Record<string, any>): Layer {
+    return { id: id(), name, type: "fonticon", properties: { x: 0, y: 0, width: 36, height: 36, opacity: 255, anchor: "top-left", iconSet: "material", glyphCode: "e1a0", color: "#ffffff", fontSize: 20, ...props }, visible: true, locked: false };
+  }
 
   const categories: Category[] = [
     // ── CLOCKS ──
@@ -286,6 +292,50 @@
             mkText("SSID", { text: "$ni(ssid)$", fontSize: 16, color: "#ffffff", width: 300, height: 22 }),
             mkText("IP", { text: "$ni(ip)$", fontSize: 12, color: "#888888", width: 300, height: 16 }),
           ]),
+        },
+        {
+          name: "Win11 Taskbar",
+          description: "Windows 11-style taskbar — all elements are individual editable layers",
+          build: () => mkOverlap("Win11 Taskbar", { x: 0, y: 0, width: 1920, height: 48, anchor: "bottom-left" }, [
+            // Background bar
+            mkShape("Bar BG", { shapeKind: "rectangle", fill: "#141414", opacity: 235, width: 1920, height: 48, x: 0, y: 0 }),
+            // Top border line
+            mkShape("Border", { shapeKind: "rectangle", fill: "#ffffff14", width: 1920, height: 1, x: 0, y: 0 }),
+            // Start button (⊞ Windows logo)
+            mkText("Start Button", { text: "\u229e", fontSize: 22, color: "#ffffff", textAlign: "center", x: 8, y: 12, width: 36, height: 24, clickAction: "app:overlay:start_menu" }),
+            // Search pill background
+            mkShape("Search BG", { shapeKind: "rectangle", fill: "#ffffff0f", cornerRadius: 17, x: 52, y: 8, width: 260, height: 32 }),
+            // Search icon + hint
+            mkText("Search", { text: "\ud83d\udd0d Search", fontSize: 13, color: "#ffffff70", x: 72, y: 16, width: 220, height: 16 }),
+            // App icons (launcher — only renders pinned app icons)
+            mkLauncher("App Icons", { x: 400, y: 0, width: 720, height: 48, launcherStyle: "win11", launcherIconSize: 34 }),
+            // ── RIGHT TRAY ──
+            // Notification bell
+            mkText("Notifications", { text: "\ud83d\udd14", fontSize: 16, color: "#ffffffcc", textAlign: "center", x: 1476, y: 14, width: 28, height: 20 }),
+            // Quick settings — wifi
+            mkText("Wifi", { text: "\ud83d\udce6", fontSize: 15, color: "$if(nc(connected)=1,#88ff88,#ff6666)$", textAlign: "center", x: 1508, y: 14, width: 24, height: 20 }),
+            // Quick settings — volume
+            mkText("Volume", { text: "\ud83d\udd0a", fontSize: 15, color: "#ffffffcc", textAlign: "center", x: 1534, y: 14, width: 24, height: 20, scrollAction: "volume:adjust" }),
+            // Battery
+            mkText("Battery", { text: "\ud83d\udd0b $bi(level)$%", fontSize: 11, color: "$if(bi(plugged)=1,#88ff88,#cccccc)$", x: 1560, y: 15, width: 52, height: 18 }),
+            // Clock
+            mkStack("Clock", { x: 1620, y: 6, width: 90, height: 36, spacing: 0 }, [
+              mkText("Time", { text: "$df(h:mm a)$", fontSize: 13, color: "#ffffff", textAlign: "center", width: 90, height: 18 }),
+              mkText("Date", { text: "$df(M/d/yyyy)$", fontSize: 11, color: "#cccccc", textAlign: "center", width: 90, height: 14 }),
+            ]),
+            // Show desktop strip
+            mkShape("Show Desktop", { shapeKind: "rectangle", fill: "#ffffff0f", x: 1914, y: 4, width: 5, height: 40, clickAction: "app:hyprctl dispatch togglespecialworkspace" }),
+          ]),
+        },
+        {
+          name: "macOS Dock",
+          description: "macOS-style floating app dock at the bottom of the screen",
+          build: () => mkLauncher("macOS Dock", { launcherStyle: "macos", launcherIconSize: 48, height: 72 }),
+        },
+        {
+          name: "Deepin Dock",
+          description: "Deepin-style taskbar dock with pinned apps",
+          build: () => mkLauncher("Deepin Dock", { launcherStyle: "deepin", launcherIconSize: 40, height: 60 }),
         },
         {
           name: "Top Bar",

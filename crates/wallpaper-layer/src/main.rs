@@ -1,7 +1,7 @@
 use gtk::prelude::*;
 use gtk::gdk;
 use gtk_layer_shell::LayerShell;
-use webkit2gtk::{gio, UserContentManager, UserContentManagerExt, WebContext, WebView, WebViewExt, WebViewExtManual, WebsiteDataManager};
+use webkit2gtk::{gio, UserContentInjectedFrames, UserContentManager, UserContentManagerExt, UserScript, UserScriptInjectionTime, WebContext, WebView, WebViewExt, WebViewExtManual, WebsiteDataManager};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -143,18 +143,80 @@ fn run_gtk_wallpaper(url: &str, project_json: Option<String>) {
     let ucm = UserContentManager::new();
     ucm.register_script_message_handler("lava");
 
-    ucm.connect_script_message_received(Some("lava"), |_ucm, js_result| {
-        if let Some(js_val) = js_result.js_value() {
-            use javascriptcore::ValueExt;
-            let msg = js_val.to_str();
-            handle_message(&msg);
-        }
-    });
-
     // Use a separate WebKit data directory to avoid conflicts with the editor
     let data_manager = WebsiteDataManager::new_ephemeral();
     let web_context = WebContext::with_website_data_manager(&data_manager);
     let webview = WebView::new_with_context_and_user_content_manager(&web_context, &ucm);
+
+    // Shared flag: is the start menu open? Used by the GTK key press handler.
+    let start_menu_open = std::rc::Rc::new(std::cell::Cell::new(false));
+
+    // Connect message handler after webview creation so we can grab GTK focus.
+    {
+        let window_for_msg = window.clone();
+        let webview_for_msg = webview.clone();
+        let smo_msg = start_menu_open.clone();
+        ucm.connect_script_message_received(Some("lava"), move |_ucm, js_result| {
+            if let Some(js_val) = js_result.js_value() {
+                use javascriptcore::ValueExt;
+                let msg = js_val.to_str();
+                match extract_json_field(&msg, "type") {
+                    Some("start_menu_open") => {
+                        smo_msg.set(true);
+                        window_for_msg.set_layer(gtk_layer_shell::Layer::Top);
+                        window_for_msg.set_keyboard_mode(gtk_layer_shell::KeyboardMode::Exclusive);
+                        webview_for_msg.grab_focus();
+                    }
+                    Some("start_menu_close") => {
+                        smo_msg.set(false);
+                        window_for_msg.set_keyboard_mode(gtk_layer_shell::KeyboardMode::None);
+                        window_for_msg.set_layer(gtk_layer_shell::Layer::Bottom);
+                    }
+                    _ => handle_message(&msg),
+                }
+            }
+        });
+    }
+
+    // GTK key press → inject into WebKit via run_javascript.
+    // WebKitGTK on Wayland layer-shell does not reliably route compositor
+    // keyboard focus into the WebKit DOM — intercepting at the GTK level and
+    // calling run_javascript is the only reliable path.
+    {
+        let wv_key = webview.clone();
+        let smo_key = start_menu_open.clone();
+        window.connect_key_press_event(move |_, key| {
+            let keyval = key.keyval();
+            if !smo_key.get() {
+                return gtk::glib::Propagation::Proceed;
+            }
+            let js: Option<String> = match keyval {
+                gdk::keys::constants::BackSpace =>
+                    Some("window.__lavaKey&&window.__lavaKey('Backspace')".into()),
+                gdk::keys::constants::Delete =>
+                    Some("window.__lavaKey&&window.__lavaKey('Delete')".into()),
+                gdk::keys::constants::Escape =>
+                    Some("window.__lavaKey&&window.__lavaKey('Escape')".into()),
+                gdk::keys::constants::Return | gdk::keys::constants::KP_Enter =>
+                    Some("window.__lavaKey&&window.__lavaKey('Enter')".into()),
+                _ => keyval.to_unicode().and_then(|c| {
+                    if !c.is_control() {
+                        Some(format!(
+                            "window.__lavaKey&&window.__lavaKey({})",
+                            serde_json::to_string(&c.to_string()).unwrap_or_default()
+                        ))
+                    } else {
+                        None
+                    }
+                }),
+            };
+            if let Some(js) = js {
+                wv_key.run_javascript(&js, None::<&gio::Cancellable>, |_| {});
+                return gtk::glib::Propagation::Stop;
+            }
+            gtk::glib::Propagation::Proceed
+        });
+    }
 
     // Handle web process crashes — reload instead of showing blank
     {
@@ -169,21 +231,36 @@ fn run_gtk_wallpaper(url: &str, project_json: Option<String>) {
         });
     }
 
-    // Once the page finishes loading, inject the project data via JS
-    if let Some(json) = project_json {
-        eprintln!("[lava-wallpaper] Will inject project ({} bytes) after page load", json.len());
-        webview.connect_load_changed(move |wv: &WebView, event| {
-            if event == webkit2gtk::LoadEvent::Finished {
-                let js = format!("window.__LAVA_PROJECT = {};", json);
-                eprintln!("[lava-wallpaper] Injecting project data now");
-                wv.run_javascript(&js, None::<&gio::Cancellable>, |result| {
-                    match result {
-                        Ok(_) => eprintln!("[lava-wallpaper] Project injection succeeded"),
-                        Err(e) => eprintln!("[lava-wallpaper] Project injection failed: {}", e),
-                    }
-                });
-            }
-        });
+    // Build apps JSON upfront (synchronous filesystem scan)
+    let apps_entries = lava_core::apps::list_apps();
+    eprintln!("[lava-wallpaper] Loaded {} apps for Start Menu", apps_entries.len());
+    let apps_json = serde_json::to_string(&apps_entries).unwrap_or_else(|_| "[]".to_string());
+
+    // Inject apps list at document start so it's available before any JS runs.
+    // This eliminates the race condition where loadLauncherApps() fires before
+    // run_javascript() injects __LAVA_APPS after LoadEvent::Finished.
+    {
+        let apps_script = UserScript::new(
+            &format!("window.__LAVA_APPS = {};", apps_json),
+            UserContentInjectedFrames::TopFrame,
+            UserScriptInjectionTime::Start,
+            &[],
+            &[],
+        );
+        ucm.add_script(&apps_script);
+    }
+
+    // Inject project data at document start (if available)
+    if let Some(ref json) = project_json {
+        eprintln!("[lava-wallpaper] Injecting project ({} bytes) via UserScript at document start", json.len());
+        let project_script = UserScript::new(
+            &format!("window.__LAVA_PROJECT = {};", json),
+            UserContentInjectedFrames::TopFrame,
+            UserScriptInjectionTime::Start,
+            &[],
+            &[],
+        );
+        ucm.add_script(&project_script);
     }
 
     // Make the WebKit background fully transparent so the GTK window

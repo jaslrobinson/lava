@@ -13,6 +13,7 @@ export interface AnimatedDeltas {
   scaleY: number;
   blur: number;
   colorOverride: string | null;
+  flashOverlay: number; // 0-1 white overlay alpha for flash animation
 }
 
 function emptyDeltas(): AnimatedDeltas {
@@ -26,6 +27,7 @@ function emptyDeltas(): AnimatedDeltas {
     scaleY: 1,
     blur: 0,
     colorOverride: null,
+    flashOverlay: 0,
   };
 }
 
@@ -72,8 +74,9 @@ function computeProgress(anim: Animation, layerId: string, timestamp: number): n
       const elapsed = timestamp - state.tapTime - delay;
       if (elapsed < 0) return null;
       if (anim.loop === "none" || !anim.loop) {
-        // One-shot: animate over `speed` ms then hold at end
-        return Math.min(1, elapsed / speed);
+        // One-shot: play forward then return to base state when done
+        if (elapsed >= speed) return null;
+        return elapsed / speed;
       }
       return applyLoop(elapsed / speed, anim.loop);
     }
@@ -205,10 +208,10 @@ function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDelta
     }
 
     case "flash": {
-      // Flash: peaks bright at the start, decays to normal by progress=1
-      // amount = peak opacity (0-255), default behavior: starts at amount, returns to base
+      // Flash: white overlay that peaks at tap and fades to transparent.
+      // Uses canvas source-atop compositing — works regardless of ctx.filter support.
       const flashIntensity = 1 - t; // 1 at start, 0 at end
-      deltas.opacityMultiplier *= 1 + (amount / 255) * flashIntensity;
+      deltas.flashOverlay = Math.max(deltas.flashOverlay, (amount / 255) * flashIntensity);
       break;
     }
   }

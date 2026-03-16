@@ -110,13 +110,19 @@ pub fn start_wallpaper_mode(window: tauri::WebviewWindow, project: serde_json::V
         .ok_or_else(|| "lava-wallpaper binary not found. Build it with: cargo build -p lava-wallpaper".to_string())?;
 
     // Launch wallpaper in standalone mode so it survives editor exit.
-    // The frontend auto-saves before calling this, so lastProjectPath is current.
-    // Always use production mode (own HTTP server) — never --dev, because Vite
-    // dies with the editor and takes the wallpaper page down.
+    // In debug builds, pass --dev so the wallpaper loads from the Vite dev server
+    // (localhost:1420) — this means JS changes are reflected immediately via HMR.
+    // In release builds, the wallpaper uses its own HTTP server serving dist/.
     // Use `setsid --fork` to fully detach from the editor's process group/session.
-    let args = vec!["--fork", binary.to_str().unwrap_or("lava-wallpaper"), "--standalone"];
+    let binary_str = binary.to_str().unwrap_or("lava-wallpaper");
+    let args: Vec<&str> = if cfg!(debug_assertions) {
+        vec!["--fork", binary_str, "--standalone", "--dev"]
+    } else {
+        vec!["--fork", binary_str, "--standalone"]
+    };
 
-    eprintln!("[wallpaper] Spawning setsid --fork {:?} --standalone", binary);
+    eprintln!("[wallpaper] Spawning setsid --fork {:?} --standalone{}", binary,
+        if cfg!(debug_assertions) { " --dev" } else { "" });
 
     let child = Command::new("setsid")
         .args(&args)
