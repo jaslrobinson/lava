@@ -14,7 +14,7 @@ chrono = "0.4"
 rustfft = "6.2"
 dirs = "5"
 tiny_http = "0.12"
-ureq = { version = "2", default-features = false, features = ["json", "native-tls"] }
+ureq = { version = "2", default-features = false, features = ["json", "tls"] }
 base64 = "0.22"
 nix = { version = "0.29", features = ["fs"] }
 rusqlite = { version = "0.31", features = ["bundled"], optional = true }

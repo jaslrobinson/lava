@@ -433,7 +433,10 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number)
 function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, _h: number) {
   const props = layer.properties;
   const fontSize = resolveNumber(props.fontSize, 24);
-  const fontFamily = props.fontFamily || "sans-serif";
+  const rawFamily = props.fontFamily || "sans-serif";
+  // Quote font family names containing spaces for ctx.font
+  const fontFamily = rawFamily.includes(" ") && !rawFamily.includes(",") && !rawFamily.startsWith('"') && !rawFamily.startsWith("'")
+    ? `"${rawFamily}"` : rawFamily;
   const color = resolve(props.color, "#ffffff");
   const text = resolve(props.text, "");
   const align = props.textAlign || "left";

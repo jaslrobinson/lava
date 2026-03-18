@@ -455,6 +455,54 @@ pub fn list_project_fonts(asset_dir: String) -> Result<Vec<String>, String> {
     Ok(fonts)
 }
 
+/// Discover system fonts via fc-list
+#[tauri::command]
+pub fn list_system_fonts() -> Result<Vec<SystemFont>, String> {
+    let output = std::process::Command::new("fc-list")
+        .args(["--format", "%{family}|%{file}|%{style}\n"])
+        .output()
+        .map_err(|e| format!("Failed to run fc-list: {}", e))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let mut seen = std::collections::HashSet::new();
+    let mut fonts = Vec::new();
+
+    for line in stdout.lines() {
+        let parts: Vec<&str> = line.splitn(3, '|').collect();
+        if parts.len() < 2 {
+            continue;
+        }
+        // fc-list family can contain comma-separated aliases; take the first
+        let family = parts[0].split(',').next().unwrap_or(parts[0]).trim();
+        if family.is_empty() || !seen.insert(family.to_string()) {
+            continue;
+        }
+        let file = parts[1].trim().to_string();
+        let style = if parts.len() > 2 {
+            parts[2].split(',').next().unwrap_or("Regular").trim().to_string()
+        } else {
+            "Regular".to_string()
+        };
+        fonts.push(SystemFont {
+            name: family.to_string(),
+            family: family.to_string(),
+            file,
+            style,
+        });
+    }
+
+    fonts.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(fonts)
+}
+
+#[derive(serde::Serialize, Clone)]
+pub struct SystemFont {
+    pub name: String,
+    pub family: String,
+    pub file: String,
+    pub style: String,
+}
+
 /// Copy a file into the project's asset directory under a subfolder
 #[tauri::command]
 pub fn copy_asset_to_project(

@@ -150,6 +150,7 @@ pub fn run() {
             commands::project::import_komp,
             commands::project::export_komp,
             commands::project::list_project_fonts,
+            commands::project::list_system_fonts,
             commands::project::copy_asset_to_project,
             commands::project::extract_apk_icon,
             commands::project::write_icon_file,

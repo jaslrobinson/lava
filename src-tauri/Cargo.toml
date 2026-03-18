@@ -1,6 +1,6 @@
 [package]
 name = "lava"
-version = "0.2.1"
+version = "0.2.2"
 edition = "2021"
 
 [features]
@@ -19,7 +19,7 @@ chrono = "0.4"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 tauri-plugin-global-shortcut = "2"
 dirs = "5"
-ureq = { version = "2", default-features = false, features = ["json", "native-tls"] }
+ureq = { version = "2", default-features = false, features = ["json", "tls"] }
 base64 = "0.22"
 rustfft = "6.2"
 rusqlite = { version = "0.31", features = ["bundled"], optional = true }

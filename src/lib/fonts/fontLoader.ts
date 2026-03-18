@@ -1,7 +1,15 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 
+export interface DiscoveredFont {
+  name: string;
+  family: string;
+  file: string;
+  style: string;
+}
+
 const loadedFonts = new Map<string, FontFace>();
 let projectFontNames: string[] = [];
+let discoveredSystemFonts: DiscoveredFont[] = [];
 
 /** Load a font from a file path (absolute) and register it */
 export async function loadFont(name: string, filePath: string): Promise<boolean> {
@@ -83,6 +91,32 @@ export function getProjectFontNames(): string[] {
 /** Check if a font is loaded/available */
 export function isFontLoaded(name: string): boolean {
   return loadedFonts.has(name);
+}
+
+/** Discover all system fonts via fc-list */
+export async function discoverSystemFonts(): Promise<DiscoveredFont[]> {
+  if (discoveredSystemFonts.length > 0) return discoveredSystemFonts;
+  try {
+    const { invoke } = await import("@tauri-apps/api/core");
+    discoveredSystemFonts = await invoke<DiscoveredFont[]>("list_system_fonts");
+    return discoveredSystemFonts;
+  } catch (e) {
+    console.warn("Failed to discover system fonts:", e);
+    return [];
+  }
+}
+
+/** Get cached discovered system fonts */
+export function getDiscoveredSystemFonts(): DiscoveredFont[] {
+  return discoveredSystemFonts;
+}
+
+/** Load a system font by name (on-demand when selected) */
+export async function ensureSystemFontLoaded(family: string): Promise<boolean> {
+  if (loadedFonts.has(family)) return true;
+  const font = discoveredSystemFonts.find(f => f.family === family);
+  if (!font) return false;
+  return loadFont(family, font.file);
 }
 
 /** Load bundled icon fonts (Material Icons, Font Awesome) */

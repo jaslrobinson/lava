@@ -6,11 +6,16 @@
   import IconPicker from "./IconPicker.svelte";
   import ColorField from "./ColorField.svelte";
   import { SYSTEM_FONTS } from "../data/fonts";
-  import { getProjectFontNames, loadFont } from "../fonts/fontLoader";
+  import { getProjectFontNames, loadFont, discoverSystemFonts, getDiscoveredSystemFonts, ensureSystemFontLoaded, type DiscoveredFont } from "../fonts/fontLoader";
 
   let formulaHelperOpen = $state(false);
   let iconPickerOpen = $state(false);
   let showCustomFont = $state(false);
+  let systemFonts = $state<DiscoveredFont[]>([]);
+  let fontSearch = $state("");
+
+  // Discover system fonts on first render
+  discoverSystemFonts().then(fonts => { systemFonts = fonts; });
   let appPickerOpen = $state(false);
   let appPickerSearch = $state("");
   let appPickerForPinned = $state(false);
@@ -338,17 +343,32 @@
                 <button class="browse-btn" title="Back to list" onclick={() => showCustomFont = false}>List</button>
               </div>
             {:else}
+              <input type="text" bind:value={fontSearch} placeholder="Search fonts..." style="margin-bottom: 3px; padding: 3px 6px; font-size: 11px;" />
               <div class="input-row">
-                <select value={props.fontFamily ?? "sans-serif"} onchange={(e) => onSelectInput("fontFamily", e)}>
-                  <optgroup label="System Fonts">
-                    {#each SYSTEM_FONTS as font}
-                      <option value={font.family}>{font.name}</option>
-                    {/each}
-                  </optgroup>
+                <select value={props.fontFamily ?? "sans-serif"} onchange={async (e) => {
+                  const target = e.target as HTMLSelectElement;
+                  const value = target.value;
+                  await ensureSystemFontLoaded(value);
+                  const layer = getSelectedLayer();
+                  if (layer) updateLayerProperty(layer.id, "fontFamily", value);
+                }}>
                   {#if getProjectFontNames().length > 0}
                     <optgroup label="Project Fonts">
-                      {#each getProjectFontNames() as name}
+                      {#each getProjectFontNames().filter(n => !fontSearch || n.toLowerCase().includes(fontSearch.toLowerCase())) as name}
                         <option value={name}>{name}</option>
+                      {/each}
+                    </optgroup>
+                  {/if}
+                  {#if systemFonts.length > 0}
+                    <optgroup label="System Fonts">
+                      {#each systemFonts.filter(f => !fontSearch || f.name.toLowerCase().includes(fontSearch.toLowerCase())) as font}
+                        <option value={font.family}>{font.name}</option>
+                      {/each}
+                    </optgroup>
+                  {:else}
+                    <optgroup label="Common Fonts">
+                      {#each SYSTEM_FONTS.filter(f => !fontSearch || f.name.toLowerCase().includes(fontSearch.toLowerCase())) as font}
+                        <option value={font.family}>{font.name}</option>
                       {/each}
                     </optgroup>
                   {/if}
