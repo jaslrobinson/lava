@@ -19,6 +19,7 @@
   import MapOverlay from "./MapOverlay.svelte";
   import { launcherHitRegions, setLauncherHoverCoords, toggleStartMenu, closeStartMenu } from "./renderer";
   import StartMenuOverlay from "./StartMenuOverlay.svelte";
+  import { getSettings } from "../stores/settings.svelte";
 
   interface Props {
     fullscreen?: boolean;
@@ -86,6 +87,11 @@
   }
   let hoveredHandle = $state(-1);
   let hoveredLayerId = $state<string | null>(null);
+
+  // Search overlay state
+  let searchOverlayOpen = $state(false);
+  let searchOverlayBounds = $state<{ x: number; y: number; w: number; h: number } | null>(null);
+  let searchOverlayEl: HTMLDivElement | undefined = $state(undefined);
 
   // Collect all visible map layers from the project (for HTML overlays)
   let mapLayers = $derived.by(() => {
@@ -781,6 +787,16 @@
           JSON.stringify({ type: "show_editor" })
         );
       }
+    } else if (action === "search" || action === "search:") {
+      // Open inline search overlay at the triggering layer's bounds
+      if (triggerId) {
+        const bounds = getLayerBounds().get(triggerId);
+        if (bounds) {
+          searchOverlayBounds = { x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h };
+          searchOverlayOpen = true;
+        }
+      }
+      return;
     } else if (action.startsWith("overlay:")) {
       // overlay:layerName — toggle visibility of a named layer
       const targetName = action.slice(8).toLowerCase();
@@ -793,6 +809,135 @@
       }
     }
   }
+
+  const searchUrls: Record<string, string> = {
+    google: "https://www.google.com/search?q=",
+    perplexity: "https://www.perplexity.ai/search?q=",
+    bing: "https://www.bing.com/search?q=",
+    chatgpt: "https://chatgpt.com/?q=",
+    duckduckgo: "https://duckduckgo.com/?q=",
+  };
+
+  function doWebSearch(query: string) {
+    const engine = getSettings().searchEngine || "google";
+    const url = (searchUrls[engine] || searchUrls.google) + encodeURIComponent(query);
+    openUrl(url);
+  }
+
+  function openSearchOverlay() {
+    if (!searchOverlayBounds || !searchOverlayOpen || !canvas) return;
+    // Remove existing portal if any
+    if (searchOverlayEl) { searchOverlayEl.remove(); searchOverlayEl = undefined; }
+
+    const b = searchOverlayBounds;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = rect.width / canvas.width;
+    const scaleY = rect.height / canvas.height;
+    // Project coords → screen coords via canvas transform
+    const left = rect.left + (b.x * zoom + panX) * scaleX;
+    const top = rect.top + (b.y * zoom + panY) * scaleY;
+    const width = b.w * zoom * scaleX;
+    const height = b.h * zoom * scaleY;
+
+    const portal = document.createElement("div");
+    portal.style.cssText = `position:fixed;left:${left}px;top:${top}px;width:${width}px;height:${height}px;z-index:99999;display:flex;align-items:center;`;
+
+    let searchText = "";
+    const fontSize = Math.max(12, height * 0.45);
+    const pad = height * 0.4;
+    const radius = Math.max(4, height * 0.2);
+
+    // Use a div instead of input — WebKitGTK layer-shell doesn't render input text
+    const box = document.createElement("div");
+    box.style.cssText = `position:relative;z-index:99999;width:100%;height:100%;border:none;outline:2px solid #60cdff;border-radius:${radius}px;padding:0 ${pad}px;background:#181825;color:#cdd6f4;font-size:${fontSize}px;box-sizing:border-box;display:flex;align-items:center;cursor:text;overflow:hidden;white-space:nowrap;`;
+
+    const textSpan = document.createElement("span");
+    textSpan.style.cssText = "color:#cdd6f4;";
+    const cursor = document.createElement("span");
+    cursor.style.cssText = "display:inline-block;width:1px;height:1.1em;background:#cdd6f4;animation:blink 1s step-end infinite;margin-left:1px;";
+    const placeholder = document.createElement("span");
+    placeholder.style.cssText = "color:rgba(255,255,255,0.35);";
+    placeholder.textContent = "Search the web...";
+
+    // Add blink animation
+    const style = document.createElement("style");
+    style.textContent = "@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}";
+    portal.appendChild(style);
+
+    box.appendChild(textSpan);
+    box.appendChild(cursor);
+    box.appendChild(placeholder);
+
+    function updateDisplay() {
+      textSpan.textContent = searchText;
+      placeholder.style.display = searchText ? "none" : "";
+    }
+
+    // Fake input element interface for compatibility
+    const input = { get value() { return searchText; }, set value(v: string) { searchText = v; updateDisplay(); } };
+
+    function closeSearch() {
+      searchOverlayOpen = false;
+      if ((portal as any)._restoreLavaKey) (portal as any)._restoreLavaKey();
+      portal.remove();
+      searchOverlayEl = undefined;
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onOutsideClick);
+      const wk2 = (window as any).webkit?.messageHandlers?.lava;
+      if (wk2) wk2.postMessage(JSON.stringify({ type: "start_menu_close" }));
+    }
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const q = searchText.trim();
+        if (q) doWebSearch(q);
+        closeSearch();
+        return;
+      }
+      if (e.key === "Escape") { closeSearch(); return; }
+      if (e.key === "Backspace") { e.preventDefault(); searchText = searchText.slice(0, -1); updateDisplay(); return; }
+      if (e.key === "Delete") { e.preventDefault(); searchText = ""; updateDisplay(); return; }
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        e.preventDefault();
+        searchText += e.key;
+        updateDisplay();
+      }
+    };
+
+    const onOutsideClick = (e: MouseEvent) => {
+      if (!portal.contains(e.target as Node)) closeSearch();
+    };
+    setTimeout(() => document.addEventListener("mousedown", onOutsideClick), 50);
+
+    portal.appendChild(box);
+    document.body.appendChild(portal);
+    searchOverlayEl = portal;
+
+    // Request keyboard focus in wallpaper mode
+    const wk = (window as any).webkit?.messageHandlers?.lava;
+    if (wk) wk.postMessage(JSON.stringify({ type: "start_menu_open" }));
+
+    document.addEventListener("keydown", onKey);
+
+    // Hijack __lavaKey so Rust GTK key injection goes to the search box
+    const originalLavaKey = (window as any).__lavaKey;
+    (window as any).__lavaKey = (key: string) => {
+      onKey(new KeyboardEvent("keydown", { key }));
+    };
+    // Store restore function for closeSearch
+    (portal as any)._restoreLavaKey = () => {
+      if (originalLavaKey) (window as any).__lavaKey = originalLavaKey;
+      else delete (window as any).__lavaKey;
+    };
+  }
+
+  $effect(() => {
+    if (searchOverlayOpen && searchOverlayBounds) {
+      // Small delay to let state settle
+      setTimeout(openSearchOverlay, 10);
+    }
+  });
 
   let estimatedVolume = 50;
   let estimatedBrightness = 50;

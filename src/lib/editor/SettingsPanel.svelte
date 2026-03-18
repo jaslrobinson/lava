@@ -74,6 +74,17 @@
         <input type="number" min="100" step="100" value={getSettings().formulaRefreshMs}
           oninput={(e) => updateSetting("formulaRefreshMs", Number((e.target as HTMLInputElement).value))} />
       </label>
+      <label class="field-row">
+        <span>Search engine</span>
+        <select value={getSettings().searchEngine ?? "google"}
+          onchange={(e) => updateSetting("searchEngine", (e.target as HTMLSelectElement).value)}>
+          <option value="google">Google</option>
+          <option value="perplexity">Perplexity</option>
+          <option value="bing">Bing</option>
+          <option value="chatgpt">ChatGPT</option>
+          <option value="duckduckgo">DuckDuckGo</option>
+        </select>
+      </label>
     </div>
 
     <!-- Provider Intervals -->

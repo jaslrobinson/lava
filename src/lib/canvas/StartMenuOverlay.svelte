@@ -2,6 +2,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { markDirty } from "./renderScheduler";
+  import { getSettings } from "../stores/settings.svelte";
 
   interface Props {
     anchorBounds?: { x: number; y: number; w: number; h: number } | null;
@@ -40,7 +41,9 @@
       ? anchorBounds.x + anchorBounds.w / 2 - SM_W / 2
       : containerW / 2 - SM_W / 2;
     panelProjX = Math.max(0, Math.min(containerW - SM_W, idealX));
-    panelProjY = containerH - SM_H;
+    // Offset: editor needs panel higher (above taskbar), wallpaper needs it lower
+    const offsetPx = interactive ? 57 : -38;
+    panelProjY = containerH - SM_H + offsetPx;
 
     const left = canvasOffsetX + (panelProjX * zoom + panX) * baseScale;
     const top = canvasOffsetY + (panelProjY * zoom + panY) * baseScale;
@@ -107,7 +110,7 @@
       if (key === 'Escape')    { visible = false; return; }
       if (key === 'Backspace') { searchQuery = searchQuery.slice(0, -1); return; }
       if (key === 'Delete')    { searchQuery = ""; return; }
-      if (key === 'Enter')     { /* TODO: launch top result */ return; }
+      if (key === 'Enter')     { handleSearchEnter(); return; }
       if (key.length === 1)    { searchQuery += key; }
     };
     return () => { delete (window as any).__lavaKey; };
@@ -136,6 +139,29 @@
     checkInjected();
   });
 
+  const searchUrls: Record<string, string> = {
+    google: "https://www.google.com/search?q=",
+    perplexity: "https://www.perplexity.ai/search?q=",
+    bing: "https://www.bing.com/search?q=",
+    chatgpt: "https://chatgpt.com/?q=",
+    duckduckgo: "https://duckduckgo.com/?q=",
+  };
+
+  async function webSearch(query: string) {
+    const engine = getSettings().searchEngine || "google";
+    const url = (searchUrls[engine] || searchUrls.google) + encodeURIComponent(query);
+    onclose();
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("open_url", { url });
+    } catch {
+      (window as any).webkit?.messageHandlers?.lava?.postMessage(
+        JSON.stringify({ type: "open_url", url })
+      );
+    }
+    markDirty();
+  }
+
   async function launchApp(exec: string) {
     onclose();
     try {
@@ -147,6 +173,16 @@
       );
     }
     markDirty();
+  }
+
+  function handleSearchEnter() {
+    const q = searchQuery.trim();
+    if (!q) return;
+    if (filteredApps.length > 0) {
+      launchApp(filteredApps[0].exec);
+    } else {
+      webSearch(q);
+    }
   }
 
   function handleKeydown(e: KeyboardEvent) {
@@ -249,9 +285,10 @@
       bind:value={searchQuery}
       class="sm-search-input"
       type="text"
-      placeholder="Search apps, settings, and more"
+      placeholder="Search apps or the web"
       autocomplete="off"
       spellcheck="false"
+      onkeydown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleSearchEnter(); } }}
     />
     {#if searchQuery}
       <button class="sm-search-clear" onclick={() => searchQuery = ""}>✕</button>

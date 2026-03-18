@@ -31,6 +31,7 @@ export interface AppSettings {
   lastProjectPath: string;
   savedThemes: { name: string; path: string }[];
   replicateApiKey: string;
+  searchEngine: "google" | "perplexity" | "bing" | "chatgpt" | "duckduckgo";
 }
 
 export const defaultSettings: AppSettings = {
@@ -61,4 +62,5 @@ export const defaultSettings: AppSettings = {
   lastProjectPath: "",
   savedThemes: [],
   replicateApiKey: "",
+  searchEngine: "google",
 };

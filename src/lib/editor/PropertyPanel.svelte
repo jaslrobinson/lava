@@ -266,6 +266,7 @@
             }}
           >
             <option value="none">None</option>
+            <option value="search">Web Search</option>
             <option value="music">Music Control</option>
             <option value="app">Launch App</option>
             <option value="overlay">Toggle Layer</option>
