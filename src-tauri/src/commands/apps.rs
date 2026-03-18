@@ -1,47 +1,72 @@
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 
-/// Resolve a .desktop Icon= value to an absolute file path.
-/// Searches hicolor theme dirs and pixmaps in priority order.
-pub fn resolve_icon_path(icon: &str) -> String {
-    if icon.is_empty() { return String::new(); }
-    // Already an absolute path
-    if icon.starts_with('/') {
-        if std::path::Path::new(icon).exists() { return icon.to_string(); }
-        return String::new();
-    }
-    let sizes = ["256x256", "128x128", "64x64", "48x48", "32x32", "scalable"];
+/// Pre-built index of icon name → file path. Built once on first use.
+static ICON_INDEX: OnceLock<HashMap<String, String>> = OnceLock::new();
+
+fn build_icon_index() -> HashMap<String, String> {
+    let mut index = HashMap::new();
+    let sizes = ["scalable", "32x32", "48x48", "64x64", "128x128", "256x256"];
     let exts = ["png", "svg", "xpm"];
-    // Theme dirs to search
     let mut theme_dirs: Vec<PathBuf> = vec![
         PathBuf::from("/usr/share/icons/hicolor"),
         PathBuf::from("/usr/share/icons/Papirus"),
         PathBuf::from("/usr/share/icons/Adwaita"),
         PathBuf::from("/usr/share/icons/breeze"),
     ];
-    // Add user icon theme dirs
     if let Some(home) = dirs::home_dir() {
         theme_dirs.insert(0, home.join(".local/share/icons/hicolor"));
     }
+    // Scan theme dirs — larger sizes overwrite smaller (last wins = biggest)
     for theme in &theme_dirs {
         for size in &sizes {
-            for ext in &exts {
-                let p = theme.join(size).join("apps").join(format!("{}.{}", icon, ext));
-                if p.exists() { return p.to_string_lossy().into_owned(); }
+            let apps_dir = theme.join(size).join("apps");
+            if let Ok(entries) = std::fs::read_dir(&apps_dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                            if exts.contains(&ext) {
+                                index.insert(stem.to_string(), path.to_string_lossy().into_owned());
+                            }
+                        }
+                    }
+                }
             }
         }
     }
-    // Fallback: pixmaps
-    for ext in &exts {
-        let p = PathBuf::from(format!("/usr/share/pixmaps/{}.{}", icon, ext));
-        if p.exists() { return p.to_string_lossy().into_owned(); }
+    // Pixmaps fallback
+    if let Ok(entries) = std::fs::read_dir("/usr/share/pixmaps") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    if exts.contains(&ext) {
+                        index.entry(stem.to_string()).or_insert_with(|| path.to_string_lossy().into_owned());
+                    }
+                }
+            }
+        }
     }
-    String::new()
+    index
+}
+
+/// Resolve a .desktop Icon= value to an absolute file path.
+pub fn resolve_icon_path(icon: &str) -> String {
+    if icon.is_empty() { return String::new(); }
+    if icon.starts_with('/') {
+        if std::path::Path::new(icon).exists() { return icon.to_string(); }
+        return String::new();
+    }
+    let idx = ICON_INDEX.get_or_init(build_icon_index);
+    idx.get(icon).cloned().unwrap_or_default()
 }
 
 #[tauri::command]
-pub fn resolve_icon(icon_name: String) -> String {
-    resolve_icon_path(&icon_name)
+pub async fn resolve_icon(icon_name: String) -> String {
+    tokio::task::spawn_blocking(move || resolve_icon_path(&icon_name)).await.unwrap_or_default()
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -53,7 +78,11 @@ pub struct AppEntry {
 }
 
 #[tauri::command]
-pub fn list_apps() -> Vec<AppEntry> {
+pub async fn list_apps() -> Vec<AppEntry> {
+    tokio::task::spawn_blocking(list_apps_sync).await.unwrap_or_default()
+}
+
+fn list_apps_sync() -> Vec<AppEntry> {
     let mut dirs: Vec<PathBuf> = vec![
         PathBuf::from("/usr/share/applications"),
         PathBuf::from("/usr/local/share/applications"),
@@ -144,7 +173,11 @@ pub struct WindowState {
 }
 
 #[tauri::command]
-pub fn get_window_state() -> WindowState {
+pub async fn get_window_state() -> WindowState {
+    tokio::task::spawn_blocking(get_window_state_sync).await.unwrap_or(WindowState { running_classes: vec![], active_class: String::new() })
+}
+
+fn get_window_state_sync() -> WindowState {
     let mut running_classes: Vec<String> = Vec::new();
     let mut active_class = String::new();
 

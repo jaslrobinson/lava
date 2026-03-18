@@ -419,6 +419,9 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
   if (offscreen) {
     const margin = Math.ceil(deltas.blur) + 2;
 
+    // Reset transform so fillRect covers the entire offscreen canvas
+    drawCtx.setTransform(1, 0, 0, 1, 0, 0);
+
     // Color overlay on the offscreen canvas (source-atop only hits this layer's pixels)
     if (deltas.colorOverride) {
       drawCtx.save();
@@ -1426,11 +1429,8 @@ function renderLauncherLayer(ctx: CanvasRenderingContext2D, layer: Layer, x: num
   if (!_launcherAppsLoaded) { loadLauncherApps(); }
 
   const pinnedEntries = pinned.map(exec => {
-    const app = _launcherApps.find(a =>
-      a.exec === exec ||
-      a.exec.startsWith(exec + " ") ||
-      a.exec.split(/[\s/]/).pop() === exec
-    );
+    const app = _launcherApps.find(a => a.exec === exec)
+      || _launcherApps.find(a => a.exec.startsWith(exec + " ") || a.exec.split(/[\s/]/).pop() === exec);
     return { exec, name: app?.name ?? exec, icon: app?.icon ?? exec };
   });
 

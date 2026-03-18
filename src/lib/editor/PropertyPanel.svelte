@@ -7,6 +7,7 @@
   import ColorField from "./ColorField.svelte";
   import { SYSTEM_FONTS } from "../data/fonts";
   import { getProjectFontNames, loadFont, discoverSystemFonts, getDiscoveredSystemFonts, ensureSystemFontLoaded, type DiscoveredFont } from "../fonts/fontLoader";
+  import AppPickerPortal from "./AppPickerPortal.svelte";
 
   let formulaHelperOpen = $state(false);
   let iconPickerOpen = $state(false);
@@ -16,21 +17,25 @@
 
   // Discover system fonts on first render
   discoverSystemFonts().then(fonts => { systemFonts = fonts; });
+
+  // Load app list immediately so pinned apps display correctly
+  import("@tauri-apps/api/core").then(({ invoke }) => {
+    invoke<typeof appList>("list_apps").then(result => { appList = result; }).catch(() => {});
+  });
   let appPickerOpen = $state(false);
   let appPickerSearch = $state("");
   let appPickerForPinned = $state(false);
   let appList = $state<{ name: string; exec: string; icon: string; categories: string }[]>([]);
 
-  async function openAppPicker(forPinned = false) {
+  function openAppPicker(forPinned = false) {
     appPickerForPinned = forPinned;
     appPickerOpen = true;
     if (appList.length === 0) {
-      try {
-        const { invoke } = await import("@tauri-apps/api/core");
-        appList = await invoke<typeof appList>("list_apps");
-      } catch (e) {
-        console.warn("list_apps failed:", e);
-      }
+      import("@tauri-apps/api/core").then(({ invoke }) => {
+        invoke<typeof appList>("list_apps").then(result => {
+          appList = result;
+        }).catch(e => console.warn("list_apps failed:", e));
+      });
     }
   }
 
@@ -50,6 +55,10 @@
     }
   }
 
+  function findApp(exec: string) {
+    return appList.find(a => a.exec === exec) || appList.find(a => a.exec.startsWith(exec + " ") || a.exec.split(/[\s/]/).pop() === exec) || null;
+  }
+
   function removePinnedApp(exec: string) {
     const layer = getSelectedLayer();
     if (!layer) return;
@@ -59,7 +68,6 @@
 
   function getIconSrc(iconPath: string): string {
     if (!iconPath) return "";
-    // list_apps now returns resolved absolute paths — convert to asset URL
     try { return convertFileSrc(iconPath); } catch { return iconPath; }
   }
 
@@ -287,7 +295,7 @@
                 const layer = getSelectedLayer()!;
                 updateLayerProperty(layer.id, "clickAction", "app:" + newArg);
               }} />
-              <button class="browse-btn" title="Browse installed apps" onclick={openAppPicker}>...</button>
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;cursor:pointer;background:var(--bg-input,#181825);border:1px solid var(--border,#444);border-radius:3px;font-size:11px;color:var(--text-primary,#cdd6f4);" title="Browse installed apps" onclick={openAppPicker}>...</span>
             </div>
           {:else if clickActionType === "overlay"}
             <input type="text" value={clickActionArg} placeholder="Layer name to show/hide" oninput={(e) => {
@@ -667,26 +675,19 @@
             <label style="margin-top: 6px; font-weight: 600;">Pinned Apps</label>
             <div class="pinned-list">
               {#each (props.pinnedApps ?? []) as exec (exec)}
-                {@const appInfo = appList.find(a => a.exec === exec || a.exec.startsWith(exec + " ") || a.exec.split(/[\s/]/).pop() === exec)}
                 <div class="pinned-item">
                   <span class="pinned-icon-wrap">
-                    {#if appInfo}
-                      <img src={getIconSrc(appInfo.icon)} alt="" class="pinned-icon"
-                        onerror={(e) => { (e.target as HTMLImageElement).style.display='none'; ((e.target as HTMLImageElement).nextElementSibling as HTMLElement).style.display='flex'; }} />
-                      <span class="pinned-letter" style="background:{iconBg(appInfo.name)};display:none">{iconLetter(appInfo.name)}</span>
-                    {:else}
-                      <span class="pinned-letter" style="background:{iconBg(exec)}">{iconLetter(exec)}</span>
-                    {/if}
+                    <span class="pinned-letter" style="background:{iconBg(findApp(exec)?.name ?? exec)}">{iconLetter(findApp(exec)?.name ?? exec)}</span>
                   </span>
-                  <span class="pinned-name">{appInfo?.name ?? exec}</span>
-                  <button class="pinned-remove" onclick={() => removePinnedApp(exec)} title="Remove">×</button>
+                  <span class="pinned-name">{findApp(exec)?.name ?? exec}</span>
+                  <span style="cursor:pointer;color:#888;font-size:14px;padding:0 4px;" onclick={() => removePinnedApp(exec)} title="Remove">&times;</span>
                 </div>
               {/each}
               {#if (props.pinnedApps ?? []).length === 0}
                 <span class="prop-hint" style="padding:6px 0;">No apps pinned yet</span>
               {/if}
             </div>
-            <button class="browse-btn" style="width:100%;text-align:center;margin-top:4px;" onclick={() => openAppPicker(true)}>+ Add App</button>
+            <span style="display:block;width:100%;text-align:center;margin-top:4px;padding:4px 0;cursor:pointer;background:var(--bg-input,#181825);border:1px solid var(--border,#444);border-radius:3px;font-size:11px;color:var(--text-primary,#cdd6f4);" onclick={() => openAppPicker(true)}>+ Add App</span>
           </div>
         </section>
       {/if}
@@ -712,48 +713,16 @@
 />
 
 {#if appPickerOpen}
-  <div class="modal-backdrop" onclick={() => { appPickerOpen = false; appPickerSearch = ""; }}>
-    <div class="app-picker-modal" onclick={(e) => e.stopPropagation()}>
-      <div class="app-picker-header">
-        <span>{appPickerForPinned ? "Add Pinned App" : "Select App"}</span>
-        <span style="cursor:pointer;font-size:18px;line-height:1;" onclick={() => { appPickerOpen = false; appPickerSearch = ""; }}>&times;</span>
-      </div>
-      <input
-        class="app-picker-search"
-        type="text"
-        placeholder="Search apps..."
-        value={appPickerSearch}
-        oninput={(e) => appPickerSearch = (e.target as HTMLInputElement).value}
-      />
-      <div class="app-picker-list">
-        {#each appList.filter(a => a.name.toLowerCase().includes(appPickerSearch.toLowerCase())) as app (app.exec)}
-          <div class="app-picker-item" onclick={() => selectApp(app.exec)} role="button" tabindex="0"
-            onkeydown={(e) => { if (e.key === 'Enter') selectApp(app.exec); }}>
-            <span class="app-picker-icon-wrap">
-              <img src={getIconSrc(app.icon)} alt="" class="app-picker-icon"
-                onerror={(e) => { (e.target as HTMLImageElement).style.display='none'; ((e.target as HTMLImageElement).nextElementSibling as HTMLElement).style.display='flex'; }} />
-              <span class="app-picker-icon-letter" style="background:{iconBg(app.name)};display:none">{iconLetter(app.name)}</span>
-            </span>
-            <span class="app-picker-info">
-              <span class="app-picker-name">{app.name}</span>
-              <span class="app-picker-exec">{app.exec.split(" ")[0]}</span>
-            </span>
-            {#if appPickerForPinned}
-              <span class="app-picker-add">+</span>
-            {/if}
-          </div>
-        {/each}
-        {#if appList.length === 0}
-          <div style="padding:16px;text-align:center;color:var(--text-muted);font-size:12px;">Loading apps...</div>
-        {/if}
-      </div>
-      {#if appPickerForPinned}
-        <div style="padding:8px;border-top:1px solid var(--border);">
-          <button class="browse-btn" style="width:100%;text-align:center;" onclick={() => { appPickerOpen = false; appPickerSearch = ""; }}>Done</button>
-        </div>
-      {/if}
-    </div>
-  </div>
+  <AppPickerPortal
+    forPinned={appPickerForPinned}
+    search={appPickerSearch}
+    apps={appList}
+    onSearch={(v) => appPickerSearch = v}
+    onSelect={selectApp}
+    onClose={() => { appPickerOpen = false; appPickerSearch = ""; }}
+    {iconBg}
+    {iconLetter}
+  />
 {/if}
 
 <style>
