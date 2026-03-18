@@ -105,15 +105,10 @@
   }
 
   function getRuleLabel(trigger: AnimationTrigger, type: AnimationType): string | null {
-    console.log('getRuleLabel called with:', { trigger, type });
     if (type === "translate") return "Direction (x, y, or x,y)";
     if (type === "color") return "Target Color (#hex)";
     if (type === "jiggle") return "Cycle Period (ms, default 80)";
-    if (trigger === "reactive") {
-      console.log('Returning "Formula ($...$)" for reactive trigger');
-      return "Formula ($...$)";
-    }
-    console.log('Returning null');
+    if (trigger === "reactive") return "Formula ($...$)";
     return null;
   }
 </script>

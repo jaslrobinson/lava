@@ -86,6 +86,7 @@ export function updateHoverState(hoveredIds: Set<string>, timestamp: number) {
     if (state.hoverEnterTime === null) {
       state.hoverEnterTime = timestamp;
       state.hoverExitTime = null;
+      markDirty();
     }
   }
 }
@@ -106,16 +107,18 @@ export function isLayerHovered(layerId: string): boolean {
 export function getHoverProgress(layerId: string, timestamp: number, speed: number = 200): number {
   const state = layerStates.get(layerId);
   if (!state || !state.hoverEnterTime) return 0;
-  
-  const enterElapsed = timestamp - state.hoverEnterTime;
+
   if (state.hoverExitTime === null) {
     // Currently hovered — animate toward 1
+    const enterElapsed = timestamp - state.hoverEnterTime;
     return Math.min(1, enterElapsed / speed);
   } else {
-    // Hover exited — animate back toward 0
-    const exitElapsed = timestamp - state.hoverExitTime;
+    // Hover exited — freeze enter progress at exit time, then retreat
+    const enterElapsed = state.hoverExitTime - state.hoverEnterTime;
     const enterProgress = Math.min(1, enterElapsed / speed);
-    return Math.max(0, enterProgress - exitElapsed / speed);
+    const exitElapsed = timestamp - state.hoverExitTime;
+    const exitProgress = Math.min(enterProgress, exitElapsed / speed);
+    return Math.max(0, enterProgress - exitProgress);
   }
 }
 

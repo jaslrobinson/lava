@@ -231,6 +231,12 @@ pub struct LayerProperties {
     pub line_spacing: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shadow: Option<Shadow>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_stroke: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_stroke_width: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text_fill_enabled: Option<bool>,
 
     // Shape properties
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -331,6 +337,17 @@ pub struct LayerProperties {
     pub pinned_apps: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub launcher_icon_size: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taskbar_bg: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taskbar_bg_opacity: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub taskbar_radius: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sm_bg: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sm_accent: Option<String>,
+
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -124,7 +124,7 @@
     const target = e.target as HTMLInputElement | HTMLSelectElement;
     const raw = target.value;
     // Try to parse as number for numeric fields
-    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "radarDotSize", "radarRingCount", "taskbarBgOpacity", "taskbarRadius"];
+    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "taskbarBgOpacity", "taskbarRadius", "textStrokeWidth"];
     if (numericKeys.includes(key)) {
       const num = Number(raw);
       updateLayerProperty(layer.id, key, isNaN(num) ? raw : num);
@@ -379,6 +379,12 @@
             <button class="browse-btn" style="margin-top: 2px; width: 100%; text-align: center;" title="Import font file (.ttf, .otf, .woff2)" onclick={handleImportFont}>Import Font</button>
             <label>Color</label>
             <ColorField value={String(props.color ?? "#ffffff")} defaultColor="#ffffff" onChange={(v) => onColorProp("color", v)} />
+            <label>Stroke Color</label>
+            <ColorField value={String(props.textStroke ?? "")} defaultColor="#000000" onChange={(v) => onColorProp("textStroke", v)} />
+            <label>Stroke Width</label>
+            <input type="number" min="0" value={props.textStrokeWidth ?? 2} oninput={(e) => onInput("textStrokeWidth", e)} />
+            <label>Fill Enabled</label>
+            <input type="checkbox" checked={props.textFillEnabled !== false} onchange={(e) => updateLayerProperty(layer.id, "textFillEnabled", (e.target as HTMLInputElement).checked)} />
             <label>Align</label>
             <select value={props.textAlign ?? "left"} onchange={(e) => onSelectInput("textAlign", e)}>
               <option value="left">Left</option>
@@ -681,24 +687,6 @@
               {/if}
             </div>
             <button class="browse-btn" style="width:100%;text-align:center;margin-top:4px;" onclick={() => openAppPicker(true)}>+ Add App</button>
-          </div>
-        </section>
-      {/if}
-
-      {#if layer.type === "radar"}
-        <section class="prop-section">
-          <div class="section-title">Radar</div>
-          <div class="prop-stack">
-            <label>Sweep Color</label>
-            <ColorField value={String(props.radarSweepColor ?? "#00ff4480")} defaultColor="#00ff4480" onChange={(v) => onColorProp("radarSweepColor", v)} />
-            <label>Ring Color</label>
-            <ColorField value={String(props.radarRingColor ?? "#00ff4440")} defaultColor="#00ff4440" onChange={(v) => onColorProp("radarRingColor", v)} />
-            <label>Dot Color</label>
-            <ColorField value={String(props.radarDotColor ?? "#00ff44")} defaultColor="#00ff44" onChange={(v) => onColorProp("radarDotColor", v)} />
-            <label>Dot Size</label>
-            <input type="number" min="1" max="20" value={props.radarDotSize ?? 4} oninput={(e) => onInput("radarDotSize", e)} />
-            <label>Ring Count</label>
-            <input type="number" min="1" max="10" value={props.radarRingCount ?? 3} oninput={(e) => onInput("radarRingCount", e)} />
           </div>
         </section>
       {/if}

@@ -190,7 +190,6 @@
     { type: "overlap", label: "Overlap", icon: "\u29C9" },
     { type: "map", label: "Map", icon: "\u25CE" },
     { type: "launcher", label: "Launcher", icon: "\u229E" },
-    { type: "radar", label: "Radar", icon: "\u29BF" },
   ];
 
   // Close panel on outside click

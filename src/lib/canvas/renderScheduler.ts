@@ -91,6 +91,7 @@ export function hasActiveLoopingAnimations(layers: Layer[]): boolean {
   for (const layer of layers) {
     // Skip hidden layers
     if (layer.visible === false) continue;
+    if (layer.properties?.visible === false || layer.properties?.visible === "NEVER") continue;
 
     if (layer.animations) {
       for (const anim of layer.animations) {
@@ -102,10 +103,10 @@ export function hasActiveLoopingAnimations(layers: Layer[]): boolean {
         ) {
           return true;
         }
-        // Jiggle and flash are inherently continuous
+        // Jiggle and flash are continuous only with time/hover triggers
         if (
-          anim.type === "jiggle" ||
-          anim.type === "flash"
+          (anim.type === "jiggle" || anim.type === "flash") &&
+          (anim.trigger === "time" || anim.trigger === "hover")
         ) {
           return true;
         }

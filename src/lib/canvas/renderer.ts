@@ -36,10 +36,34 @@ function resolveNumber(value: string | number | undefined, fallback: number = 0)
   return isNaN(n) ? fallback : n;
 }
 
+/** Safely append alpha to a color string (handles #RGB, #RRGGBB; non-hex passes through) */
+function withAlpha(color: string, alpha: number): string {
+  const a = Math.round(alpha * 255).toString(16).padStart(2, '0');
+  if (color.match(/^#[0-9a-fA-F]{6}$/)) return color + a;
+  if (color.match(/^#[0-9a-fA-F]{3}$/)) {
+    const r = color[1], g = color[2], b = color[3];
+    return `#${r}${r}${g}${g}${b}${b}${a}`;
+  }
+  return color;
+}
+
 // Debug overlay: shows bounds, transform info, and position markers on each layer
 let debugOverlay = false;
 export function setDebugOverlay(enabled: boolean) { debugOverlay = enabled; }
 export function getDebugOverlay(): boolean { return debugOverlay; }
+
+// Reusable offscreen canvas to avoid allocating a new one every frame
+let _reusableOffscreen: HTMLCanvasElement | null = null;
+function getReusableCanvas(w: number, h: number): HTMLCanvasElement {
+  if (!_reusableOffscreen) _reusableOffscreen = document.createElement("canvas");
+  _reusableOffscreen.width = w;
+  _reusableOffscreen.height = h;
+  return _reusableOffscreen;
+}
+
+// Track whether any visible GIF images were rendered this frame (need full-fps for animation)
+let hasGifImages = false;
+export function hasAnimatedGifs(): boolean { return hasGifImages; }
 
 // Image cache to avoid reloading every frame
 const imageCache = new Map<string, HTMLImageElement>();
@@ -182,6 +206,7 @@ function getHoveredIds(hoveredLayerId: string | null, layers: Layer[]): Set<stri
 }
 
 export function renderProject(ctx: CanvasRenderingContext2D, project: Project, selectedId: string | null, timestamp: number = 0, hoveredLayerId: string | null = null) {
+  hasGifImages = false;
   beginFrame();
   initEngineTime(timestamp);
   updateHoverState(getHoveredIds(hoveredLayerId, project.layers), timestamp);
@@ -339,73 +364,83 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
     ctx.translate(-cx, -cy);
   }
 
+  const needsOffscreen = deltas.colorOverride || deltas.flashOverlay > 0;
+
+  // For color/flash overlays, render to a temporary canvas so source-atop
+  // only affects this layer's pixels, not previously drawn content.
+  // Uses HTMLCanvasElement instead of OffscreenCanvas for WebKitGTK compatibility.
+  let drawCtx = ctx;
+  let offscreen: HTMLCanvasElement | null = null;
+  if (needsOffscreen) {
+    const margin = Math.ceil(deltas.blur) + 2;
+    const ow = (w || 100) + margin * 2;
+    const oh = (h || 100) + margin * 2;
+    offscreen = getReusableCanvas(ow, oh);
+    drawCtx = offscreen.getContext("2d")!;
+    // Copy font from main context so text renders correctly on the offscreen canvas
+    drawCtx.font = ctx.font;
+    // Shift drawing so layer content is at (margin, margin) on the offscreen canvas
+    drawCtx.translate(margin - x, margin - y);
+  }
+
   switch (layer.type) {
     case "text":
-      renderText(ctx, layer, x, y, w, h);
+      renderText(drawCtx, layer, x, y, w, h);
       break;
     case "shape":
-      renderShape(ctx, layer, x, y, w, h);
+      renderShape(drawCtx, layer, x, y, w, h);
       break;
     case "image":
-      renderImage(ctx, layer, x, y, w, h);
+      renderImage(drawCtx, layer, x, y, w, h);
       break;
     case "progress":
-      renderProgress(ctx, layer, x, y, w, h);
+      renderProgress(drawCtx, layer, x, y, w, h);
       break;
     case "overlap":
-      renderOverlap(ctx, layer, x, y, container, parentAbsX, parentAbsY, timestamp);
+      renderOverlap(drawCtx, layer, x, y, container, parentAbsX, parentAbsY, timestamp);
       break;
     case "stack":
-      renderStack(ctx, layer, x, y, container, parentAbsX, parentAbsY, timestamp);
+      renderStack(drawCtx, layer, x, y, container, parentAbsX, parentAbsY, timestamp);
       break;
     case "fonticon":
-      renderFontIcon(ctx, layer, x, y, w, h);
+      renderFontIcon(drawCtx, layer, x, y, w, h);
       break;
     case "visualizer":
-      renderVisualizer(ctx, layer, x, y, w, h);
+      renderVisualizer(drawCtx, layer, x, y, w, h);
       break;
     case "map":
-      renderMapPlaceholder(ctx, layer, x, y, w, h);
+      renderMapPlaceholder(drawCtx, layer, x, y, w, h);
       break;
     case "launcher":
-      renderLauncherLayer(ctx, layer, x, y, w, h);
-      break;
-    case "radar":
-      renderRadarLayer(ctx, layer, x, y, w, h);
+      renderLauncherLayer(drawCtx, layer, x, y, w, h);
       break;
   }
 
-  // Color animation overlay: tint the already-drawn layer content
-  if (deltas.colorOverride) {
-    ctx.globalCompositeOperation = "source-atop";
-    ctx.fillStyle = deltas.colorOverride;
+  if (offscreen) {
+    const margin = Math.ceil(deltas.blur) + 2;
 
-    // For shapes, create and fill the exact shape path
-    // For other layer types, use fillRect
-    if (layer.type === "shape") {
-      createShapePath(ctx, layer, x, y, w, h);
-      ctx.fill();
-    } else {
-      ctx.fillRect(x, y, w, h);
+    // Color overlay on the offscreen canvas (source-atop only hits this layer's pixels)
+    if (deltas.colorOverride) {
+      drawCtx.save();
+      drawCtx.globalAlpha = deltas.colorStrength;
+      drawCtx.globalCompositeOperation = "source-atop";
+      drawCtx.fillStyle = deltas.colorOverride;
+      drawCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+      drawCtx.restore();
     }
 
-    ctx.globalCompositeOperation = "source-over";
-  }
-
-  // Flash overlay: white wash drawn on top via source-atop (no ctx.filter needed)
-  if (deltas.flashOverlay > 0) {
-    const savedAlpha = ctx.globalAlpha;
-    ctx.globalAlpha = deltas.flashOverlay;
-    ctx.globalCompositeOperation = "source-atop";
-    ctx.fillStyle = "#ffffff";
-    if (layer.type === "shape") {
-      createShapePath(ctx, layer, x, y, w, h);
-      ctx.fill();
-    } else {
-      ctx.fillRect(x, y, w, h);
+    // Flash overlay on the offscreen canvas
+    if (deltas.flashOverlay > 0) {
+      drawCtx.save();
+      drawCtx.globalAlpha = deltas.flashOverlay;
+      drawCtx.globalCompositeOperation = "source-atop";
+      drawCtx.fillStyle = "#ffffff";
+      drawCtx.fillRect(0, 0, offscreen.width, offscreen.height);
+      drawCtx.restore();
     }
-    ctx.globalAlpha = savedAlpha;
-    ctx.globalCompositeOperation = "source-over";
+
+    // Composite the offscreen result back to the main canvas
+    ctx.drawImage(offscreen, x - margin, y - margin);
   }
 
   ctx.restore();
@@ -470,7 +505,36 @@ function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: n
   const lineHeight = fontSize + lineSpacing;
 
   for (let i = 0; i < displayLines.length; i++) {
-    ctx.fillText(displayLines[i], textX, y + i * lineHeight);
+    const lineX = textX;
+    const lineY = y + i * lineHeight;
+    // Stroke (outline)
+    if (props.textStroke) {
+      const savedShadowColor = ctx.shadowColor;
+      ctx.shadowColor = "transparent";
+      const strokeColor = resolve(props.textStroke, "#000000");
+      const sw = resolveNumber(props.textStrokeWidth, 2);
+
+      if (props.textFillEnabled === false) {
+        // Outline-only: use strokeText for hollow letters
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = sw;
+        ctx.lineJoin = "round";
+        ctx.strokeText(displayLines[i], lineX, lineY);
+      } else {
+        // Filled + outline: offset renders for crisp border, then fill on top
+        const savedFill = ctx.fillStyle;
+        ctx.fillStyle = strokeColor;
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+          ctx.fillText(displayLines[i], lineX + Math.cos(a) * sw, lineY + Math.sin(a) * sw);
+        }
+        ctx.fillStyle = savedFill;
+      }
+      ctx.shadowColor = savedShadowColor;
+    }
+    // Fill
+    if (props.textFillEnabled !== false) {
+      ctx.fillText(displayLines[i], lineX, lineY);
+    }
   }
 
   if (debugOverlay) {
@@ -711,6 +775,9 @@ function renderImage(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   const src = resolve(layer.properties.src, "");
   const img = getCachedImage(src);
 
+  // Flag animated GIFs so the render loop stays at full fps
+  if (src && src.toLowerCase().endsWith(".gif")) hasGifImages = true;
+
   if (!img) {
     // Placeholder while loading or no source
     ctx.fillStyle = "#2a3a4a";
@@ -740,34 +807,7 @@ function renderImage(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   const imgH = img.naturalHeight;
   const cornerRadius = resolveNumber(layer.properties.cornerRadius, 0);
 
-  // Draw shadow by filling the image bounds shape with shadow enabled.
-  // This must happen BEFORE clipping, otherwise the clip eats the shadow.
-  if (layer.properties.shadow) {
-    ctx.save();
-    ctx.shadowColor = resolve(layer.properties.shadow.color, "#000000");
-    ctx.shadowOffsetX = resolveNumber(layer.properties.shadow.dx, 0);
-    ctx.shadowOffsetY = resolveNumber(layer.properties.shadow.dy, 0);
-    ctx.shadowBlur = resolveNumber(layer.properties.shadow.radius, 0);
-    ctx.fillStyle = "rgba(0,0,0,1)";
-    ctx.beginPath();
-    if (cornerRadius > 0) {
-      roundedRect(ctx, x, y, w, h, cornerRadius);
-    } else {
-      ctx.rect(x, y, w, h);
-    }
-    ctx.fill();
-    ctx.restore();
-  }
-
-  ctx.save();
-  ctx.beginPath();
-  if (cornerRadius > 0) {
-    roundedRect(ctx, x, y, w, h, cornerRadius);
-  } else {
-    ctx.rect(x, y, w, h);
-  }
-  ctx.clip();
-
+  // Compute scaleMode dimensions first so shadow matches the visible image
   let drawX = x, drawY = y, drawW = w, drawH = h;
 
   switch (scaleMode) {
@@ -795,14 +835,49 @@ function renderImage(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
     }
   }
 
+  // Draw shadow using the image itself so transparent areas don't show an
+  // opaque black fill.  We render the image (with optional corner-radius
+  // clip) into a small offscreen canvas, then drawImage that onto the main
+  // context with shadow enabled — the browser derives the shadow shape from
+  // the offscreen bitmap's alpha channel.
+  if (layer.properties.shadow) {
+    const offCanvas = document.createElement("canvas");
+    offCanvas.width = drawW;
+    offCanvas.height = drawH;
+    const offCtx = offCanvas.getContext("2d")!;
+    if (cornerRadius > 0) {
+      offCtx.beginPath();
+      roundedRect(offCtx, 0, 0, drawW, drawH, cornerRadius);
+      offCtx.clip();
+    }
+    offCtx.drawImage(img, 0, 0, drawW, drawH);
+
+    ctx.save();
+    ctx.shadowColor = resolve(layer.properties.shadow.color, "#000000");
+    ctx.shadowOffsetX = resolveNumber(layer.properties.shadow.dx, 0);
+    ctx.shadowOffsetY = resolveNumber(layer.properties.shadow.dy, 0);
+    ctx.shadowBlur = resolveNumber(layer.properties.shadow.radius, 0);
+    ctx.drawImage(offCanvas, drawX, drawY);
+    ctx.restore();
+  }
+
+  ctx.save();
+  ctx.beginPath();
+  if (cornerRadius > 0) {
+    roundedRect(ctx, x, y, w, h, cornerRadius);
+  } else {
+    ctx.rect(x, y, w, h);
+  }
+  ctx.clip();
+
   ctx.drawImage(img, drawX, drawY, drawW, drawH);
 
   // Apply tint color overlay over the drawn image
   const tint = layer.properties.tint;
-  if (tint && tint !== "#ffffff" && tint !== "#FFFFFF") {
+  if (tint && tint !== "#ffffff" && tint !== "#FFFFFF" && tint !== "#fff" && tint !== "#FFF") {
     ctx.globalCompositeOperation = "source-atop";
     ctx.fillStyle = resolve(tint, "#ffffff");
-    ctx.globalAlpha = 0.4;
+    ctx.globalAlpha *= 0.4;
     ctx.fillRect(drawX, drawY, drawW, drawH);
     ctx.globalCompositeOperation = "source-over";
   }
@@ -885,7 +960,7 @@ function renderFontIcon(ctx: CanvasRenderingContext2D, layer: Layer, x: number, 
         // Tint: draw image then overlay color using composite
         ctx.save();
         ctx.drawImage(img, x, y, w, h);
-        if (color && color !== "#ffffff" && color !== "#FFFFFF") {
+        if (color && color !== "#ffffff" && color !== "#FFFFFF" && color !== "#fff" && color !== "#FFF") {
           ctx.globalCompositeOperation = "source-atop";
           ctx.fillStyle = color;
           ctx.fillRect(x, y, w, h);
@@ -982,8 +1057,8 @@ function renderVisualizerBars(ctx: CanvasRenderingContext2D, layer: Layer, x: nu
     const by = y + h - barH;
 
     const grad = ctx.createLinearGradient(bx, by + barH, bx, by);
-    grad.addColorStop(0, colorBottom + "60");
-    grad.addColorStop(0.4, colorMid + "cc");
+    grad.addColorStop(0, withAlpha(colorBottom, 0.38));
+    grad.addColorStop(0.4, withAlpha(colorMid, 0.8));
     grad.addColorStop(1, colorTop);
 
     ctx.fillStyle = grad;
@@ -1005,7 +1080,7 @@ function renderVisualizerBars(ctx: CanvasRenderingContext2D, layer: Layer, x: nu
     if (peaksData[bandIdx] > 0.05) {
       const peakH = Math.min(1, peaksData[bandIdx] * sensitivity) * h;
       const peakY = y + h - peakH;
-      ctx.fillStyle = peakColor + "cc";
+      ctx.fillStyle = withAlpha(peakColor, 0.8);
       ctx.fillRect(bx, peakY - 2, barW, 2);
     }
   }
@@ -1065,9 +1140,9 @@ function renderVisualizerWave(ctx: CanvasRenderingContext2D, layer: Layer, x: nu
 
   // Filled gradient: colorBottom at base → colorMid → colorTop at peaks
   const fillGrad = ctx.createLinearGradient(x, y + h, x, y);
-  fillGrad.addColorStop(0, colorBottom + "40");
-  fillGrad.addColorStop(0.4, colorMid + "99");
-  fillGrad.addColorStop(1, colorTop + "dd");
+  fillGrad.addColorStop(0, withAlpha(colorBottom, 0.25));
+  fillGrad.addColorStop(0.4, withAlpha(colorMid, 0.6));
+  fillGrad.addColorStop(1, withAlpha(colorTop, 0.87));
   ctx.fillStyle = fillGrad;
   ctx.fill();
 
@@ -1223,93 +1298,6 @@ function renderMapPlaceholder(ctx: CanvasRenderingContext2D, _layer: Layer, x: n
   ctx.restore();
 }
 
-// ─── Radar ────────────────────────────────────────────────────────────────────
-
-function renderRadarLayer(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
-  const props = layer.properties;
-  const sweepColor = resolve(props.radarSweepColor, "#00ff4480");
-  const ringColor = resolve(props.radarRingColor, "#00ff4440");
-  const dotColor = resolve(props.radarDotColor, "#00ff44");
-  const dotSize = resolveNumber(props.radarDotSize, 4);
-  const ringCount = resolveNumber(props.radarRingCount, 3);
-
-  const cx = x + w / 2;
-  const cy = y + h / 2;
-  const radius = Math.min(w, h) / 2;
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-  ctx.clip();
-
-  // Background
-  ctx.fillStyle = "#0a1a0a";
-  ctx.fillRect(x, y, w, h);
-
-  // Concentric rings
-  ctx.strokeStyle = ringColor;
-  ctx.lineWidth = 1;
-  for (let i = 1; i <= ringCount; i++) {
-    ctx.beginPath();
-    ctx.arc(cx, cy, (radius * i) / ringCount, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  // Crosshair lines
-  ctx.beginPath();
-  ctx.moveTo(cx - radius, cy); ctx.lineTo(cx + radius, cy);
-  ctx.moveTo(cx, cy - radius); ctx.lineTo(cx, cy + radius);
-  ctx.stroke();
-
-  // Animated sweep using timestamp from animation engine (fall back to Date.now)
-  const now = typeof performance !== "undefined" ? performance.now() : Date.now();
-  const angle = ((now / 3000) % 1) * Math.PI * 2 - Math.PI / 2;
-
-  // Sweep gradient
-  const grad = ctx.createConicalGradient
-    ? (ctx as any).createConicalGradient(cx, cy, angle)
-    : null;
-  if (grad) {
-    grad.addColorStop(0, sweepColor);
-    grad.addColorStop(0.25, "transparent");
-    grad.addColorStop(1, "transparent");
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    // Fallback: draw a sweep line
-    ctx.strokeStyle = sweepColor;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy);
-    ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
-    ctx.stroke();
-  }
-
-  // Static blip dots (seeded by layer id for consistency)
-  const seed = layer.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-  ctx.fillStyle = dotColor;
-  for (let i = 0; i < 6; i++) {
-    const dotAngle = ((seed * (i + 1) * 137.5) % 360) * (Math.PI / 180);
-    const dotR = ((seed * (i + 3) * 73) % 80 + 10) / 100 * radius;
-    const dx = cx + Math.cos(dotAngle) * dotR;
-    const dy = cy + Math.sin(dotAngle) * dotR;
-    ctx.beginPath();
-    ctx.arc(dx, dy, dotSize, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Outer border circle
-  ctx.strokeStyle = ringColor;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(cx, cy, radius - 1, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.restore();
-}
-
 // ─── Launcher module-level state ──────────────────────────────────────────────
 const _launcherApps: { name: string; exec: string; icon: string }[] = [];
 let _launcherAppsLoaded = false;
@@ -1386,8 +1374,15 @@ function getLauncherIcon(iconPath: string): HTMLImageElement | null {
   if (!iconPath) return null;
   if (_launcherIconCache.has(iconPath)) return _launcherIconCache.get(iconPath) ?? null;
   // iconPath is a resolved absolute path from list_apps
-  // Use existing lazy-loaded convertFileSrc to get asset:// URL for WebKitGTK
-  const src = convertFileSrc ? convertFileSrc(iconPath) : iconPath;
+  // Use the same path resolution as getCachedImage for cross-mode compatibility
+  let src: string;
+  if (!isTauri || import.meta.env.DEV) {
+    src = `/__lava_assets${iconPath}`;
+  } else if (convertFileSrc) {
+    src = convertFileSrc(iconPath);
+  } else {
+    return null; // convertFileSrc not loaded yet — wait
+  }
   const img = new Image();
   img.onload = () => { _launcherIconCache.set(iconPath, img); };
   img.onerror = () => { _launcherIconCache.set(iconPath, null); };

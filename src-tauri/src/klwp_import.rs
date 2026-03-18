@@ -882,6 +882,14 @@ impl Default for LayerProperties {
             launcher_style: None,
             pinned_apps: None,
             launcher_icon_size: None,
+            text_stroke: None,
+            text_stroke_width: None,
+            text_fill_enabled: None,
+            taskbar_bg: None,
+            taskbar_bg_opacity: None,
+            taskbar_radius: None,
+            sm_bg: None,
+            sm_accent: None,
         }
     }
 }

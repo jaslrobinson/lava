@@ -100,7 +100,6 @@ pub fn run() {
             let (weather, forecast) = providers::weather::create_providers();
             manager.register(Box::new(weather));
             manager.register(Box::new(forecast));
-            manager.register(Box::new(providers::radar::RadarProvider));
             manager.register(Box::new(providers::hyprland::HyprlandProvider::new()));
 
             for provider in plugins::load_plugins() {

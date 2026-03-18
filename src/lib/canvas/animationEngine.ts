@@ -13,6 +13,7 @@ export interface AnimatedDeltas {
   scaleY: number;
   blur: number;
   colorOverride: string | null;
+  colorStrength: number; // 0-1 blend strength for color overlay
   flashOverlay: number; // 0-1 white overlay alpha for flash animation
 }
 
@@ -27,6 +28,7 @@ function emptyDeltas(): AnimatedDeltas {
     scaleY: 1,
     blur: 0,
     colorOverride: null,
+    colorStrength: 0,
     flashOverlay: 0,
   };
 }
@@ -119,15 +121,17 @@ function computeProgress(anim: Animation, layerId: string, timestamp: number): n
       const state = getLayerAnimState(layerId);
       const speed = anim.speed || 200; // default 200ms transition
       if (!state.hoverEnterTime) return 0;
-      const enterElapsed = timestamp - state.hoverEnterTime;
       if (state.hoverExitTime === null) {
         // Currently hovered — animate toward 1
+        const enterElapsed = timestamp - state.hoverEnterTime;
         return Math.min(1, enterElapsed / speed);
       } else {
-        // Hover exited — animate back toward 0
-        const exitElapsed = timestamp - state.hoverExitTime;
+        // Hover exited — freeze enter progress at exit time, then retreat
+        const enterElapsed = state.hoverExitTime - state.hoverEnterTime;
         const enterProgress = Math.min(1, enterElapsed / speed);
-        return Math.max(0, enterProgress - exitElapsed / speed);
+        const exitElapsed = timestamp - state.hoverExitTime;
+        const exitProgress = Math.min(enterProgress, exitElapsed / speed);
+        return Math.max(0, enterProgress - exitProgress);
       }
     }
 
@@ -156,11 +160,14 @@ function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDelta
 
   switch (anim.type) {
     case "fade":
-      // For show/tap triggers: fade IN from 0 to amount (absolute opacity)
-      // For other triggers: fade as multiplier toward amount/255
       if (trigger === "show" || trigger === "tap") {
+        // Fade in from invisible: opacity goes 0 → amount over the animation
         deltas.opacityOverride = (amount / 255) * t * 255;
+      } else if (trigger === "hover") {
+        // Hover: rest at amount/255 opacity, transition to full on hover
+        deltas.opacityMultiplier *= (amount / 255) + t * (1 - amount / 255);
       } else {
+        // Scroll/time/reactive: multiply opacity toward amount/255
         deltas.opacityMultiplier *= 1 - t * (1 - amount / 255);
       }
       break;
@@ -194,16 +201,18 @@ function applyAnimation(anim: Animation, progress: number, deltas: AnimatedDelta
       const targetColor = anim.colorTarget || anim.rule;
       if (targetColor && t > 0) {
         deltas.colorOverride = targetColor;
+        deltas.colorStrength = t;
       }
       break;
     }
 
     case "jiggle": {
-      // t is the amplitude envelope (0 = still, 1 = full intensity)
+      // Envelope decays from full to zero so jiggle starts strong and fades out
       // rule optionally overrides the oscillation period in ms (default 80ms = fast buzz)
       const cyclePeriod = parseFloat(anim.rule) || 80;
       const oscillation = Math.sin(timestamp * (2 * Math.PI / cyclePeriod));
-      deltas.dRotation += amount * t * oscillation;
+      const envelope = 1 - t; // decay from full to zero
+      deltas.dRotation += amount * envelope * oscillation;
       break;
     }
 

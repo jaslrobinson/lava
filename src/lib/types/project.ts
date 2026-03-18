@@ -1,4 +1,4 @@
-export type LayerType = "text" | "shape" | "image" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer" | "map" | "launcher" | "radar";
+export type LayerType = "text" | "shape" | "image" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer" | "map" | "launcher";
 
 export type ShapeKind = "rectangle" | "circle" | "oval" | "triangle" | "arc";
 
@@ -59,6 +59,9 @@ export interface LayerProperties {
   textAlign?: "left" | "center" | "right";
   maxLines?: number;
   lineSpacing?: number;
+  textStroke?: string;      // stroke/outline color (hex)
+  textStrokeWidth?: number; // stroke width in pixels
+  textFillEnabled?: boolean; // whether to fill text (default true)
   shadow?: Shadow;
 
   // Shape
@@ -122,12 +125,6 @@ export interface LayerProperties {
   pinnedApps?: string[]; // list of app exec commands e.g. ["firefox", "thunar"]
   launcherIconSize?: number; // icon size in pixels (default 36)
 
-  // Radar
-  radarSweepColor?: string;  // sweep/scan line color (default "#00ff4480")
-  radarRingColor?: string;   // concentric ring color (default "#00ff4440")
-  radarDotColor?: string;    // blip dot color (default "#00ff44")
-  radarDotSize?: number;     // blip dot radius in pixels (default 4)
-  radarRingCount?: number;   // number of concentric rings (default 3)
 }
 
 export interface Layer {
@@ -282,15 +279,6 @@ export function createLayer(type: LayerType, name: string): Layer {
       base.properties.width = 1920;
       base.properties.height = 48;
       base.properties.anchor = "top-left";
-      break;
-    case "radar":
-      base.properties.width = 200;
-      base.properties.height = 200;
-      base.properties.radarSweepColor = "#00ff4480";
-      base.properties.radarRingColor = "#00ff4440";
-      base.properties.radarDotColor = "#00ff44";
-      base.properties.radarDotSize = 4;
-      base.properties.radarRingCount = 3;
       break;
   }
 

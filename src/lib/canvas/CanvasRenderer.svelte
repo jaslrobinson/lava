@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { renderProject, getLayerBounds, type LayerBounds } from "./renderer";
+  import { renderProject, getLayerBounds, type LayerBounds, hasAnimatedGifs } from "./renderer";
   import {
     getProject,
     getSelectedLayerId,
@@ -266,7 +266,7 @@
 
     // Wallpaper mode: decide whether to render or skip this frame
     if (isWallpaperView) {
-      const looping = hasActiveLoopingAnimations(getProject().layers);
+      const looping = hasActiveLoopingAnimations(getProject().layers) || hasAnimatedGifs();
       const fullFps = shouldRenderFullFps(timestamp, looping);
 
       if (fullFps) {
@@ -834,10 +834,6 @@
     }
   }
 
-  function onCanvasWheel(_e: WheelEvent) {
-    // scrolling handled by StartMenuOverlay when visible
-  }
-
   function onFullscreenWheel(e: WheelEvent) {
     markDirty();
     const id = hitTest(e.clientX, e.clientY);
@@ -873,7 +869,7 @@
     onmouseleave={fullscreen ? undefined : onMouseUp}
     onclick={fullscreen ? onFullscreenClick : undefined}
     ondblclick={fullscreen ? undefined : onDblClick}
-    onwheel={fullscreen ? onFullscreenWheel : onCanvasWheel}
+    onwheel={fullscreen ? onFullscreenWheel : onWheel}
   />
   {#each mapLayers as mapLayer (mapLayer.id)}
     <MapOverlay

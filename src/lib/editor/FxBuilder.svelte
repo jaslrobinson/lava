@@ -61,7 +61,7 @@
   }
 
   const PRESETS: Preset[] = [
-    { label: "Hover Fade", desc: "Fade in on hover", anim: { type: "fade", trigger: "hover", amount: 255, speed: 200, easing: "ease-out", loop: "none", rule: "" } },
+    { label: "Hover Fade", desc: "Fade in on hover (50% → 100%)", anim: { type: "fade", trigger: "hover", amount: 128, speed: 200, easing: "ease-out", loop: "none", rule: "" } },
     { label: "Hover Scale", desc: "Grow slightly on hover", anim: { type: "scale", trigger: "hover", amount: 1.1, speed: 200, easing: "ease-out", loop: "none", rule: "" } },
     { label: "Hover Glow", desc: "Color tint on hover", anim: { type: "color", trigger: "hover", amount: 0.4, speed: 200, easing: "ease-out", loop: "none", rule: "#ffffff" } },
     { label: "Click Flash", desc: "Quick flash on tap", anim: { type: "flash", trigger: "tap", amount: 200, speed: 300, easing: "ease-out", loop: "none", rule: "" } },
