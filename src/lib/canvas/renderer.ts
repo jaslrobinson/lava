@@ -531,33 +531,36 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
       drawCtx.restore();
     }
 
-    // Apply blur by downscaling then upscaling the offscreen canvas.
-    // This avoids ctx.filter (broken in WebKitGTK) and getImageData (tainted canvas).
+    // Apply blur via multi-draw with offsets (same method as blur+blend path).
     if (totalBlur > 0) {
       const ow = offscreen.width;
       const oh = offscreen.height;
-      // Scale factor: lower = more blur. blur 5 → 20%, blur 20 → 5%, blur 50 → 2%
-      const scale = Math.max(0.02, 1 / (1 + totalBlur * 0.8));
-      const sw = Math.max(2, Math.round(ow * scale));
-      const sh = Math.max(2, Math.round(oh * scale));
-      const tmpCanvas = document.createElement("canvas");
-      const tmpCtx = tmpCanvas.getContext("2d")!;
-      // Multiple passes for smoother blur
-      const passes = Math.min(6, Math.max(2, Math.ceil(totalBlur / 5)));
-      // First pass: read from offscreen
-      tmpCanvas.width = sw;
-      tmpCanvas.height = sh;
-      tmpCtx.drawImage(offscreen, 0, 0, sw, sh);
-      drawCtx.clearRect(0, 0, ow, oh);
-      drawCtx.imageSmoothingEnabled = true;
-      drawCtx.drawImage(tmpCanvas, 0, 0, ow, oh);
-      // Subsequent passes: read from offscreen (which now has pass 1 result)
-      for (let p = 1; p < passes; p++) {
-        tmpCtx.clearRect(0, 0, sw, sh);
-        tmpCtx.drawImage(offscreen, 0, 0, sw, sh);
-        drawCtx.clearRect(0, 0, ow, oh);
-        drawCtx.drawImage(tmpCanvas, 0, 0, ow, oh);
+      // Copy current offscreen content
+      const copyC = document.createElement("canvas");
+      copyC.width = ow;
+      copyC.height = oh;
+      const copyX = copyC.getContext("2d")!;
+      copyX.drawImage(offscreen, 0, 0);
+
+      const radius = Math.min(totalBlur, 50);
+      const rings = Math.max(2, Math.ceil(radius / 4));
+      const offsets: [number, number][] = [];
+      for (let ring = 1; ring <= rings; ring++) {
+        const r = (ring / rings) * radius;
+        const count = Math.max(4, Math.ceil(ring * 4));
+        for (let j = 0; j < count; j++) {
+          const angle = (j / count) * Math.PI * 2;
+          offsets.push([Math.cos(angle) * r, Math.sin(angle) * r]);
+        }
       }
+      const alpha = 1 / (offsets.length + 1);
+      drawCtx.clearRect(0, 0, ow, oh);
+      drawCtx.globalAlpha = alpha;
+      drawCtx.drawImage(copyC, 0, 0);
+      for (const [dx, dy] of offsets) {
+        drawCtx.drawImage(copyC, dx, dy);
+      }
+      drawCtx.globalAlpha = 1;
     }
 
     // Composite the offscreen result back to the main canvas
