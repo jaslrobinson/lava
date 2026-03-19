@@ -1,11 +1,14 @@
 pub mod ai;
+pub mod air_quality;
 pub mod audio;
 pub mod battery;
 pub mod datetime;
 pub mod hyprland;
+pub mod location;
 pub mod manager;
 pub mod music;
 pub mod network;
+pub mod notifications;
 pub mod resource_monitor;
 pub mod sysinfo_provider;
 pub mod traffic;

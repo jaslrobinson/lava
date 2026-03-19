@@ -10,8 +10,12 @@
     updateGlobal,
     getInteractiveMode,
     flattenLayers,
+    getToolMode,
+    getPaintBrushSettings,
   } from "../stores/project.svelte";
   import type { Layer } from "../types/project";
+  import type { PaintPoint, PaintStroke } from "../types/paint";
+  import { renderStroke } from "./paintEngine";
   import { startFormulaLoop, stopFormulaLoop, evaluateSync, flushGlobalsNow, resolveFormula, hasFormula } from "../formula/service";
   import { setScrollPosition, triggerTap } from "./animationState";
   import { loadBundledIconFonts } from "../fonts/fontLoader";
@@ -108,6 +112,10 @@
   });
 
   let spaceHeld = $state(false);
+
+  // Paint mode state
+  let isPainting = $state(false);
+  let currentStrokePoints: PaintPoint[] = [];
 
   // OSD overlay state
   let osdText = $state("");
@@ -317,12 +325,48 @@
       ctx.translate(panX, panY);
       ctx.scale(zoom, zoom);
       renderProject(ctx, project, selectedId, timestamp, hoveredLayerId);
+
+      // Draw in-progress paint stroke as overlay
+      if (isPainting && currentStrokePoints.length > 1) {
+        drawInProgressStroke(ctx);
+      }
+
       ctx.restore();
     } else {
       renderProject(ctx, project, selectedId, timestamp, hoveredLayerId);
+
+      // Draw in-progress paint stroke as overlay
+      if (isPainting && currentStrokePoints.length > 1) {
+        drawInProgressStroke(ctx);
+      }
     }
 
     drawOsd(ctx, timestamp);
+  }
+
+  function drawInProgressStroke(drawCtx: CanvasRenderingContext2D) {
+    const selectedLayer = getSelectedLayer();
+    if (!selectedLayer || selectedLayer.type !== "paint") return;
+    const bounds = getLayerBounds().get(selectedLayer.id);
+    if (!bounds) return;
+
+    const brush = getPaintBrushSettings();
+    const tempStroke: PaintStroke = {
+      points: currentStrokePoints,
+      brushType: brush.brushType,
+      brushSize: brush.brushSize,
+      color: brush.color,
+      opacity: brush.opacity,
+      splatterSeed: 42,
+    };
+
+    drawCtx.save();
+    drawCtx.beginPath();
+    drawCtx.rect(bounds.x, bounds.y, bounds.w, bounds.h);
+    drawCtx.clip();
+    drawCtx.translate(bounds.x, bounds.y);
+    renderStroke(drawCtx, tempStroke);
+    drawCtx.restore();
   }
 
   /** Convert screen coords to project coords, accounting for zoom/pan */
@@ -394,6 +438,7 @@
   function getCursorStyle(): string {
     if (dragMode === "pan") return "grabbing";
     if (spaceHeld) return "grab";
+    if (getToolMode() === "paint") return "crosshair";
     if (dragMode === "resize") return HANDLE_CURSORS[resizeHandleIdx] || "default";
     if (hoveredHandle >= 0) return HANDLE_CURSORS[hoveredHandle] || "default";
     if (dragMode === "move") return "move";
@@ -445,6 +490,34 @@
     if (e.button !== 0) return;
 
     const proj = canvasToProject(e.clientX, e.clientY);
+
+    // Paint mode: start painting — block all move/resize/selection
+    if (getToolMode() === "paint") {
+      // Reset any stale drag state so move/resize can never fire in paint mode
+      dragMode = "none";
+      resizeHandleIdx = -1;
+
+      // Auto-select a paint layer if none is selected
+      let paintLayer = getSelectedLayer();
+      if (!paintLayer || paintLayer.type !== "paint") {
+        const allLayers = flattenLayers(getProject().layers);
+        paintLayer = allLayers.find(l => l.type === "paint") || null;
+        if (paintLayer) setSelectedLayerId(paintLayer.id);
+      }
+      if (paintLayer && paintLayer.type === "paint") {
+        isPainting = true;
+        const bounds = getLayerBounds().get(paintLayer.id);
+        const localX = bounds ? proj.x - bounds.x : proj.x;
+        const localY = bounds ? proj.y - bounds.y : proj.y;
+        const pressure = (e instanceof PointerEvent && e.pressure > 0) ? e.pressure : 1.0;
+        currentStrokePoints = [{ x: localX, y: localY, pressure }];
+        e.preventDefault();
+        return;
+      }
+      // No paint layer found — block interaction anyway so layer doesn't move
+      e.preventDefault();
+      return;
+    }
 
     // Check resize handles first (skip in interactive mode — click actions take priority)
     if (!getInteractiveMode()) {
@@ -507,6 +580,29 @@
 
   function onMouseMove(e: MouseEvent) {
     setScrollPosition(e.clientX / window.innerWidth);
+
+    // Paint mode: record points if actively painting, and always block
+    // move/resize/selection so layers never move while the paint tool is active.
+    if (getToolMode() === "paint") {
+      if (isPainting) {
+        const selectedLayer = getSelectedLayer();
+        if (selectedLayer && selectedLayer.type === "paint") {
+          const proj = canvasToProject(e.clientX, e.clientY);
+          const bounds = getLayerBounds().get(selectedLayer.id);
+          const localX = bounds ? proj.x - bounds.x : proj.x;
+          const localY = bounds ? proj.y - bounds.y : proj.y;
+          const pressure = (e instanceof PointerEvent && e.pressure > 0) ? e.pressure : 1.0;
+          currentStrokePoints.push({ x: localX, y: localY, pressure });
+        }
+      }
+      // In paint mode, never fall through to move/resize/selection — only allow pan
+      if (dragMode === "pan") {
+        const d = screenToCanvasDelta(e.clientX - panStart.x, e.clientY - panStart.y);
+        panX = panStart.px + d.dx;
+        panY = panStart.py + d.dy;
+      }
+      return;
+    }
 
     if (dragMode === "pan") {
       // Convert screen pixel delta to canvas internal coords
@@ -591,6 +687,26 @@
   }
 
   function onMouseUp() {
+    // Finalize paint stroke
+    if (isPainting && currentStrokePoints.length > 0) {
+      const selectedLayer = getSelectedLayer();
+      if (selectedLayer && selectedLayer.type === "paint") {
+        const brush = getPaintBrushSettings();
+        const newStroke: PaintStroke = {
+          points: [...currentStrokePoints],
+          brushType: brush.brushType,
+          brushSize: brush.brushSize,
+          color: brush.color,
+          opacity: brush.opacity,
+          splatterSeed: Math.floor(Math.random() * 2147483647),
+        };
+        const existing: PaintStroke[] = (selectedLayer.properties.paintStrokes as any) || [];
+        updateLayerProperty(selectedLayer.id, "paintStrokes", [...existing, newStroke]);
+      }
+      isPainting = false;
+      currentStrokePoints = [];
+    }
+    // Always reset drag state — ensures no stale move/resize persists
     dragMode = "none";
     resizeHandleIdx = -1;
   }
@@ -873,8 +989,8 @@
       placeholder.style.display = searchText ? "none" : "";
     }
 
-    // Fake input element interface for compatibility
-    const input = { get value() { return searchText; }, set value(v: string) { searchText = v; updateDisplay(); } };
+    // Fake input element interface for compatibility (kept for future use)
+    void({ get value() { return searchText; }, set value(v: string) { searchText = v; updateDisplay(); } });
 
     function closeSearch() {
       searchOverlayOpen = false;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { addLayer, getProject, getProjectSnapshot, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo, insertWidget, ensureGlobal, getCurrentProjectPath, setCurrentProjectPath } from "../stores/project.svelte";
+  import { addLayer, getProject, getProjectSnapshot, setProject, getIsDirty, getSelectedLayer, isContainerType, getInteractiveMode, setInteractiveMode, getSelectedLayerId, copySelectedLayer, getCopiedLayer, pasteLayer, undo, redo, canUndo, canRedo, insertWidget, ensureGlobal, getCurrentProjectPath, setCurrentProjectPath, getToolMode, setToolMode } from "../stores/project.svelte";
   import { updateSetting } from "../stores/settings.svelte";
   import type { LayerType, Project, GlobalVarType, Layer } from "../types/project";
   import { createDefaultProject } from "../types/project";
@@ -190,6 +190,7 @@
     { type: "overlap", label: "Overlap", icon: "\u29C9" },
     { type: "map", label: "Map", icon: "\u25CE" },
     { type: "launcher", label: "Launcher", icon: "\u229E" },
+    { type: "paint", label: "Paint", icon: "\u{1F3A8}" },
   ];
 
   // Close panel on outside click
@@ -245,6 +246,11 @@
     >
       <span class="btn-icon">{getInteractiveMode() ? "\u25B6" : "\u23F8"}</span>
     </button>
+    <span
+      style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:6px;cursor:pointer;font-size:16px;{getToolMode() === 'paint' ? 'background:#e53935;color:#fff;' : 'background:var(--bg-secondary, #2a2a3e);color:var(--text-secondary, #aaa);'}"
+      title={getToolMode() === 'paint' ? "Paint mode ON (click to deactivate)" : "Paint mode"}
+      onclick={() => setToolMode(getToolMode() === 'paint' ? 'select' : 'paint')}
+    >{"\u270E"}</span>
     <button
       class="toolbar-btn"
       class:debug-active={getDebugOverlay()}
@@ -437,6 +443,13 @@
   }
   .toolbar-btn.interactive-active:hover {
     background: #d4a017;
+  }
+  .toolbar-btn.paint-active {
+    background: #c0392b;
+    color: #fff;
+  }
+  .toolbar-btn.paint-active:hover {
+    background: #e74c3c;
   }
   .toolbar-btn.debug-active {
     background: #e74c3c;

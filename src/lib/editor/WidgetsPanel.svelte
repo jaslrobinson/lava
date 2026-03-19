@@ -32,10 +32,6 @@
   function mkLauncher(name: string, props: Record<string, any>): Layer {
     return { id: id(), name, type: "launcher", properties: { x: 0, y: 0, width: 1920, height: 48, opacity: 255, anchor: "bottom-left", launcherStyle: "win11", launcherIconSize: 36, pinnedApps: [], ...props }, visible: true, locked: false };
   }
-  function mkFontIcon(name: string, props: Record<string, any>): Layer {
-    return { id: id(), name, type: "fonticon", properties: { x: 0, y: 0, width: 36, height: 36, opacity: 255, anchor: "top-left", iconSet: "material", glyphCode: "e1a0", color: "#ffffff", fontSize: 20, ...props }, visible: true, locked: false };
-  }
-
   const categories: Category[] = [
     // ── CLOCKS ──
     {

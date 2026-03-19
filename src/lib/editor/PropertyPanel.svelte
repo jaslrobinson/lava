@@ -6,7 +6,7 @@
   import IconPicker from "./IconPicker.svelte";
   import ColorField from "./ColorField.svelte";
   import { SYSTEM_FONTS } from "../data/fonts";
-  import { getProjectFontNames, loadFont, discoverSystemFonts, getDiscoveredSystemFonts, ensureSystemFontLoaded, type DiscoveredFont } from "../fonts/fontLoader";
+  import { getProjectFontNames, loadFont, discoverSystemFonts, ensureSystemFontLoaded, type DiscoveredFont } from "../fonts/fontLoader";
   import AppPickerPortal from "./AppPickerPortal.svelte";
 
   let formulaHelperOpen = $state(false);
@@ -64,11 +64,6 @@
     if (!layer) return;
     const current = (layer.properties.pinnedApps ?? []) as string[];
     updateLayerProperty(layer.id, "pinnedApps", current.filter(e => e !== exec));
-  }
-
-  function getIconSrc(iconPath: string): string {
-    if (!iconPath) return "";
-    try { return convertFileSrc(iconPath); } catch { return iconPath; }
   }
 
   function iconLetter(name: string): string { return name.charAt(0).toUpperCase(); }
@@ -132,7 +127,7 @@
     const target = e.target as HTMLInputElement | HTMLSelectElement;
     const raw = target.value;
     // Try to parse as number for numeric fields
-    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "taskbarBgOpacity", "taskbarRadius", "textStrokeWidth"];
+    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "taskbarBgOpacity", "taskbarRadius", "textStrokeWidth", "fxBlur", "fxContrast", "fxSaturation", "fxBrightness", "fxSepia", "fxGrayscale", "fxInvert"];
     if (numericKeys.includes(key)) {
       const num = Number(raw);
       updateLayerProperty(layer.id, key, isNaN(num) ? raw : num);
@@ -296,7 +291,7 @@
                 const layer = getSelectedLayer()!;
                 updateLayerProperty(layer.id, "clickAction", "app:" + newArg);
               }} />
-              <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;cursor:pointer;background:var(--bg-input,#181825);border:1px solid var(--border,#444);border-radius:3px;font-size:11px;color:var(--text-primary,#cdd6f4);" title="Browse installed apps" onclick={openAppPicker}>...</span>
+              <span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;cursor:pointer;background:var(--bg-input,#181825);border:1px solid var(--border,#444);border-radius:3px;font-size:11px;color:var(--text-primary,#cdd6f4);" title="Browse installed apps" onclick={() => openAppPicker()}>...</span>
             </div>
           {:else if clickActionType === "overlay"}
             <input type="text" value={clickActionArg} placeholder="Layer name to show/hide" oninput={(e) => {
@@ -428,6 +423,7 @@
               <option value="oval">Oval</option>
               <option value="triangle">Triangle</option>
               <option value="arc">Arc</option>
+              <option value="line">Line</option>
             </select>
             <label>Fill</label>
             <div class="input-row">
@@ -498,6 +494,25 @@
             <input type="number" min="0" value={props.shadow?.radius ?? 4} oninput={(e) => onShadowInput("radius", e)} />
           </div>
         </section>
+        <section class="prop-section">
+          <div class="section-title">FX / Filters</div>
+          <div class="prop-stack">
+            <label>Blur (0-50px)</label>
+            <input type="number" min="0" max="50" value={props.fxBlur ?? 0} oninput={(e) => onInput("fxBlur", e)} />
+            <label>Contrast (0-300%)</label>
+            <input type="number" min="0" max="300" value={props.fxContrast ?? 100} oninput={(e) => onInput("fxContrast", e)} />
+            <label>Saturation (0-300%)</label>
+            <input type="number" min="0" max="300" value={props.fxSaturation ?? 100} oninput={(e) => onInput("fxSaturation", e)} />
+            <label>Brightness (0-300%)</label>
+            <input type="number" min="0" max="300" value={props.fxBrightness ?? 100} oninput={(e) => onInput("fxBrightness", e)} />
+            <label>Sepia (0-100%)</label>
+            <input type="number" min="0" max="100" value={props.fxSepia ?? 0} oninput={(e) => onInput("fxSepia", e)} />
+            <label>Grayscale (0-100%)</label>
+            <input type="number" min="0" max="100" value={props.fxGrayscale ?? 0} oninput={(e) => onInput("fxGrayscale", e)} />
+            <label>Invert (0-100%)</label>
+            <input type="number" min="0" max="100" value={props.fxInvert ?? 0} oninput={(e) => onInput("fxInvert", e)} />
+          </div>
+        </section>
       {/if}
 
       {#if layer.type === "progress"}
@@ -555,6 +570,8 @@
             <input type="number" value={props.width} oninput={(e) => onInput("width", e)} />
             <label>Height</label>
             <input type="number" value={props.height} oninput={(e) => onInput("height", e)} />
+            <label>Clip to first child</label>
+            <input type="checkbox" checked={props.clipFirstChild ?? false} onchange={(e) => updateLayerProperty(layer.id, "clipFirstChild", (e.target as HTMLInputElement).checked)} />
             <div class="child-count">Children: {layer.children?.length ?? 0}</div>
           </div>
         </section>
@@ -692,6 +709,44 @@
           </div>
         </section>
       {/if}
+
+      {#if layer.type === "paint"}
+        <section class="prop-section">
+          <div class="section-title">Paint</div>
+          <div class="prop-stack">
+            <span style="font-size:12px;color:var(--text-secondary);">Strokes: {((props.paintStrokes as any[]) || []).length}</span>
+            <span
+              style="cursor:pointer;color:#f44;font-size:11px;padding:4px 0;user-select:none;"
+              onclick={() => { updateLayerProperty(layer.id, 'paintStrokes', []); }}
+            >Clear All Strokes</span>
+            <span class="prop-hint">Use the paint mode button in the toolbar to draw on this layer.</span>
+          </div>
+        </section>
+      {/if}
+
+      <section class="prop-section">
+        <div class="section-title">Blend Mode</div>
+        <div class="prop-stack">
+          <select value={props.blendMode ?? "source-over"} onchange={(e) => onSelectInput("blendMode", e)}>
+            <option value="source-over">Normal</option>
+            <option value="multiply">Multiply</option>
+            <option value="screen">Screen</option>
+            <option value="overlay">Overlay</option>
+            <option value="darken">Darken</option>
+            <option value="lighten">Lighten</option>
+            <option value="color-dodge">Color Dodge</option>
+            <option value="color-burn">Color Burn</option>
+            <option value="hard-light">Hard Light</option>
+            <option value="soft-light">Soft Light</option>
+            <option value="difference">Difference</option>
+            <option value="exclusion">Exclusion</option>
+            <option value="hue">Hue</option>
+            <option value="saturation">Saturation</option>
+            <option value="color">Color</option>
+            <option value="luminosity">Luminosity</option>
+          </select>
+        </div>
+      </section>
 
       <AnimationPanel />
     {:else}

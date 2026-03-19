@@ -1,6 +1,8 @@
-export type LayerType = "text" | "shape" | "image" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer" | "map" | "launcher";
+import type { PaintStroke } from "./paint";
 
-export type ShapeKind = "rectangle" | "circle" | "oval" | "triangle" | "arc";
+export type LayerType = "text" | "shape" | "image" | "stack" | "overlap" | "progress" | "fonticon" | "visualizer" | "map" | "launcher" | "paint";
+
+export type ShapeKind = "rectangle" | "circle" | "oval" | "triangle" | "arc" | "line";
 
 export type AnchorPoint = "center" | "top-left" | "top-center" | "top-right" | "center-left" | "center-right" | "bottom-left" | "bottom-center" | "bottom-right";
 
@@ -92,6 +94,7 @@ export interface LayerProperties {
   // Stack/Group
   orientation?: "horizontal" | "vertical";
   spacing?: number;
+  clipFirstChild?: boolean;
 
   // Click action (for fullscreen/wallpaper mode)
   clickAction?: string; // e.g. "overlay:news", "url:https://..."
@@ -124,6 +127,26 @@ export interface LayerProperties {
   launcherStyle?: "win11" | "macos" | "deepin"; // visual style
   pinnedApps?: string[]; // list of app exec commands e.g. ["firefox", "thunar"]
   launcherIconSize?: number; // icon size in pixels (default 36)
+  taskbarBg?: string;        // taskbar background color
+  taskbarBgOpacity?: number; // taskbar background opacity (0-255)
+  taskbarRadius?: number;    // taskbar corner radius
+  smBg?: string;             // start menu background color
+  smAccent?: string;         // start menu accent color
+
+  // Image FX / Filters
+  fxBlur?: number;        // pixels, default 0
+  fxContrast?: number;    // percentage, default 100
+  fxSaturation?: number;  // percentage, default 100
+  fxBrightness?: number;  // percentage, default 100
+  fxSepia?: number;       // percentage, default 0
+  fxGrayscale?: number;   // percentage, default 0
+  fxInvert?: number;      // percentage, default 0
+
+  // Blend mode (applies to all layer types)
+  blendMode?: string;     // CSS globalCompositeOperation value, default "source-over"
+
+  // Paint
+  paintStrokes?: PaintStroke[];
 
 }
 
@@ -279,6 +302,11 @@ export function createLayer(type: LayerType, name: string): Layer {
       base.properties.width = 1920;
       base.properties.height = 48;
       base.properties.anchor = "top-left";
+      break;
+    case "paint":
+      base.properties.paintStrokes = [];
+      base.properties.width = 400;
+      base.properties.height = 400;
       break;
   }
 

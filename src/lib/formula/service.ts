@@ -1,4 +1,4 @@
-import { markDirty, markRepaint } from "../canvas/renderScheduler";
+import { markRepaint } from "../canvas/renderScheduler";
 import { setMusicPlaying } from "../canvas/audioVisualizer";
 
 const formulaPattern = /\$[^$]+\$/g;
@@ -49,7 +49,7 @@ function startProviderListener(getGlobals: () => Record<string, string>) {
       const resolved = resolveGlobals(getGlobals());
       let changed = false;
       for (const [key] of cache) {
-        if (key.match(/\b(hy|mi|bi|rm|ts|nc|si|wi|wf|ai)\(/)) {
+        if (key.match(/\b(hy|mi|bi|rm|ts|nc|si|wi|wf|ai|aq|ni|li|bp)\(/)) {
           const result = evaluateClientSide(key, resolved);
           if (result !== cache.get(key)) {
             cache.set(key, result);
@@ -1090,7 +1090,7 @@ export function startFormulaLoop(getGlobals: () => Record<string, string>): Prom
   const refreshAll = () => {
     // Queue time-dependent and provider formulas for re-evaluation
     for (const [key] of cache) {
-      if (key.match(/\b(df|dp|tf|tu|ai|mi|bi|rm|ts|wg|gv|mu|wi|wf|lrc|hy|nc|si)\(/)) {
+      if (key.match(/\b(df|dp|tf|tu|ai|mi|bi|rm|ts|wg|gv|mu|wi|wf|lrc|hy|nc|si|aq|ni|li|bp)\(/)) {
         pending.add(key);
       }
     }

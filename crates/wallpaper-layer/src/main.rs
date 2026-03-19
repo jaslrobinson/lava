@@ -91,6 +91,9 @@ fn run_standalone(dev_mode: bool) {
     manager.register(Box::new(weather));
     manager.register(Box::new(forecast));
     manager.register(Box::new(providers::hyprland::HyprlandProvider::new()));
+    manager.register(Box::new(providers::air_quality::AirQualityProvider::new()));
+    manager.register(Box::new(providers::notifications::NotificationProvider::new()));
+    manager.register(Box::new(providers::location::LocationProvider::new()));
 
     for provider in plugins::load_plugins() {
         manager.register(provider);

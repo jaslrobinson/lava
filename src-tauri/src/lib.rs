@@ -100,7 +100,16 @@ pub fn run() {
             let (weather, forecast) = providers::weather::create_providers();
             manager.register(Box::new(weather));
             manager.register(Box::new(forecast));
+            manager.register(Box::new(
+                providers::air_quality::AirQualityProvider::new(),
+            ));
             manager.register(Box::new(providers::hyprland::HyprlandProvider::new()));
+            manager.register(Box::new(
+                providers::notifications::NotificationProvider::new(),
+            ));
+            manager.register(Box::new(
+                providers::location::LocationProvider::new(),
+            ));
 
             for provider in plugins::load_plugins() {
                 manager.register(provider);
@@ -170,6 +179,7 @@ pub fn run() {
             commands::apps::list_apps,
             commands::apps::resolve_icon,
             commands::apps::get_window_state,
+            commands::palette::extract_palette,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

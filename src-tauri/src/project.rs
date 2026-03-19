@@ -13,6 +13,7 @@ pub enum LayerType {
     Visualizer,
     Map,
     Launcher,
+    Paint,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,6 +24,7 @@ pub enum ShapeKind {
     Oval,
     Triangle,
     Arc,
+    Line,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +132,26 @@ pub struct Shadow {
     pub dx: f64,
     pub dy: f64,
     pub radius: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaintPoint {
+    pub x: f64,
+    pub y: f64,
+    pub pressure: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PaintStroke {
+    pub points: Vec<PaintPoint>,
+    pub brush_type: String,
+    pub brush_size: f64,
+    pub color: String,
+    pub opacity: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub splatter_seed: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -285,6 +307,8 @@ pub struct LayerProperties {
     pub orientation: Option<Orientation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub spacing: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub clip_first_child: Option<bool>,
 
     // Click action (for fullscreen/wallpaper mode)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -347,6 +371,28 @@ pub struct LayerProperties {
     pub sm_bg: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sm_accent: Option<String>,
+
+    // FX / filter properties
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_blur: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_contrast: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_saturation: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_brightness: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_sepia: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_grayscale: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_invert: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub blend_mode: Option<String>,
+
+    // Paint properties
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub paint_strokes: Option<Vec<PaintStroke>>,
 
 }
 

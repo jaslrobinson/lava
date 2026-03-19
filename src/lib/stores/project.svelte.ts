@@ -1,4 +1,5 @@
-import { type Project, type Layer, type Animation, type Shortcut, createDefaultProject, createLayer, cloneLayerWithNewIds, type LayerType, type GlobalVarType } from "../types/project";
+import { type Project, type Layer, type Animation, createDefaultProject, createLayer, cloneLayerWithNewIds, type LayerType, type GlobalVarType } from "../types/project";
+import type { BrushType } from "../types/paint";
 import { clearImageCache } from "../canvas/renderer";
 import { invalidateGlobalsFormulas, clearFormulaCache } from "../formula/service";
 import { resetAnimationState } from "../canvas/animationState";
@@ -11,6 +12,13 @@ let activeOverlay = $state<string | null>(null);
 let interactiveMode = $state(false);
 let copiedLayer = $state<Layer | null>(null);
 let currentProjectPath = $state<string>("");
+let toolMode = $state<'select' | 'paint'>('select');
+let paintBrushSettings = $state({
+  brushType: 'solid' as BrushType,
+  brushSize: 20,
+  color: '#FF0000',
+  opacity: 1.0,
+});
 
 // Undo history
 const MAX_UNDO = 30;
@@ -60,6 +68,12 @@ export function setInteractiveMode(active: boolean) { interactiveMode = active; 
 export function getCopiedLayer() { return copiedLayer; }
 export function getCurrentProjectPath() { return currentProjectPath; }
 export function setCurrentProjectPath(path: string) { currentProjectPath = path; }
+export function getToolMode() { return toolMode; }
+export function setToolMode(mode: 'select' | 'paint') { toolMode = mode; }
+export function getPaintBrushSettings() { return paintBrushSettings; }
+export function setPaintBrushSettings(settings: Partial<typeof paintBrushSettings>) {
+  paintBrushSettings = { ...paintBrushSettings, ...settings };
+}
 
 export function copySelectedLayer() {
   const layer = getSelectedLayer();
@@ -321,6 +335,7 @@ export function addGlobal(type: GlobalVarType = "text") {
     color: "#ffffff",
     switch: false,
     list: "",
+    image: "",
   };
   project.globals = [...project.globals, { name, type, value: defaults[type] }];
   isDirty = true;

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { getSettings, updateSetting } from "../stores/settings.svelte";
-  import { getProject, setProject, insertWidget } from "../stores/project.svelte";
+  import { getProject, insertWidget } from "../stores/project.svelte";
   import { createLayer } from "../types/project";
 
   let { onClose }: { onClose: () => void } = $props();

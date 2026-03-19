@@ -1,8 +1,10 @@
 import type { Project, Layer } from "../types/project";
+import type { PaintStroke } from "../types/paint";
 import { resolveFormula, hasFormula } from "../formula/service";
 import { computeAnimatedDeltas } from "./animationEngine";
 import { initEngineTime, markLayerSeen, beginFrame, updateHoverState } from "./animationState";
 import { getAudioBands, getAudioPeaks, initAudioVisualizer } from "./audioVisualizer";
+import { renderPaintStrokes } from "./paintEngine";
 
 // Detect if we're running inside Tauri (vs plain WebKitGTK wallpaper view)
 const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
@@ -45,6 +47,29 @@ function withAlpha(color: string, alpha: number): string {
     return `#${r}${r}${g}${g}${b}${b}${a}`;
   }
   return color;
+}
+
+// Detect whether CanvasRenderingContext2D.filter actually works (not just accepted silently).
+// We draw a red pixel, apply an invert filter, and check if it changed to cyan.
+let _canvasFilterSupported: boolean | null = null;
+function canvasFilterWorks(): boolean {
+  if (_canvasFilterSupported !== null) return _canvasFilterSupported;
+  try {
+    const c = document.createElement("canvas");
+    c.width = 1; c.height = 1;
+    const cx = c.getContext("2d")!;
+    cx.fillStyle = "#ff0000";
+    cx.fillRect(0, 0, 1, 1);
+    cx.filter = "invert(1)";
+    cx.drawImage(c, 0, 0);
+    cx.filter = "none";
+    const p = cx.getImageData(0, 0, 1, 1).data;
+    // After invert, red (255,0,0) should become cyan (0,255,255)
+    _canvasFilterSupported = p[0] < 128 && p[1] > 128 && p[2] > 128;
+  } catch {
+    _canvasFilterSupported = false;
+  }
+  return _canvasFilterSupported;
 }
 
 // Debug overlay: shows bounds, transform info, and position markers on each layer
@@ -347,9 +372,12 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
 
   ctx.globalAlpha *= opacity;
 
-  if (deltas.blur > 0) {
-    ctx.filter = `blur(${deltas.blur}px)`;
-  }
+  // Compute total blur from animations + FX property
+  const fxBlurVal = resolveNumber(props.fxBlur, 0);
+  const totalBlur = deltas.blur + fxBlurVal;
+
+  // Apply blend mode — defer until just before compositing if using offscreen
+  const blendMode = props.blendMode;
 
   const cx = x + w / 2;
   const cy = y + h / 2;
@@ -364,15 +392,23 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
     ctx.translate(-cx, -cy);
   }
 
-  const needsOffscreen = deltas.colorOverride || deltas.flashOverlay > 0;
+  // Only use offscreen for blur when there's no blend mode conflict
+  const hasBlend = !!(blendMode && blendMode !== "source-over");
+  const blurNeedsOffscreen = totalBlur > 0 && !hasBlend;
+  const needsOffscreen = deltas.colorOverride || deltas.flashOverlay > 0 || blurNeedsOffscreen;
 
   // For color/flash overlays, render to a temporary canvas so source-atop
   // only affects this layer's pixels, not previously drawn content.
   // Uses HTMLCanvasElement instead of OffscreenCanvas for WebKitGTK compatibility.
+  // Apply blend mode now if rendering directly (no offscreen)
+  if (!needsOffscreen && blendMode && blendMode !== "source-over") {
+    ctx.globalCompositeOperation = blendMode as GlobalCompositeOperation;
+  }
+
   let drawCtx = ctx;
   let offscreen: HTMLCanvasElement | null = null;
   if (needsOffscreen) {
-    const margin = Math.ceil(deltas.blur) + 2;
+    const margin = Math.ceil(totalBlur) + 2;
     const ow = (w || 100) + margin * 2;
     const oh = (h || 100) + margin * 2;
     offscreen = getReusableCanvas(ow, oh);
@@ -414,10 +450,63 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
     case "launcher":
       renderLauncherLayer(drawCtx, layer, x, y, w, h);
       break;
+    case "paint":
+      renderPaintLayer(drawCtx, layer, x, y, w, h);
+      break;
+  }
+
+  // Blur + blend mode combo: render to temp canvas, then multi-draw with offsets
+  // on the main ctx which has blend mode active. Each offset draw blends properly.
+  if (!offscreen && totalBlur > 0 && hasBlend) {
+    // Capture what was just drawn by rendering again to a temp canvas
+    const lw = w || 100;
+    const lh = h || 100;
+    const tmpC = document.createElement("canvas");
+    tmpC.width = Math.ceil(lw);
+    tmpC.height = Math.ceil(lh);
+    const tmpX = tmpC.getContext("2d")!;
+    tmpX.translate(-x, -y);
+    // Re-render the layer onto the temp canvas
+    switch (layer.type) {
+      case "text": renderText(tmpX, layer, x, y, lw, lh); break;
+      case "shape": renderShape(tmpX, layer, x, y, lw, lh); break;
+      case "image": renderImage(tmpX, layer, x, y, lw, lh); break;
+      case "progress": renderProgress(tmpX, layer, x, y, lw, lh); break;
+      case "fonticon": renderFontIcon(tmpX, layer, x, y, lw, lh); break;
+      case "visualizer": renderVisualizer(tmpX, layer, x, y, lw, lh); break;
+      case "paint": renderPaintLayer(tmpX, layer, x, y, lw, lh); break;
+    }
+    // Now overdraw on main ctx at offsets with reduced alpha
+    const radius = Math.min(totalBlur, 50);
+    const rings = Math.max(2, Math.ceil(radius / 4));
+    let sampleCount = 0;
+    const offsets: [number, number][] = [];
+    for (let ring = 1; ring <= rings; ring++) {
+      const r = (ring / rings) * radius;
+      const count = Math.max(4, Math.ceil(ring * 4));
+      for (let j = 0; j < count; j++) {
+        const angle = (j / count) * Math.PI * 2;
+        offsets.push([Math.cos(angle) * r, Math.sin(angle) * r]);
+        sampleCount++;
+      }
+    }
+    const alpha = 1 / (sampleCount + 1);
+    // Clear the original sharp draw first
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.globalAlpha = 1;
+    ctx.fillRect(x, y, lw, lh);
+    ctx.restore();
+    // Redraw blurred with blend mode
+    ctx.globalAlpha *= alpha;
+    ctx.drawImage(tmpC, x, y);
+    for (const [dx, dy] of offsets) {
+      ctx.drawImage(tmpC, x + dx, y + dy);
+    }
   }
 
   if (offscreen) {
-    const margin = Math.ceil(deltas.blur) + 2;
+    const margin = Math.ceil(totalBlur) + 2;
 
     // Reset transform so fillRect covers the entire offscreen canvas
     drawCtx.setTransform(1, 0, 0, 1, 0, 0);
@@ -440,6 +529,35 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
       drawCtx.fillStyle = "#ffffff";
       drawCtx.fillRect(0, 0, offscreen.width, offscreen.height);
       drawCtx.restore();
+    }
+
+    // Apply blur by downscaling then upscaling the offscreen canvas.
+    // This avoids ctx.filter (broken in WebKitGTK) and getImageData (tainted canvas).
+    if (totalBlur > 0) {
+      const ow = offscreen.width;
+      const oh = offscreen.height;
+      // Scale factor: lower = more blur. blur 5 → 20%, blur 20 → 5%, blur 50 → 2%
+      const scale = Math.max(0.02, 1 / (1 + totalBlur * 0.8));
+      const sw = Math.max(2, Math.round(ow * scale));
+      const sh = Math.max(2, Math.round(oh * scale));
+      const tmpCanvas = document.createElement("canvas");
+      const tmpCtx = tmpCanvas.getContext("2d")!;
+      // Multiple passes for smoother blur
+      const passes = Math.min(6, Math.max(2, Math.ceil(totalBlur / 5)));
+      // First pass: read from offscreen
+      tmpCanvas.width = sw;
+      tmpCanvas.height = sh;
+      tmpCtx.drawImage(offscreen, 0, 0, sw, sh);
+      drawCtx.clearRect(0, 0, ow, oh);
+      drawCtx.imageSmoothingEnabled = true;
+      drawCtx.drawImage(tmpCanvas, 0, 0, ow, oh);
+      // Subsequent passes: read from offscreen (which now has pass 1 result)
+      for (let p = 1; p < passes; p++) {
+        tmpCtx.clearRect(0, 0, sw, sh);
+        tmpCtx.drawImage(offscreen, 0, 0, sw, sh);
+        drawCtx.clearRect(0, 0, ow, oh);
+        drawCtx.drawImage(tmpCanvas, 0, 0, ow, oh);
+      }
     }
 
     // Composite the offscreen result back to the main canvas
@@ -525,7 +643,7 @@ function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: n
         ctx.strokeText(displayLines[i], lineX, lineY);
       } else {
         // Filled + outline: offset renders for crisp border, then fill on top
-        const savedFill = ctx.fillStyle;
+        const savedFill: string | CanvasGradient | CanvasPattern = ctx.fillStyle;
         ctx.fillStyle = strokeColor;
         for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
           ctx.fillText(displayLines[i], lineX + Math.cos(a) * sw, lineY + Math.sin(a) * sw);
@@ -679,6 +797,21 @@ function renderShape(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
       if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
       break;
     }
+
+    case "line": {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + w, y + h);
+      if (stroke) {
+        ctx.stroke();
+      } else {
+        // Fallback: use fill color as stroke for lines if no stroke set
+        ctx.strokeStyle = fillRaw;
+        ctx.lineWidth = Math.max(effectiveStrokeWidth, 1);
+        ctx.stroke();
+      }
+      break;
+    }
   }
 
   if (hasSkew) ctx.restore();
@@ -745,6 +878,13 @@ function createShapePath(ctx: CanvasRenderingContext2D, layer: Layer, x: number,
       const r = Math.min(w, h) / 2;
       ctx.beginPath();
       ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI);
+      break;
+    }
+
+    case "line": {
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + w, y + h);
       break;
     }
   }
@@ -873,7 +1013,128 @@ function renderImage(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   }
   ctx.clip();
 
-  ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  // Apply FX filters using CSS filter string on the canvas context.
+  // This avoids getImageData (which fails on tainted/cross-origin canvases
+  // from asset:// or http images) and is GPU-accelerated.
+  // Blur is now handled at renderLayer level (combined with animation blur).
+  // Only non-blur FX filters are handled here.
+  const fxContrast = resolveNumber(layer.properties.fxContrast, 100);
+  const fxSaturation = resolveNumber(layer.properties.fxSaturation, 100);
+  const fxBrightness = resolveNumber(layer.properties.fxBrightness, 100);
+  const fxSepia = resolveNumber(layer.properties.fxSepia, 0);
+  const fxGrayscale = resolveNumber(layer.properties.fxGrayscale, 0);
+  const fxInvert = resolveNumber(layer.properties.fxInvert, 0);
+  const hasFx = fxContrast !== 100 || fxSaturation !== 100 ||
+    fxBrightness !== 100 || fxSepia > 0 || fxGrayscale > 0 || fxInvert > 0;
+
+  if (hasFx) {
+    // Build a compound CSS filter string
+    const filters: string[] = [];
+    if (fxBrightness !== 100) filters.push(`brightness(${fxBrightness / 100})`);
+    if (fxContrast !== 100) filters.push(`contrast(${fxContrast / 100})`);
+    if (fxSaturation !== 100) filters.push(`saturate(${fxSaturation / 100})`);
+    if (fxGrayscale > 0) filters.push(`grayscale(${fxGrayscale / 100})`);
+    if (fxSepia > 0) filters.push(`sepia(${fxSepia / 100})`);
+    if (fxInvert > 0) filters.push(`invert(${fxInvert / 100})`);
+    const filterStr = filters.join(" ");
+
+    if (canvasFilterWorks()) {
+      // GPU-accelerated path: apply non-blur CSS filters on offscreen canvas.
+      // Blur is handled separately via manual box blur since CSS blur() is
+      // unreliable across WebKitGTK versions.
+      const nonBlurFilters: string[] = [];
+      if (fxBrightness !== 100) nonBlurFilters.push(`brightness(${fxBrightness / 100})`);
+      if (fxContrast !== 100) nonBlurFilters.push(`contrast(${fxContrast / 100})`);
+      if (fxSaturation !== 100) nonBlurFilters.push(`saturate(${fxSaturation / 100})`);
+      if (fxGrayscale > 0) nonBlurFilters.push(`grayscale(${fxGrayscale / 100})`);
+      if (fxSepia > 0) nonBlurFilters.push(`sepia(${fxSepia / 100})`);
+      if (fxInvert > 0) nonBlurFilters.push(`invert(${fxInvert / 100})`);
+
+      const offCanvas = document.createElement("canvas");
+      offCanvas.width = Math.ceil(drawW);
+      offCanvas.height = Math.ceil(drawH);
+      const offCtx = offCanvas.getContext("2d")!;
+      if (nonBlurFilters.length > 0) offCtx.filter = nonBlurFilters.join(" ");
+      offCtx.drawImage(img, 0, 0, drawW, drawH);
+      offCtx.filter = "none";
+
+      ctx.drawImage(offCanvas, drawX, drawY, drawW, drawH);
+    } else {
+      // Fallback for WebKitGTK builds where ctx.filter is not implemented:
+      // draw to offscreen and apply pixel-level adjustments.
+      const offCanvas = document.createElement("canvas");
+      offCanvas.width = Math.ceil(drawW);
+      offCanvas.height = Math.ceil(drawH);
+      const offCtx = offCanvas.getContext("2d")!;
+      offCtx.drawImage(img, 0, 0, drawW, drawH);
+
+      try {
+        const imageData = offCtx.getImageData(0, 0, offCanvas.width, offCanvas.height);
+        const d = imageData.data;
+        const contrastF = fxContrast / 100;
+        const brightnessF = fxBrightness / 100;
+        const saturationF = fxSaturation / 100;
+        const sepiaF = fxSepia / 100;
+        const grayscaleF = fxGrayscale / 100;
+        const invertF = fxInvert / 100;
+
+        for (let i = 0; i < d.length; i += 4) {
+          let r = d[i], g = d[i + 1], b = d[i + 2];
+          if (brightnessF !== 1) { r *= brightnessF; g *= brightnessF; b *= brightnessF; }
+          if (contrastF !== 1) {
+            r = (r - 128) * contrastF + 128;
+            g = (g - 128) * contrastF + 128;
+            b = (b - 128) * contrastF + 128;
+          }
+          if (saturationF !== 1) {
+            const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            r = gray + (r - gray) * saturationF;
+            g = gray + (g - gray) * saturationF;
+            b = gray + (b - gray) * saturationF;
+          }
+          if (grayscaleF > 0) {
+            const gray = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+            r = r + (gray - r) * grayscaleF;
+            g = g + (gray - g) * grayscaleF;
+            b = b + (gray - b) * grayscaleF;
+          }
+          if (sepiaF > 0) {
+            const sr = Math.min(255, r * 0.393 + g * 0.769 + b * 0.189);
+            const sg = Math.min(255, r * 0.349 + g * 0.686 + b * 0.168);
+            const sb = Math.min(255, r * 0.272 + g * 0.534 + b * 0.131);
+            r = r + (sr - r) * sepiaF;
+            g = g + (sg - g) * sepiaF;
+            b = b + (sb - b) * sepiaF;
+          }
+          if (invertF > 0) {
+            r = r + (255 - 2 * r) * invertF;
+            g = g + (255 - 2 * g) * invertF;
+            b = b + (255 - 2 * b) * invertF;
+          }
+          d[i] = Math.max(0, Math.min(255, r));
+          d[i + 1] = Math.max(0, Math.min(255, g));
+          d[i + 2] = Math.max(0, Math.min(255, b));
+        }
+
+        offCtx.putImageData(imageData, 0, 0);
+        ctx.drawImage(offCanvas, drawX, drawY, drawW, drawH);
+      } catch {
+        // getImageData failed (tainted canvas from cross-origin image) —
+        // try applying filter directly on the main context as last resort
+        try {
+          ctx.filter = filterStr;
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+          ctx.filter = "none";
+        } catch {
+          // No filter support at all — draw image unfiltered
+          ctx.drawImage(img, drawX, drawY, drawW, drawH);
+        }
+      }
+    }
+  } else {
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+  }
+
 
   // Apply tint color overlay over the drawn image
   const tint = layer.properties.tint;
@@ -1184,9 +1445,42 @@ function renderOverlap(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y
     width: resolveNumber(layer.properties.width, container.width),
     height: resolveNumber(layer.properties.height, container.height),
   };
-  for (const child of layer.children) {
-    renderLayer(ctx, child, childContainer, absX, absY, timestamp);
+
+  if (layer.properties.clipFirstChild && layer.children.length > 0) {
+    const firstChild = layer.children[0];
+
+    // Render the first child normally
+    renderLayer(ctx, firstChild, childContainer, absX, absY, timestamp);
+
+    // Set up clipping path from the first child's shape
+    ctx.save();
+    const fcProps = firstChild.properties;
+    const fcW = resolveNumber(fcProps.width, 0);
+    const fcH = resolveNumber(fcProps.height, 0);
+    const fcOffsetX = resolveNumber(fcProps.x, 0);
+    const fcOffsetY = resolveNumber(fcProps.y, 0);
+    const { x: fcX, y: fcY } = anchorPosition(fcOffsetX, fcOffsetY, fcW, fcH, fcProps.anchor, childContainer);
+
+    if (firstChild.type === "shape") {
+      createShapePath(ctx, firstChild, fcX, fcY, fcW, fcH);
+    } else {
+      // Non-shape first child: clip to its rectangular bounds
+      ctx.beginPath();
+      ctx.rect(fcX, fcY, fcW, fcH);
+    }
+    ctx.clip();
+
+    // Render remaining children within the clip
+    for (let i = 1; i < layer.children.length; i++) {
+      renderLayer(ctx, layer.children[i], childContainer, absX, absY, timestamp);
+    }
+    ctx.restore();
+  } else {
+    for (const child of layer.children) {
+      renderLayer(ctx, child, childContainer, absX, absY, timestamp);
+    }
   }
+
   ctx.restore();
 }
 
@@ -1268,6 +1562,40 @@ function drawSelectionOutline(ctx: CanvasRenderingContext2D, bounds: LayerBounds
     ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
   }
 
+  ctx.restore();
+}
+
+function renderPaintLayer(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: number, w: number, h: number) {
+  const strokes: PaintStroke[] = (layer.properties.paintStrokes as any) || [];
+
+  // Draw a subtle canvas/background when there are no strokes (editor hint)
+  if (strokes.length === 0) {
+    ctx.save();
+    ctx.fillStyle = "#1a1a2e";
+    ctx.globalAlpha = 0.15;
+    ctx.fillRect(x, y, w, h);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#3a4a5a";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = "#6a7a8a";
+    ctx.font = `${Math.max(12, Math.min(w, h) * 0.08)}px sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("Paint Layer", x + w / 2, y + h / 2);
+    ctx.restore();
+    return;
+  }
+
+  // Clip to layer bounds and translate so strokes render relative to layer origin
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  ctx.translate(x, y);
+  renderPaintStrokes(ctx, strokes);
   ctx.restore();
 }
 

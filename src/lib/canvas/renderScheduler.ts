@@ -8,7 +8,6 @@
 
 import type { Layer } from "../types/project";
 
-let dirty = true; // start dirty to ensure first render
 let dirtyUntil = 0; // timestamp: stay in 60fps mode until this time
 let repaint = true; // content changed, render on next opportunity (no fps boost)
 let wakeCallback: (() => void) | null = null; // called when transitioning from idle to active
@@ -21,8 +20,7 @@ export const IDLE_INTERVAL_MS = 250; // ~4fps idle ticks
  * Mark the renderer as dirty — need full-fps rendering.
  * Call this from any code that changes visual state (user interaction, animations).
  */
-export function markDirty(reason?: string) {
-  dirty = true;
+export function markDirty(_reason?: string) {
   repaint = true;
   dirtyUntil = performance.now() + DIRTY_COOLDOWN_MS;
 
@@ -77,7 +75,6 @@ export function shouldRenderFullFps(
 ): boolean {
   if (timestamp < dirtyUntil) return true;
   if (hasLoopingAnims) return true;
-  dirty = false;
   return false;
 }
 

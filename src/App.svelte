@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Toolbar from "./lib/editor/Toolbar.svelte";
+  import PaintToolbar from "./lib/editor/PaintToolbar.svelte";
   import LeftPanel from "./lib/editor/LeftPanel.svelte";
   import CanvasRenderer from "./lib/canvas/CanvasRenderer.svelte";
   import PropertyPanel from "./lib/editor/PropertyPanel.svelte";
   import FormulaBar from "./lib/editor/FormulaBar.svelte";
-  import { getWallpaperMode, setWallpaperMode, setProject, copySelectedLayer, pasteLayer, getSelectedLayerId, getCopiedLayer, removeLayer, undo, redo } from "./lib/stores/project.svelte";
+  import { getWallpaperMode, setWallpaperMode, setProject, copySelectedLayer, pasteLayer, getSelectedLayerId, getCopiedLayer, removeLayer, undo, redo, getToolMode, getSelectedLayer } from "./lib/stores/project.svelte";
 
   // Check if this is the wallpaper helper webview (loaded with ?wallpaper=true)
   const isWallpaperView = new URLSearchParams(window.location.search).has("wallpaper");
@@ -115,6 +116,9 @@
 {:else}
   <div class="app-layout">
     <Toolbar />
+    {#if getToolMode() === 'paint' || (getSelectedLayer()?.type === 'paint')}
+      <PaintToolbar />
+    {/if}
     <div class="main-area">
       <LeftPanel />
       <CanvasRenderer />

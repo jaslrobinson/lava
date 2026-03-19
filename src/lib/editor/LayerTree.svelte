@@ -7,7 +7,6 @@
     renameLayer,
     isContainerType,
     moveLayer,
-    flattenLayers,
   } from "../stores/project.svelte";
   import type { Layer, GlobalVariable } from "../types/project";
 

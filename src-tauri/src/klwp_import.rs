@@ -213,6 +213,7 @@ fn map_shape_kind(shape: Option<&str>) -> Option<ShapeKind> {
         Some("OVAL") => Some(ShapeKind::Oval),
         Some("TRIANGLE") => Some(ShapeKind::Triangle),
         Some("ARC") => Some(ShapeKind::Arc),
+        Some("LINE") => Some(ShapeKind::Line),
         _ => Some(ShapeKind::Rectangle),
     }
 }
@@ -862,6 +863,7 @@ impl Default for LayerProperties {
             glyph_code: None,
             orientation: None,
             spacing: None,
+            clip_first_child: None,
             click_action: None,
             scroll_action: None,
             icon_src: None,
@@ -890,6 +892,15 @@ impl Default for LayerProperties {
             taskbar_radius: None,
             sm_bg: None,
             sm_accent: None,
+            fx_blur: None,
+            fx_contrast: None,
+            fx_saturation: None,
+            fx_brightness: None,
+            fx_sepia: None,
+            fx_grayscale: None,
+            fx_invert: None,
+            blend_mode: None,
+            paint_strokes: None,
         }
     }
 }

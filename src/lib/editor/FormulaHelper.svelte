@@ -156,6 +156,24 @@
       ],
     },
     {
+      name: "Air Quality",
+      options: [
+        { name: "AQI Index", formula: "$aq(index)$" },
+        { name: "AQI Label", formula: "$aq(label)$" },
+        { name: "PM2.5", formula: "$aq(pm25)$" },
+        { name: "PM10", formula: "$aq(pm10)$" },
+        { name: "CO", formula: "$aq(co)$" },
+        { name: "NO2", formula: "$aq(no2)$" },
+        { name: "Ozone (O3)", formula: "$aq(o3)$" },
+        { name: "SO2", formula: "$aq(so2)$" },
+        { name: "Ammonia (NH3)", formula: "$aq(nh3)$" },
+        { name: "NO", formula: "$aq(no)$" },
+        { name: "Last Updated", formula: "$aq(updated)$" },
+        { name: "AQI Status Text", formula: '$aq(label)$ (AQI $aq(index)$)' },
+        { name: "PM2.5 with unit", formula: "$aq(pm25)$ ug/m3" },
+      ],
+    },
+    {
       name: "Astronomy",
       options: [
         { name: "Sunrise", formula: "$ai(sunrise)$" },
@@ -196,6 +214,32 @@
         { name: "First App", formula: "$ni(0, app)$" },
         { name: "Second Title", formula: "$ni(1, title)$" },
         { name: "Persistent Count", formula: "$ni(scount)$" },
+      ],
+    },
+    {
+      name: "Location",
+      options: [
+        { name: "Latitude", formula: "$li(lat)$" },
+        { name: "Longitude", formula: "$li(lon)$" },
+        { name: "Altitude", formula: "$li(alt)$" },
+        { name: "Speed", formula: "$li(speed)$" },
+        { name: "Accuracy", formula: "$li(accuracy)$" },
+        { name: "Address", formula: "$li(addr)$" },
+        { name: "City/Locality", formula: "$li(loc)$" },
+        { name: "Country", formula: "$li(country)$" },
+        { name: "Country Code", formula: "$li(countrycode)$" },
+      ],
+    },
+    {
+      name: "Bitmap Palette",
+      options: [
+        { name: "Dominant Color", formula: "$bp(path, dominant)$" },
+        { name: "Vibrant Color", formula: "$bp(path, vibrant)$" },
+        { name: "Muted Color", formula: "$bp(path, muted)$" },
+        { name: "Light Vibrant", formula: "$bp(path, light_vibrant)$" },
+        { name: "Dark Vibrant", formula: "$bp(path, dark_vibrant)$" },
+        { name: "Light Muted", formula: "$bp(path, light_muted)$" },
+        { name: "Dark Muted", formula: "$bp(path, dark_muted)$" },
       ],
     },
     {

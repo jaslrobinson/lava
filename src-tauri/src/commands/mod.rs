@@ -1,5 +1,6 @@
 pub mod apps;
 pub mod formula;
+pub mod palette;
 pub mod project;
 pub mod settings;
 pub mod wallpaper;
