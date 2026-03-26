@@ -275,6 +275,8 @@ pub struct LayerProperties {
     pub skew_x: Option<NumberOrString>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub skew_y: Option<NumberOrString>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roughness: Option<f64>,
 
     // Image properties
     #[serde(skip_serializing_if = "Option::is_none")]

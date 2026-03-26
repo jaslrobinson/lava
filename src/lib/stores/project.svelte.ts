@@ -294,6 +294,29 @@ function findParentArrayInner(layers: Layer[], id: string, parent: Layer): { arr
  * @param targetId - the layer to drop near/into
  * @param position - "before", "after", or "inside" (for containers)
  */
+/** Move a layer one step up or down within its sibling list, or to the very top/bottom */
+export function moveLayerStep(layerId: string, direction: "up" | "down" | "top" | "bottom") {
+  pushUndo();
+  const loc = findParentArray(project.layers, layerId);
+  if (!loc) return;
+  const { arr, idx } = loc;
+  if (direction === "up" && idx < arr.length - 1) {
+    [arr[idx + 1], arr[idx]] = [arr[idx], arr[idx + 1]];
+  } else if (direction === "down" && idx > 0) {
+    [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+  } else if (direction === "top") {
+    const [layer] = arr.splice(idx, 1);
+    arr.push(layer);
+  } else if (direction === "bottom") {
+    const [layer] = arr.splice(idx, 1);
+    arr.unshift(layer);
+  } else {
+    return; // already at limit — don't mark dirty
+  }
+  project.layers = [...project.layers];
+  isDirty = true;
+}
+
 export function moveLayer(layerId: string, targetId: string, position: "before" | "after" | "inside") {
   if (layerId === targetId) return;
   pushUndo();

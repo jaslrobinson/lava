@@ -851,6 +851,7 @@ impl Default for LayerProperties {
             corner_radius: None,
             skew_x: None,
             skew_y: None,
+            roughness: None,
             src: None,
             scale_mode: None,
             tint: None,

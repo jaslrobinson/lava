@@ -1,7 +1,7 @@
 <script lang="ts">
   import { getSelectedLayer, updateLayerProperty, getProject } from "../stores/project.svelte";
   import { convertFileSrc } from "@tauri-apps/api/core";
-  import FormulaHelper from "./FormulaHelper.svelte";
+  import FormulaEditor from "./FormulaEditor.svelte";
   import AnimationPanel from "./AnimationPanel.svelte";
   import IconPicker from "./IconPicker.svelte";
   import ColorField from "./ColorField.svelte";
@@ -9,7 +9,6 @@
   import { getProjectFontNames, loadFont, discoverSystemFonts, ensureSystemFontLoaded, type DiscoveredFont } from "../fonts/fontLoader";
   import AppPickerPortal from "./AppPickerPortal.svelte";
 
-  let formulaHelperOpen = $state(false);
   let iconPickerOpen = $state(false);
   let showCustomFont = $state(false);
   let systemFonts = $state<DiscoveredFont[]>([]);
@@ -88,13 +87,6 @@
     return idx >= 0 ? ca.slice(idx + 1) : "";
   });
 
-  function handleFormulaInsert(formula: string) {
-    const layer = getSelectedLayer();
-    if (!layer) return;
-    const current = String(layer.properties.text ?? "");
-    updateLayerProperty(layer.id, "text", current + formula);
-  }
-
   function getImageSrc(src: string): string {
     if (!src) return "";
     if (src.startsWith("http://") || src.startsWith("https://") || src.startsWith("data:")) {
@@ -127,7 +119,7 @@
     const target = e.target as HTMLInputElement | HTMLSelectElement;
     const raw = target.value;
     // Try to parse as number for numeric fields
-    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "taskbarBgOpacity", "taskbarRadius", "textStrokeWidth", "fxBlur", "fxContrast", "fxSaturation", "fxBrightness", "fxSepia", "fxGrayscale", "fxInvert"];
+    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "roughness", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "taskbarBgOpacity", "taskbarRadius", "textStrokeWidth", "fxBlur", "fxContrast", "fxSaturation", "fxBrightness", "fxSepia", "fxGrayscale", "fxInvert"];
     if (numericKeys.includes(key)) {
       const num = Number(raw);
       updateLayerProperty(layer.id, key, isNaN(num) ? raw : num);
@@ -333,11 +325,10 @@
         <section class="prop-section">
           <div class="section-title">Text</div>
           <div class="prop-stack">
-            <label>Content</label>
-            <div class="input-row">
-              <input type="text" value={props.text ?? ""} oninput={(e) => onInput("text", e)} />
-              <button class="fx-btn" title="Formula Helper" onclick={() => formulaHelperOpen = true}>fx</button>
-            </div>
+            <FormulaEditor
+              value={String(props.text ?? "")}
+              onchange={(v) => updateLayerProperty(layer.id, "text", v)}
+            />
             <label>Font Size</label>
             <input type="number" value={props.fontSize ?? 24} oninput={(e) => onInput("fontSize", e)} />
             <label>Font Family</label>
@@ -439,6 +430,8 @@
             <input type="number" value={props.strokeWidth ?? 0} oninput={(e) => onInput("strokeWidth", e)} />
             <label>Corner Radius</label>
             <input type="number" value={props.cornerRadius ?? 0} oninput={(e) => onInput("cornerRadius", e)} />
+            <label>Roughness</label>
+            <input type="number" min="0" max="40" value={props.roughness ?? 0} title="Rough/stamped edge jitter (0 = off)" oninput={(e) => onInput("roughness", e)} />
             <label style="margin-top: 6px; font-weight: 600;">Skew / Perspective</label>
             <label>Skew X (°)</label>
             <input type="number" value={props.skewX ?? 0} step="1" oninput={(e) => onInput("skewX", e)} />
@@ -754,12 +747,6 @@
     {/if}
   </div>
 </div>
-
-<FormulaHelper
-  open={formulaHelperOpen}
-  onInsert={handleFormulaInsert}
-  onClose={() => formulaHelperOpen = false}
-/>
 
 <IconPicker
   open={iconPickerOpen}

@@ -7,6 +7,7 @@
     renameLayer,
     isContainerType,
     moveLayer,
+    moveLayerStep,
   } from "../stores/project.svelte";
   import type { Layer, GlobalVariable } from "../types/project";
 
@@ -193,7 +194,6 @@
   }
 
   function handleContextMenu(e: MouseEvent, layer: Layer) {
-    if (!isContainerType(layer.type)) return;
     e.preventDefault();
     e.stopPropagation();
     contextMenuLayer = layer;
@@ -262,7 +262,19 @@
     if (!layer) return;
     layer.visible = currentVisible === false ? true : false;
   }
+
+  function handleGlobalKeydown(e: KeyboardEvent) {
+    const id = getSelectedLayerId();
+    if (!id) return;
+    // Alt+Up / Alt+Down to move layer
+    if (e.altKey && e.key === "ArrowUp") { e.preventDefault(); moveLayerStep(id, "up"); }
+    else if (e.altKey && e.key === "ArrowDown") { e.preventDefault(); moveLayerStep(id, "down"); }
+    else if (e.altKey && e.key === "PageUp") { e.preventDefault(); moveLayerStep(id, "top"); }
+    else if (e.altKey && e.key === "PageDown") { e.preventDefault(); moveLayerStep(id, "bottom"); }
+  }
 </script>
+
+<svelte:window onkeydown={handleGlobalKeydown} />
 
 <div class="layer-panel">
   {#if focusedContainerId}
@@ -406,9 +418,24 @@
   <div class="ctx-backdrop" onclick={closeContextMenu}></div>
   <div class="ctx-menu" style="left:{contextMenuX}px;top:{contextMenuY}px;">
     <div class="ctx-header">{contextMenuLayer.name}</div>
-    <span class="ctx-item" onclick={() => exportAsKomp(contextMenuLayer!)}>
-      Export as .rock
+    <span class="ctx-item" onclick={() => { moveLayerStep(contextMenuLayer!.id, "top"); closeContextMenu(); }}>
+      ↟ Bring to Front
     </span>
+    <span class="ctx-item" onclick={() => { moveLayerStep(contextMenuLayer!.id, "up"); closeContextMenu(); }}>
+      ↑ Move Up
+    </span>
+    <span class="ctx-item" onclick={() => { moveLayerStep(contextMenuLayer!.id, "down"); closeContextMenu(); }}>
+      ↓ Move Down
+    </span>
+    <span class="ctx-item" onclick={() => { moveLayerStep(contextMenuLayer!.id, "bottom"); closeContextMenu(); }}>
+      ↡ Send to Back
+    </span>
+    {#if isContainerType(contextMenuLayer.type)}
+      <div class="ctx-divider"></div>
+      <span class="ctx-item" onclick={() => exportAsKomp(contextMenuLayer!)}>
+        Export as .rock
+      </span>
+    {/if}
   </div>
 {/if}
 
@@ -598,5 +625,10 @@
   .ctx-item:hover {
     background: var(--accent-dim);
     color: var(--accent);
+  }
+  .ctx-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 3px 0;
   }
 </style>

@@ -94,6 +94,7 @@ export default defineConfig({
   server: {
     port: 1420,
     strictPort: true,
+    hmr: { overlay: false },
     watch: {
       ignored: ["**/src-tauri/**", "**/*.klwp", "**/*_assets/**"],
     },

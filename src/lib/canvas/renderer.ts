@@ -230,7 +230,11 @@ function getHoveredIds(hoveredLayerId: string | null, layers: Layer[]): Set<stri
   return ids;
 }
 
-export function renderProject(ctx: CanvasRenderingContext2D, project: Project, selectedId: string | null, timestamp: number = 0, hoveredLayerId: string | null = null) {
+// Canvas-to-screen scale — set from renderProject so roughness stays visually consistent
+let _renderScale = 1;
+
+export function renderProject(ctx: CanvasRenderingContext2D, project: Project, selectedId: string | null, timestamp: number = 0, hoveredLayerId: string | null = null, renderScale: number = 1) {
+  _renderScale = renderScale;
   hasGifImages = false;
   beginFrame();
   initEngineTime(timestamp);
@@ -726,6 +730,7 @@ function renderShape(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   const strokeWidth = resolveNumber(props.strokeWidth, 0);
   const effectiveStrokeWidth = stroke ? Math.max(strokeWidth, 1) : 0;
   const cornerRadius = resolveNumber(props.cornerRadius, 0);
+  const roughness = resolveNumber(props.roughness, 0);
   const skewX = resolveNumber(props.skewX, 0);
   const skewY = resolveNumber(props.skewY, 0);
 
@@ -756,7 +761,9 @@ function renderShape(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
 
   switch (kind) {
     case "rectangle":
-      if (cornerRadius > 0) {
+      if (roughness > 0) {
+        roughRect(ctx, x, y, w, h, roughness / Math.max(_renderScale, 0.05), hashStr(layer.id));
+      } else if (cornerRadius > 0) {
         roundedRect(ctx, x, y, w, h, cornerRadius);
       } else {
         ctx.beginPath();
@@ -826,6 +833,51 @@ function renderShape(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   ctx.shadowBlur = 0;
 }
 
+/** Fast seeded PRNG (mulberry32) — gives consistent roughness per layer ID */
+function seededRand(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashStr(str: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 0x01000193); }
+  return h >>> 0;
+}
+
+/** Draw a rough/stamped rectangle path — edges are jittered perpendicular to their direction */
+function roughRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, roughness: number, seed: number) {
+  const r = Math.min(roughness, Math.min(w, h) * 0.4); // cap at 40% of smallest dimension
+  if (!isFinite(r) || r <= 0) { ctx.beginPath(); ctx.rect(x, y, w, h); return; }
+  roughness = r;
+  const rand = seededRand(seed);
+  const segLen = Math.max(3, roughness * 2.5);
+
+  function edge(x1: number, y1: number, x2: number, y2: number, nx: number, ny: number) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const steps = Math.max(2, Math.ceil(Math.sqrt(dx * dx + dy * dy) / segLen));
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const jit = (rand() * 2 - 1) * roughness;
+      ctx.lineTo(x1 + dx * t + nx * jit, y1 + dy * t + ny * jit);
+    }
+  }
+
+  const j0 = (rand() * 2 - 1) * roughness;
+  ctx.beginPath();
+  ctx.moveTo(x + j0, y + j0);
+  edge(x, y, x + w, y, 0, 1);       // top
+  edge(x + w, y, x + w, y + h, 1, 0); // right
+  edge(x + w, y + h, x, y + h, 0, 1); // bottom
+  edge(x, y + h, x, y, 1, 0);       // left
+  ctx.closePath();
+}
+
 function roundedRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   r = Math.min(r, w / 2, h / 2);
   ctx.beginPath();
@@ -846,9 +898,14 @@ function createShapePath(ctx: CanvasRenderingContext2D, layer: Layer, x: number,
   const props = layer.properties;
   const kind = props.shapeKind || "rectangle";
   const cornerRadius = resolveNumber(props.cornerRadius, 0);
+  const roughness = resolveNumber(props.roughness, 0);
 
   switch (kind) {
     case "rectangle":
+      if (roughness > 0) {
+        roughRect(ctx, x, y, w, h, roughness, hashStr(layer.id));
+        return;
+      }
       if (cornerRadius > 0) {
         roundedRect(ctx, x, y, w, h, cornerRadius);
       } else {

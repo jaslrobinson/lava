@@ -324,7 +324,7 @@
       ctx.save();
       ctx.translate(panX, panY);
       ctx.scale(zoom, zoom);
-      renderProject(ctx, project, selectedId, timestamp, hoveredLayerId);
+      renderProject(ctx, project, selectedId, timestamp, hoveredLayerId, baseScale);
 
       // Draw in-progress paint stroke as overlay
       if (isPainting && currentStrokePoints.length > 1) {
@@ -333,7 +333,7 @@
 
       ctx.restore();
     } else {
-      renderProject(ctx, project, selectedId, timestamp, hoveredLayerId);
+      renderProject(ctx, project, selectedId, timestamp, hoveredLayerId, baseScale);
 
       // Draw in-progress paint stroke as overlay
       if (isPainting && currentStrokePoints.length > 1) {
