@@ -390,6 +390,10 @@ pub struct LayerProperties {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fx_invert: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_glow_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fx_glow_radius: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub blend_mode: Option<String>,
 
     // Paint properties

@@ -119,7 +119,7 @@
     const target = e.target as HTMLInputElement | HTMLSelectElement;
     const raw = target.value;
     // Try to parse as number for numeric fields
-    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "roughness", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "taskbarBgOpacity", "taskbarRadius", "textStrokeWidth", "fxBlur", "fxContrast", "fxSaturation", "fxBrightness", "fxSepia", "fxGrayscale", "fxInvert"];
+    const numericKeys = ["x", "y", "width", "height", "rotation", "opacity", "fontSize", "strokeWidth", "cornerRadius", "roughness", "min", "max", "value", "lineSpacing", "maxLines", "spacing", "scaleX", "scaleY", "barCount", "barSpacing", "sensitivity", "mapLat", "mapLng", "mapZoom", "launcherIconSize", "taskbarBgOpacity", "taskbarRadius", "textStrokeWidth", "fxBlur", "fxContrast", "fxSaturation", "fxBrightness", "fxSepia", "fxGrayscale", "fxInvert", "fxGlowRadius"];
     if (numericKeys.includes(key)) {
       const num = Number(raw);
       updateLayerProperty(layer.id, key, isNaN(num) ? raw : num);
@@ -448,6 +448,30 @@
             <input type="number" min="0" value={props.shadow?.radius ?? 4} oninput={(e) => onShadowInput("radius", e)} />
           </div>
         </section>
+        <section class="prop-section">
+          <div class="section-title">FX / Filters</div>
+          <div class="prop-stack">
+            <label>Blur (0-50px)</label>
+            <input type="number" min="0" max="50" value={props.fxBlur ?? 0} oninput={(e) => onInput("fxBlur", e)} />
+            <label>Brightness (0-300%)</label>
+            <input type="number" min="0" max="300" value={props.fxBrightness ?? 100} oninput={(e) => onInput("fxBrightness", e)} />
+            <label>Contrast (0-300%)</label>
+            <input type="number" min="0" max="300" value={props.fxContrast ?? 100} oninput={(e) => onInput("fxContrast", e)} />
+            <label>Saturation (0-300%)</label>
+            <input type="number" min="0" max="300" value={props.fxSaturation ?? 100} oninput={(e) => onInput("fxSaturation", e)} />
+            <label>Grayscale (0-100%)</label>
+            <input type="number" min="0" max="100" value={props.fxGrayscale ?? 0} oninput={(e) => onInput("fxGrayscale", e)} />
+            <label>Sepia (0-100%)</label>
+            <input type="number" min="0" max="100" value={props.fxSepia ?? 0} oninput={(e) => onInput("fxSepia", e)} />
+            <label>Invert (0-100%)</label>
+            <input type="number" min="0" max="100" value={props.fxInvert ?? 0} oninput={(e) => onInput("fxInvert", e)} />
+            <label style="margin-top: 6px; font-weight: 600;">Glow</label>
+            <label>Glow Color</label>
+            <ColorField value={String(props.fxGlowColor ?? "#ffffff")} defaultColor="#ffffff" onChange={(v) => onColorProp("fxGlowColor", v)} />
+            <label>Glow Radius (0-50px)</label>
+            <input type="number" min="0" max="50" value={props.fxGlowRadius ?? 0} oninput={(e) => onInput("fxGlowRadius", e)} />
+          </div>
+        </section>
       {/if}
 
       {#if layer.type === "image"}
@@ -531,6 +555,11 @@
             <ColorField value={String(props.trackColor ?? "#333333")} defaultColor="#333333" onChange={(v) => onColorProp("trackColor", v)} />
             <label>Stroke Width</label>
             <input type="number" value={props.strokeWidth ?? 6} oninput={(e) => onInput("strokeWidth", e)} />
+            <label style="margin-top: 6px; font-weight: 600;">Glow</label>
+            <label>Glow Color</label>
+            <ColorField value={String(props.fxGlowColor ?? "#ffffff")} defaultColor="#ffffff" onChange={(v) => onColorProp("fxGlowColor", v)} />
+            <label>Glow Radius (0-50px)</label>
+            <input type="number" min="0" max="50" value={props.fxGlowRadius ?? 0} oninput={(e) => onInput("fxGlowRadius", e)} />
           </div>
         </section>
       {/if}

@@ -49,6 +49,15 @@ function withAlpha(color: string, alpha: number): string {
   return color;
 }
 
+/** Parse a hex color string to r,g,b components (0-255 each) */
+function parseRGB(color: string): [number, number, number] {
+  const m6 = color.match(/^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})/);
+  if (m6) return [parseInt(m6[1], 16), parseInt(m6[2], 16), parseInt(m6[3], 16)];
+  const m3 = color.match(/^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/);
+  if (m3) return [parseInt(m3[1] + m3[1], 16), parseInt(m3[2] + m3[2], 16), parseInt(m3[3] + m3[3], 16)];
+  return [255, 255, 255];
+}
+
 // Detect whether CanvasRenderingContext2D.filter actually works (not just accepted silently).
 // We draw a red pixel, apply an invert filter, and check if it changed to cyan.
 let _canvasFilterSupported: boolean | null = null;
@@ -412,7 +421,8 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
   let drawCtx = ctx;
   let offscreen: HTMLCanvasElement | null = null;
   if (needsOffscreen) {
-    const margin = Math.ceil(totalBlur) + 2;
+    const glowMargin = Math.ceil(resolveNumber(layer.properties.fxGlowRadius, 0));
+    const margin = Math.ceil(totalBlur) + glowMargin + 2;
     const ow = (w || 100) + margin * 2;
     const oh = (h || 100) + margin * 2;
     offscreen = getReusableCanvas(ow, oh);
@@ -465,11 +475,12 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
     // Capture what was just drawn by rendering again to a temp canvas
     const lw = w || 100;
     const lh = h || 100;
+    const glowM = Math.ceil(resolveNumber(layer.properties.fxGlowRadius, 0));
     const tmpC = document.createElement("canvas");
-    tmpC.width = Math.ceil(lw);
-    tmpC.height = Math.ceil(lh);
+    tmpC.width = Math.ceil(lw) + glowM * 2;
+    tmpC.height = Math.ceil(lh) + glowM * 2;
     const tmpX = tmpC.getContext("2d")!;
-    tmpX.translate(-x, -y);
+    tmpX.translate(glowM - x, glowM - y);
     // Re-render the layer onto the temp canvas
     switch (layer.type) {
       case "text": renderText(tmpX, layer, x, y, lw, lh); break;
@@ -499,13 +510,13 @@ function renderLayer(ctx: CanvasRenderingContext2D, layer: Layer, container: Con
     ctx.save();
     ctx.globalCompositeOperation = "destination-out";
     ctx.globalAlpha = 1;
-    ctx.fillRect(x, y, lw, lh);
+    ctx.fillRect(x - glowM, y - glowM, lw + glowM * 2, lh + glowM * 2);
     ctx.restore();
     // Redraw blurred with blend mode
     ctx.globalAlpha *= alpha;
-    ctx.drawImage(tmpC, x, y);
+    ctx.drawImage(tmpC, x - glowM, y - glowM);
     for (const [dx, dy] of offsets) {
-      ctx.drawImage(tmpC, x + dx, y + dy);
+      ctx.drawImage(tmpC, x - glowM + dx, y - glowM + dy);
     }
   }
 
@@ -734,103 +745,163 @@ function renderShape(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   const skewX = resolveNumber(props.skewX, 0);
   const skewY = resolveNumber(props.skewY, 0);
 
-  if (!noFill) ctx.fillStyle = fillRaw;
+  // FX / filters (mirrors image FX pipeline)
+  const fxContrast = resolveNumber(props.fxContrast, 100);
+  const fxSaturation = resolveNumber(props.fxSaturation, 100);
+  const fxBrightness = resolveNumber(props.fxBrightness, 100);
+  const fxSepia = resolveNumber(props.fxSepia, 0);
+  const fxGrayscale = resolveNumber(props.fxGrayscale, 0);
+  const fxInvert = resolveNumber(props.fxInvert, 0);
+  const fxGlowRadius = resolveNumber(props.fxGlowRadius, 0);
+  const fxGlowColor = resolve(props.fxGlowColor ?? "#ffffff", "#ffffff");
+  const hasFx = fxContrast !== 100 || fxSaturation !== 100 ||
+    fxBrightness !== 100 || fxSepia > 0 || fxGrayscale > 0 || fxInvert > 0;
+  const hasGlow = fxGlowRadius > 0;
+
+  if (hasGlow) {
+    const [gr, gg, gb] = parseRGB(fxGlowColor);
+    ctx.save();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    const steps = 8;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const expand = (1 - t) * fxGlowRadius;
+      const alpha = t * 0.6;
+      ctx.lineWidth = Math.max(effectiveStrokeWidth, 4) + expand * 2;
+      ctx.strokeStyle = `rgba(${gr},${gg},${gb},${alpha.toFixed(3)})`;
+      createShapePath(ctx, layer, x, y, w, h);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // When FX colour filters are needed, render shape to offscreen then composite with filter
+  let offCanvas: HTMLCanvasElement | null = null;
+  let drawCtx: CanvasRenderingContext2D = ctx;
+  let offX = x, offY = y;
+
+  if (hasFx) {
+    offCanvas = document.createElement("canvas");
+    offCanvas.width = Math.max(1, Math.ceil(w));
+    offCanvas.height = Math.max(1, Math.ceil(h));
+    drawCtx = offCanvas.getContext("2d")!;
+    drawCtx.translate(-x, -y);
+  }
+
+  if (!noFill) drawCtx.fillStyle = fillRaw;
   if (stroke) {
-    ctx.strokeStyle = stroke;
-    ctx.lineWidth = effectiveStrokeWidth;
+    drawCtx.strokeStyle = stroke;
+    drawCtx.lineWidth = effectiveStrokeWidth;
   }
 
   // Apply skew transform around the shape center
   const hasSkew = skewX !== 0 || skewY !== 0;
   if (hasSkew) {
-    ctx.save();
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    ctx.translate(cx, cy);
-    ctx.transform(1, Math.tan(skewY * Math.PI / 180), Math.tan(skewX * Math.PI / 180), 1, 0, 0);
-    ctx.translate(-cx, -cy);
+    drawCtx.save();
+    const scx = x + w / 2;
+    const scy = y + h / 2;
+    drawCtx.translate(scx, scy);
+    drawCtx.transform(1, Math.tan(skewY * Math.PI / 180), Math.tan(skewX * Math.PI / 180), 1, 0, 0);
+    drawCtx.translate(-scx, -scy);
   }
 
   // Set shadow right before draw calls so it's in the active context
   if (props.shadow) {
-    ctx.shadowColor = resolve(props.shadow.color, "#000000");
-    ctx.shadowOffsetX = resolveNumber(props.shadow.dx, 0);
-    ctx.shadowOffsetY = resolveNumber(props.shadow.dy, 0);
-    ctx.shadowBlur = resolveNumber(props.shadow.radius, 0);
+    drawCtx.shadowColor = resolve(props.shadow.color, "#000000");
+    drawCtx.shadowOffsetX = resolveNumber(props.shadow.dx, 0);
+    drawCtx.shadowOffsetY = resolveNumber(props.shadow.dy, 0);
+    drawCtx.shadowBlur = resolveNumber(props.shadow.radius, 0);
   }
 
   switch (kind) {
     case "rectangle":
       if (roughness > 0) {
-        roughRect(ctx, x, y, w, h, roughness / Math.max(_renderScale, 0.05), hashStr(layer.id));
+        roughRect(drawCtx, x, y, w, h, roughness / Math.max(_renderScale, 0.05), hashStr(layer.id));
       } else if (cornerRadius > 0) {
-        roundedRect(ctx, x, y, w, h, cornerRadius);
+        roundedRect(drawCtx, x, y, w, h, cornerRadius);
       } else {
-        ctx.beginPath();
-        ctx.rect(x, y, w, h);
+        drawCtx.beginPath();
+        drawCtx.rect(x, y, w, h);
       }
-      if (!noFill) ctx.fill();
-      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
+      if (!noFill) drawCtx.fill();
+      if (stroke && effectiveStrokeWidth > 0) drawCtx.stroke();
       break;
 
     case "circle": {
       const radius = Math.min(w, h) / 2;
-      ctx.beginPath();
-      ctx.arc(x + w / 2, y + h / 2, radius, 0, Math.PI * 2);
-      if (!noFill) ctx.fill();
-      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
+      drawCtx.beginPath();
+      drawCtx.arc(x + w / 2, y + h / 2, radius, 0, Math.PI * 2);
+      if (!noFill) drawCtx.fill();
+      if (stroke && effectiveStrokeWidth > 0) drawCtx.stroke();
       break;
     }
 
     case "oval":
-      ctx.beginPath();
-      ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-      if (!noFill) ctx.fill();
-      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
+      drawCtx.beginPath();
+      drawCtx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+      if (!noFill) drawCtx.fill();
+      if (stroke && effectiveStrokeWidth > 0) drawCtx.stroke();
       break;
 
     case "triangle":
-      ctx.beginPath();
-      ctx.moveTo(x + w / 2, y);
-      ctx.lineTo(x + w, y + h);
-      ctx.lineTo(x, y + h);
-      ctx.closePath();
-      if (!noFill) ctx.fill();
-      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
+      drawCtx.beginPath();
+      drawCtx.moveTo(x + w / 2, y);
+      drawCtx.lineTo(x + w, y + h);
+      drawCtx.lineTo(x, y + h);
+      drawCtx.closePath();
+      if (!noFill) drawCtx.fill();
+      if (stroke && effectiveStrokeWidth > 0) drawCtx.stroke();
       break;
 
     case "arc": {
       const r = Math.min(w, h) / 2;
-      ctx.beginPath();
-      ctx.arc(x + w / 2, y + h / 2, r, 0, Math.PI);
-      if (!noFill) ctx.fill();
-      if (stroke && effectiveStrokeWidth > 0) ctx.stroke();
+      drawCtx.beginPath();
+      drawCtx.arc(x + w / 2, y + h / 2, r, 0, Math.PI);
+      if (!noFill) drawCtx.fill();
+      if (stroke && effectiveStrokeWidth > 0) drawCtx.stroke();
       break;
     }
 
     case "line": {
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + w, y + h);
+      drawCtx.beginPath();
+      drawCtx.moveTo(x, y);
+      drawCtx.lineTo(x + w, y + h);
       if (stroke) {
-        ctx.stroke();
+        drawCtx.stroke();
       } else {
         // Fallback: use fill color as stroke for lines if no stroke set
-        ctx.strokeStyle = fillRaw;
-        ctx.lineWidth = Math.max(effectiveStrokeWidth, 1);
-        ctx.stroke();
+        drawCtx.strokeStyle = fillRaw;
+        drawCtx.lineWidth = Math.max(effectiveStrokeWidth, 1);
+        drawCtx.stroke();
       }
       break;
     }
   }
 
-  if (hasSkew) ctx.restore();
+  if (hasSkew) drawCtx.restore();
 
-  // Reset shadow
-  ctx.shadowColor = "transparent";
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 0;
-  ctx.shadowBlur = 0;
+  // Reset shadow on whichever context was used
+  drawCtx.shadowColor = "transparent";
+  drawCtx.shadowOffsetX = 0;
+  drawCtx.shadowOffsetY = 0;
+  drawCtx.shadowBlur = 0;
+
+  // Composite offscreen canvas with CSS colour filters applied
+  if (offCanvas) {
+    if (hasFx && canvasFilterWorks()) {
+      const filters: string[] = [];
+      if (fxBrightness !== 100) filters.push(`brightness(${fxBrightness / 100})`);
+      if (fxContrast !== 100) filters.push(`contrast(${fxContrast / 100})`);
+      if (fxSaturation !== 100) filters.push(`saturate(${fxSaturation / 100})`);
+      if (fxGrayscale > 0) filters.push(`grayscale(${fxGrayscale / 100})`);
+      if (fxSepia > 0) filters.push(`sepia(${fxSepia / 100})`);
+      if (fxInvert > 0) filters.push(`invert(${fxInvert / 100})`);
+      ctx.filter = filters.join(" ");
+    }
+    ctx.drawImage(offCanvas, offX, offY);
+    if (hasFx) ctx.filter = "none";
+  }
 }
 
 /** Fast seeded PRNG (mulberry32) — gives consistent roughness per layer ID */
@@ -1220,6 +1291,41 @@ function renderProgress(ctx: CanvasRenderingContext2D, layer: Layer, x: number, 
   const style = props.style || "arc";
   const progress = Math.max(0, Math.min(1, (value - min) / (max - min)));
 
+  // Glow pre-pass: multi-draw offset bloom — same WebKitGTK-safe technique as blur.
+  const fxGlowRadius = resolveNumber(props.fxGlowRadius, 0);
+  const fxGlowColor = resolve(props.fxGlowColor ?? "#ffffff", "#ffffff");
+  const hasGlow = fxGlowRadius > 0;
+
+  if (hasGlow) {
+    const [gr, gg, gb] = parseRGB(fxGlowColor);
+    const cx = x + w / 2;
+    const cy = y + h / 2;
+    const radius = Math.min(w, h) / 2 - strokeWidth / 2;
+    const startAngle = -Math.PI / 2;
+    const endAngle = startAngle + Math.PI * 2 * progress;
+    ctx.save();
+    ctx.lineCap = "round";
+    const steps = 8;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const expand = (1 - t) * fxGlowRadius;
+      const alpha = t * 0.6;
+      ctx.globalAlpha = 1;
+      if (style === "bar") {
+        const barH = strokeWidth + expand * 2;
+        ctx.fillStyle = `rgba(${gr},${gg},${gb},${alpha.toFixed(3)})`;
+        ctx.fillRect(x, y + h / 2 - barH / 2, w * progress, barH);
+      } else {
+        ctx.lineWidth = strokeWidth + expand * 2;
+        ctx.strokeStyle = `rgba(${gr},${gg},${gb},${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, startAngle, endAngle);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   if (style === "bar") {
     // Horizontal bar
     ctx.fillStyle = trackColor;
@@ -1242,7 +1348,7 @@ function renderProgress(ctx: CanvasRenderingContext2D, layer: Layer, x: number, 
     ctx.lineCap = "round";
     ctx.stroke();
 
-    // Progress
+    // Progress arc
     ctx.beginPath();
     ctx.arc(cx, cy, radius, startAngle, endAngle);
     ctx.strokeStyle = color;

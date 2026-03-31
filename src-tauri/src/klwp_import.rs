@@ -900,6 +900,8 @@ impl Default for LayerProperties {
             fx_sepia: None,
             fx_grayscale: None,
             fx_invert: None,
+            fx_glow_color: None,
+            fx_glow_radius: None,
             blend_mode: None,
             paint_strokes: None,
         }

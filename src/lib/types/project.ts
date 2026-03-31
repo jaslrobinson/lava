@@ -72,6 +72,7 @@ export interface LayerProperties {
   stroke?: string;
   strokeWidth?: number;
   cornerRadius?: number;
+  roughness?: number;       // rough/stamped edge jitter (0 = off, max 40)
   skewX?: number | string;  // degrees horizontal skew
   skewY?: number | string;  // degrees vertical skew
 
@@ -133,7 +134,7 @@ export interface LayerProperties {
   smBg?: string;             // start menu background color
   smAccent?: string;         // start menu accent color
 
-  // Image FX / Filters
+  // FX / Filters (applies to image and shape layers)
   fxBlur?: number;        // pixels, default 0
   fxContrast?: number;    // percentage, default 100
   fxSaturation?: number;  // percentage, default 100
@@ -141,6 +142,8 @@ export interface LayerProperties {
   fxSepia?: number;       // percentage, default 0
   fxGrayscale?: number;   // percentage, default 0
   fxInvert?: number;      // percentage, default 0
+  fxGlowColor?: string;   // outer glow color, e.g. "#ff8800"
+  fxGlowRadius?: number;  // outer glow spread radius in pixels, default 0
 
   // Blend mode (applies to all layer types)
   blendMode?: string;     // CSS globalCompositeOperation value, default "source-over"
