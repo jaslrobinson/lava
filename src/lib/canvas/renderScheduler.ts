@@ -1,7 +1,7 @@
 /**
  * Render scheduler for wallpaper mode.
  * Two-tier system:
- *   - dirty flag → 60fps for 500ms (user interaction, animations)
+ *   - dirty window (dirtyUntil) → 60fps for 500ms (user interaction, animations)
  *   - repaint flag → render on next idle tick (formula/provider changes)
  * When neither is set, idle ticks skip rendering entirely (~0% CPU).
  */
@@ -20,7 +20,7 @@ export const IDLE_INTERVAL_MS = 250; // ~4fps idle ticks
  * Mark the renderer as dirty — need full-fps rendering.
  * Call this from any code that changes visual state (user interaction, animations).
  */
-export function markDirty(_reason?: string) {
+export function markDirty() {
   repaint = true;
   dirtyUntil = performance.now() + DIRTY_COOLDOWN_MS;
 
@@ -53,16 +53,35 @@ export function clearRepaint() {
 /**
  * Register a callback that's called when transitioning from idle to active.
  * The callback should call requestAnimationFrame(renderLoop).
+ * Pass null to unregister (e.g. on component teardown).
  */
-export function setWakeCallback(cb: () => void) {
+export function setWakeCallback(cb: (() => void) | null) {
   wakeCallback = cb;
 }
 
 /**
- * Store the idle timeout ID so markDirty can cancel it.
+ * Schedule cb to run after IDLE_INTERVAL_MS, tracking the timer so markDirty()
+ * can cancel it and wake early. Clears the tracked id itself right before cb
+ * runs, so a timer that fires naturally is never mistaken by a later
+ * markDirty() call for one that's still pending (which would otherwise fire
+ * a spurious extra wakeCallback and spawn a duplicate render loop).
  */
-export function setIdleTimeout(id: ReturnType<typeof setTimeout>) {
-  idleTimeoutId = id;
+export function scheduleIdle(cb: () => void) {
+  idleTimeoutId = setTimeout(() => {
+    idleTimeoutId = null;
+    cb();
+  }, IDLE_INTERVAL_MS);
+}
+
+/**
+ * Cancel any pending idle timer without waking (e.g. on component teardown),
+ * so it can't fire against a torn-down renderer.
+ */
+export function cancelIdle() {
+  if (idleTimeoutId !== null) {
+    clearTimeout(idleTimeoutId);
+    idleTimeoutId = null;
+  }
 }
 
 /**
@@ -86,9 +105,12 @@ export function shouldRenderFullFps(
  */
 export function hasActiveLoopingAnimations(layers: Layer[]): boolean {
   for (const layer of layers) {
-    // Skip hidden layers
+    // Skip hidden layers (editor-hidden, or literally hidden via properties.visible).
+    // Note: a formula string in properties.visible that *resolves* to hidden isn't
+    // caught here (no globals/resolve() available at this layer) — only the
+    // literal-false cases are, which still avoids the worst always-on-60fps case.
     if (layer.visible === false) continue;
-    if (layer.properties?.visible === false || layer.properties?.visible === "NEVER") continue;
+    if (layer.properties.visible === false) continue;
 
     if (layer.animations) {
       for (const anim of layer.animations) {
@@ -100,10 +122,10 @@ export function hasActiveLoopingAnimations(layers: Layer[]): boolean {
         ) {
           return true;
         }
-        // Jiggle and flash are continuous only with time/hover triggers
+        // Jiggle and flash are inherently continuous
         if (
-          (anim.type === "jiggle" || anim.type === "flash") &&
-          (anim.trigger === "time" || anim.trigger === "hover")
+          anim.type === "jiggle" ||
+          anim.type === "flash"
         ) {
           return true;
         }

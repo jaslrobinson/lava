@@ -19,7 +19,7 @@
   import { startFormulaLoop, stopFormulaLoop, evaluateSync, flushGlobalsNow, resolveFormula, hasFormula } from "../formula/service";
   import { setScrollPosition, triggerTap } from "./animationState";
   import { loadBundledIconFonts } from "../fonts/fontLoader";
-  import { markDirty, shouldRenderFullFps, hasActiveLoopingAnimations, setWakeCallback, setIdleTimeout, needsRepaint, clearRepaint, IDLE_INTERVAL_MS } from "./renderScheduler";
+  import { markDirty, shouldRenderFullFps, hasActiveLoopingAnimations, setWakeCallback, scheduleIdle, cancelIdle, needsRepaint, clearRepaint } from "./renderScheduler";
   import MapOverlay from "./MapOverlay.svelte";
   import { launcherHitRegions, setLauncherHoverCoords, toggleStartMenu, closeStartMenu } from "./renderer";
   import StartMenuOverlay from "./StartMenuOverlay.svelte";
@@ -210,7 +210,12 @@
       return globals;
     }).then(() => { canvasReady = true; });
 
-    const observer = new ResizeObserver(() => updateCanvasSize());
+    const observer = new ResizeObserver(() => {
+      updateCanvasSize();
+      // Resizing clears the canvas bitmap (canvas.width/height reset) — make sure
+      // an idle wallpaper wakes up and redraws instead of staying blank.
+      markDirty();
+    });
     observer.observe(containerEl);
 
     const onKeyDown = (e: KeyboardEvent) => {
@@ -227,6 +232,10 @@
 
     return () => {
       cancelAnimationFrame(rafId);
+      if (isWallpaperView) {
+        cancelIdle();
+        setWakeCallback(null);
+      }
       observer.disconnect();
       stopFormulaLoop();
       window.removeEventListener("keydown", onKeyDown);
@@ -292,16 +301,14 @@
         // Idle mode but content changed (clock tick, provider update): render once
         clearRepaint();
         doRender(timestamp);
-        const timeoutId = setTimeout(() => {
+        scheduleIdle(() => {
           rafId = requestAnimationFrame(renderLoop);
-        }, IDLE_INTERVAL_MS);
-        setIdleTimeout(timeoutId);
+        });
       } else {
         // Idle mode, nothing changed: skip render entirely
-        const timeoutId = setTimeout(() => {
+        scheduleIdle(() => {
           rafId = requestAnimationFrame(renderLoop);
-        }, IDLE_INTERVAL_MS);
-        setIdleTimeout(timeoutId);
+        });
       }
     } else {
       // Editor mode: always render at 60fps

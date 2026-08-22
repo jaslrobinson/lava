@@ -10,6 +10,10 @@ import { markDirty } from "./renderScheduler";
 
 export const NUM_BANDS = 24;
 
+// Detect Tauri once — HTTP polling (/__lava_audio) is only valid in the
+// standalone wallpaper webview; Tauri mode uses the "audio-bands" event instead.
+const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
+
 // Current smoothed band values (0.0 - 1.0)
 let bands: Float32Array = new Float32Array(NUM_BANDS);
 // Peak hold values for each band
@@ -32,8 +36,9 @@ export function setMusicPlaying(playing: boolean) {
   const wasPlaying = musicPlaying;
   musicPlaying = playing;
 
-  // Start/stop audio polling based on music state (wallpaper mode only)
-  if (playing && !wasPlaying && audioPollId === null && initialized) {
+  // Start/stop audio polling based on music state (wallpaper mode only —
+  // Tauri mode gets its bands from the "audio-bands" event, not HTTP polling)
+  if (!isTauri && playing && !wasPlaying && audioPollId === null && initialized) {
     startAudioPolling();
   } else if (!playing && wasPlaying) {
     stopAudioPolling();
@@ -86,8 +91,6 @@ function stopAudioPolling() {
 export function initAudioVisualizer() {
   if (initialized) return;
   initialized = true;
-
-  const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
 
   if (isTauri) {
     // Tauri mode: listen to backend events
