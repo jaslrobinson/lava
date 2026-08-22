@@ -23,7 +23,7 @@
       "tooltip": "LAVA - Live Animated Visuals for Arch"
     },
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' https: http:; img-src 'self' asset: https://asset.localhost http://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'",
+      "csp": "default-src 'self'; connect-src 'self' https: http:; img-src 'self' asset: https://asset.localhost http://asset.localhost https: http: data: blob:; style-src 'self' 'unsafe-inline'",
       "assetProtocol": {
         "enable": true,
         "scope": ["**", "$HOME/**", "$APPCONFIG/**", "$APPDATA/**"]
