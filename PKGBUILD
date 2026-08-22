@@ -28,7 +28,7 @@ makedepends=(
 )
 provides=('lava')
 source=("$pkgname-$pkgver.tar.gz::https://github.com/jaslrobinson/lava/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('5f424859adad40054691dca62723f9f425325b907d30d5bf1b7bd16b6069f38a')
+sha256sums=('88fcb5fbf6657f100e672c7cc7f49f6f488415f0977d57b30439a277ca925d8e')
 
 build() {
     cd "$srcdir/lava-$pkgver"
