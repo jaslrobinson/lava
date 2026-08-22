@@ -8,6 +8,10 @@ import { renderPaintStrokes } from "./paintEngine";
 
 // Detect if we're running inside Tauri (vs plain WebKitGTK wallpaper view)
 const isTauri = typeof (window as any).__TAURI_INTERNALS__ !== "undefined";
+// Detect the live wallpaper view specifically (same check CanvasRenderer.svelte uses)
+// so the wallpaper never shows the editor's "loading/failed" placeholder box.
+const isWallpaperMode = typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).has("wallpaper");
 let convertFileSrc: ((path: string) => string) | null = null;
 if (isTauri) {
   import("@tauri-apps/api/core").then(m => { convertFileSrc = m.convertFileSrc; });
@@ -1057,7 +1061,11 @@ function renderImage(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: 
   if (src && src.toLowerCase().endsWith(".gif")) hasGifImages = true;
 
   if (!img) {
-    // Placeholder while loading or no source
+    // On the live wallpaper, an image that's missing/still loading/failed
+    // should just render nothing rather than an editor-style debug box.
+    if (isWallpaperMode) return;
+
+    // Placeholder while loading or no source (editor only)
     ctx.fillStyle = "#2a3a4a";
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = "#556677";
