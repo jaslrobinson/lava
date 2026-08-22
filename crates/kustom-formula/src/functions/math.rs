@@ -13,8 +13,28 @@ pub fn eval_mu(args: &[Expr], ctx: &EvalContext) -> Value {
     let nums: Vec<f64> = args[1..].iter().map(|a| ctx.evaluate(a).as_number()).collect();
 
     let result = match func.as_str() {
-        "ceil" => nums.first().map(|n| n.ceil()).unwrap_or(0.0),
-        "floor" => nums.first().map(|n| n.floor()).unwrap_or(0.0),
+        // ceil/floor take an optional divisor: mu(floor, x, step) == floor(x / step),
+        // matching the common Kustom idiom for "advance every N units".
+        "ceil" => {
+            if let Some(&n) = nums.first() {
+                match nums.get(1) {
+                    Some(&step) if step != 0.0 => (n / step).ceil(),
+                    _ => n.ceil(),
+                }
+            } else {
+                0.0
+            }
+        }
+        "floor" => {
+            if let Some(&n) = nums.first() {
+                match nums.get(1) {
+                    Some(&step) if step != 0.0 => (n / step).floor(),
+                    _ => n.floor(),
+                }
+            } else {
+                0.0
+            }
+        }
         "round" => {
             if let Some(&n) = nums.first() {
                 if let Some(&places) = nums.get(1) {
@@ -61,8 +81,9 @@ pub fn eval_mu(args: &[Expr], ctx: &EvalContext) -> Value {
         "rnd" => {
             if nums.len() >= 2 {
                 let mut rng = rand::thread_rng();
-                let lo = nums[0];
-                let hi = nums[1];
+                // gen_range panics on a reversed/empty range — normalize order
+                // so a swapped min/max in the formula degrades gracefully instead.
+                let (lo, hi) = if nums[0] <= nums[1] { (nums[0], nums[1]) } else { (nums[1], nums[0]) };
                 rng.gen_range(lo..=hi)
             } else {
                 0.0
@@ -137,6 +158,28 @@ mod tests {
     #[test]
     fn test_ceil() {
         assert_eq!(eval_mu_simple("ceil", &[3.2]).as_number(), 4.0);
+    }
+
+    #[test]
+    fn test_floor_with_divisor() {
+        // floor(1234 / 500) == 2 — the "advance every N units" idiom
+        assert_eq!(eval_mu_simple("floor", &[1234.0, 500.0]).as_number(), 2.0);
+    }
+
+    #[test]
+    fn test_ceil_with_divisor() {
+        assert_eq!(eval_mu_simple("ceil", &[1001.0, 500.0]).as_number(), 3.0);
+    }
+
+    #[test]
+    fn test_floor_divisor_zero_falls_back_to_plain_floor() {
+        assert_eq!(eval_mu_simple("floor", &[3.9, 0.0]).as_number(), 3.0);
+    }
+
+    #[test]
+    fn test_rnd_reversed_range_does_not_panic() {
+        let result = eval_mu_simple("rnd", &[100.0, 0.0]).as_number();
+        assert!((0.0..=100.0).contains(&result));
     }
 
     #[test]

@@ -1,7 +1,27 @@
 use crate::evaluator::EvalContext;
 use crate::parser::Expr;
 use crate::value::Value;
-use chrono::{Datelike, Local, NaiveDateTime, Timelike};
+use chrono::{DateTime, Datelike, Local, NaiveDateTime, Timelike};
+
+/// Parse a date string trying several common formats (our own
+/// "%Y-%m-%d %H:%M:%S", RFC2822 as used by RSS `pubDate`, RFC3339/ISO8601,
+/// and a bare ISO date with a "T" separator) before giving up.
+fn parse_flexible_datetime(s: &str) -> Option<NaiveDateTime> {
+    let s = s.trim();
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%d %H:%M:%S") {
+        return Some(dt);
+    }
+    if let Ok(dt) = DateTime::parse_from_rfc2822(s) {
+        return Some(dt.with_timezone(&Local).naive_local());
+    }
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Some(dt.with_timezone(&Local).naive_local());
+    }
+    if let Ok(dt) = NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S") {
+        return Some(dt);
+    }
+    None
+}
 
 /// Evaluate `df(format, [date])` - date formatting.
 pub fn eval_df(args: &[Expr], ctx: &EvalContext) -> Value {
@@ -13,8 +33,7 @@ pub fn eval_df(args: &[Expr], ctx: &EvalContext) -> Value {
     let now = Local::now().naive_local();
     let dt = if args.len() > 1 {
         let date_str = ctx.evaluate(&args[1]).as_text();
-        NaiveDateTime::parse_from_str(&date_str, "%Y-%m-%d %H:%M:%S")
-            .unwrap_or(now)
+        parse_flexible_datetime(&date_str).unwrap_or(now)
     } else {
         now
     };
@@ -235,5 +254,35 @@ mod tests {
         ];
         let result = eval_tf(&args, &ctx);
         assert_eq!(result.as_text(), "01:01:01");
+    }
+
+    #[test]
+    fn test_parse_rfc2822_rss_pubdate() {
+        // Common RSS <pubDate> format
+        let dt = parse_flexible_datetime("Sun, 08 Mar 2026 14:05:09 +0000");
+        assert!(dt.is_some());
+        assert_eq!(dt.unwrap().date(), NaiveDate::from_ymd_opt(2026, 3, 8).unwrap());
+    }
+
+    #[test]
+    fn test_parse_rfc3339_iso_date() {
+        let dt = parse_flexible_datetime("2026-03-08T14:05:09Z");
+        assert!(dt.is_some());
+        assert_eq!(dt.unwrap().date(), NaiveDate::from_ymd_opt(2026, 3, 8).unwrap());
+    }
+
+    #[test]
+    fn test_parse_unrecognized_date_returns_none() {
+        assert_eq!(parse_flexible_datetime("not a date"), None);
+    }
+
+    #[test]
+    fn test_df_with_rss_pubdate() {
+        let ctx = EvalContext::new();
+        let args = vec![
+            Expr::Literal(Value::Text("yyyy-MM-dd".into())),
+            Expr::Literal(Value::Text("Sun, 08 Mar 2026 14:05:09 +0000".into())),
+        ];
+        assert_eq!(eval_df(&args, &ctx).as_text(), "2026-03-08");
     }
 }
