@@ -175,7 +175,7 @@ export interface Project {
   version: string;
   name: string;
   resolution: { width: number; height: number };
-  background: { type: "color" | "image"; value: string };
+  background: { type: "color" | "image" | "none"; value: string };
   globals: GlobalVariable[];
   layers: Layer[];
   shortcuts: Shortcut[];

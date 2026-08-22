@@ -2035,7 +2035,7 @@ dependencies = [
 
 [[package]]
 name = "lava"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -2061,7 +2061,7 @@ dependencies = [
 
 [[package]]
 name = "lava-core"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -2078,7 +2078,7 @@ dependencies = [
 
 [[package]]
 name = "lava-wallpaper"
-version = "0.2.1"
+version = "0.2.2"
 dependencies = [
  "gtk",
  "gtk-layer-shell",

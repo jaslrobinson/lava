@@ -1,6 +1,6 @@
 {
   "productName": "LAVA",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "identifier": "com.lava.app",
   "build": {
     "frontendDist": "../dist",

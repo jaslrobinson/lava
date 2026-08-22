@@ -130,6 +130,20 @@ fn run_gtk_wallpaper(url: &str, project_json: Option<String>) {
 
     let window = gtk::Window::new(gtk::WindowType::Toplevel);
 
+    // Request an alpha-capable (RGBA) visual for the window BEFORE it's
+    // realized. Without this, GTK's own drawing surface has no alpha
+    // channel at all, so nothing — not WebKit's set_background_color(),
+    // not any CSS "transparent" — can actually punch a hole through to
+    // whatever's on the layer-shell layer below (e.g. a wallpaper daemon
+    // at the Background layer). Confirmed via an isolated GTK+WebKit test:
+    // without this, a fully-transparent-per-CSS page still renders opaque.
+    if let Some(screen) = WidgetExt::screen(&window) {
+        if let Some(visual) = screen.rgba_visual() {
+            window.set_visual(Some(&visual));
+        }
+    }
+    window.set_app_paintable(true);
+
     // Init layer shell BEFORE the window is realized
     window.init_layer_shell();
     window.set_layer(gtk_layer_shell::Layer::Bottom);

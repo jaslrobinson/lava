@@ -11,6 +11,18 @@
   // Check if this is the wallpaper helper webview (loaded with ?wallpaper=true)
   const isWallpaperView = new URLSearchParams(window.location.search).has("wallpaper");
 
+  // html/body/#app default to an opaque background (see app.css) so the editor
+  // UI always has a backdrop. In the wallpaper webview that opaque color sits
+  // behind the canvas and shows through wherever the project background is
+  // "none" — tag both <html> and <body> so app.css can punch a transparent
+  // hole through it. <html> matters too: it paints its own background
+  // independently of body/#app, and stays opaque even when everything
+  // inside it (body, #app, canvas) is correctly transparent.
+  if (isWallpaperView) {
+    document.documentElement.classList.add("wallpaper-view");
+    document.body.classList.add("wallpaper-view");
+  }
+
   if (isWallpaperView) {
     onMount(() => {
       let checkTimer: ReturnType<typeof setTimeout> | null = null;

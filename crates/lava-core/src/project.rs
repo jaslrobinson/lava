@@ -339,6 +339,7 @@ pub struct Resolution {
 pub enum BackgroundType {
     Color,
     Image,
+    None,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

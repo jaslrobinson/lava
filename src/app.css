@@ -36,6 +36,18 @@ html, body, #app {
   font-size: 13px;
 }
 
+/* Wallpaper webview: punch a transparent hole through the opaque editor
+   backdrop above, so a project background of "none" actually shows the
+   real desktop wallpaper through the WebKit view instead of this color.
+   html must be included — it has its own opaque background from the rule
+   above, sitting behind body/#app, and stays visible even when everything
+   inside it is transparent unless it's covered too. */
+html.wallpaper-view,
+body.wallpaper-view,
+body.wallpaper-view #app {
+  background: transparent;
+}
+
 button {
   cursor: pointer;
   border: none;

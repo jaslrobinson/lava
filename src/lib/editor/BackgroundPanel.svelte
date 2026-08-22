@@ -2,7 +2,7 @@
   import { getProject } from "../stores/project.svelte";
   import { convertFileSrc } from "@tauri-apps/api/core";
 
-  function updateBgType(type: "color" | "image") {
+  function updateBgType(type: "color" | "image" | "none") {
     const project = getProject();
     project.background = { ...project.background, type };
     if (type === "color" && !project.background.value.startsWith("#")) {
@@ -84,13 +84,15 @@
             onclick={() => updateBgType("color")}>Color</button>
           <button class="toggle-btn" class:active={getProject().background.type === "image"}
             onclick={() => updateBgType("image")}>Image</button>
+          <button class="toggle-btn" class:active={getProject().background.type === "none"}
+            onclick={() => updateBgType("none")}>None</button>
         </div>
 
         {#if getProject().background.type === "color"}
           <label>Color</label>
           <input type="color" value={getProject().background.value}
             oninput={(e) => updateBgValue((e.target as HTMLInputElement).value)} />
-        {:else}
+        {:else if getProject().background.type === "image"}
           <label>Image</label>
           <div class="input-row">
             <input type="text" value={getProject().background.value} placeholder="Path or URL"
@@ -102,6 +104,11 @@
               <img src={getPreviewSrc(getProject().background.value)} alt="background" />
             </div>
           {/if}
+        {:else}
+          <p class="bg-hint">
+            No background is drawn — in wallpaper mode your real desktop
+            wallpaper shows through behind your layers.
+          </p>
         {/if}
       </div>
     </section>
@@ -259,5 +266,11 @@
     max-width: 100%;
     max-height: 100%;
     object-fit: contain;
+  }
+  .bg-hint {
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--text-muted);
+    margin-top: 4px;
   }
 </style>
