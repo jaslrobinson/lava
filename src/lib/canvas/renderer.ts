@@ -660,13 +660,17 @@ function renderText(ctx: CanvasRenderingContext2D, layer: Layer, x: number, y: n
         ctx.lineJoin = "round";
         ctx.strokeText(displayLines[i], lineX, lineY);
       } else {
-        // Filled + outline: offset renders for crisp border, then fill on top
-        const savedFill: string | CanvasGradient | CanvasPattern = ctx.fillStyle;
+        // Filled + outline: offset renders for crisp border, then fill on top.
+        // Restore fillStyle from the already-known `color` value rather than
+        // reading ctx.fillStyle back — under a non-default globalCompositeOperation
+        // (e.g. blendMode "screen"), the read-back doesn't reliably reflect the
+        // color just assigned, which silently stuck the fill on the outline
+        // color until the app was restarted.
         ctx.fillStyle = strokeColor;
         for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
           ctx.fillText(displayLines[i], lineX + Math.cos(a) * sw, lineY + Math.sin(a) * sw);
         }
-        ctx.fillStyle = savedFill;
+        ctx.fillStyle = color;
       }
       ctx.shadowColor = savedShadowColor;
     }
