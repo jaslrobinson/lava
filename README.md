@@ -54,7 +54,7 @@ rust  cargo  nodejs  pnpm  pkg-config
 ### Install from source
 
 ```bash
-git clone https://github.com/andason/lava.git
+git clone https://github.com/jaslrobinson/lava.git
 cd lava
 ./install.sh
 ```
@@ -564,7 +564,7 @@ Cache and generated files at `~/.cache/lava/`:
 
 ```bash
 # Clone
-git clone https://github.com/andason/lava.git
+git clone https://github.com/jaslrobinson/lava.git
 cd lava
 
 # Install dependencies
