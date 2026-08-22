@@ -476,7 +476,18 @@ pub fn list_project_fonts(asset_dir: String) -> Result<Vec<String>, String> {
     Ok(fonts)
 }
 
-/// Discover system fonts via fc-list
+/// Collapse width/weight variant suffixes (e.g. "3270 Nerd Font Mono Cond")
+/// down to their base family name (e.g. "3270 Nerd Font") so callers can
+/// dedupe on it. Non-Nerd-Font families are returned unchanged.
+fn base_family_key(family: &str) -> String {
+    match family.find("Nerd Font") {
+        Some(idx) => format!("{}Nerd Font", &family[..idx]),
+        None => family.to_string(),
+    }
+}
+
+/// Discover system fonts via fc-list, collapsed to one entry per base family
+/// (Nerd Font Mono/Propo/Cond/SemCond variants are folded into their base).
 #[tauri::command]
 pub fn list_system_fonts() -> Result<Vec<SystemFont>, String> {
     let output = std::process::Command::new("fc-list")
@@ -485,8 +496,7 @@ pub fn list_system_fonts() -> Result<Vec<SystemFont>, String> {
         .map_err(|e| format!("Failed to run fc-list: {}", e))?;
 
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let mut seen = std::collections::HashSet::new();
-    let mut fonts = Vec::new();
+    let mut raw = Vec::new();
 
     for line in stdout.lines() {
         let parts: Vec<&str> = line.splitn(3, '|').collect();
@@ -495,7 +505,7 @@ pub fn list_system_fonts() -> Result<Vec<SystemFont>, String> {
         }
         // fc-list family can contain comma-separated aliases; take the first
         let family = parts[0].split(',').next().unwrap_or(parts[0]).trim();
-        if family.is_empty() || !seen.insert(family.to_string()) {
+        if family.is_empty() {
             continue;
         }
         let file = parts[1].trim().to_string();
@@ -504,13 +514,23 @@ pub fn list_system_fonts() -> Result<Vec<SystemFont>, String> {
         } else {
             "Regular".to_string()
         };
-        fonts.push(SystemFont {
+        raw.push(SystemFont {
             name: family.to_string(),
             family: family.to_string(),
             file,
             style,
         });
     }
+
+    // Prefer the shortest family string per base key — that's always the
+    // unsuffixed variant (e.g. "3270 Nerd Font" over "3270 Nerd Font Mono").
+    raw.sort_by_key(|f| f.family.len());
+
+    let mut seen = std::collections::HashSet::new();
+    let mut fonts: Vec<SystemFont> = raw
+        .into_iter()
+        .filter(|f| seen.insert(base_family_key(&f.family)))
+        .collect();
 
     fonts.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
     Ok(fonts)
